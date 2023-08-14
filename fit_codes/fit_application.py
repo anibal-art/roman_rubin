@@ -44,6 +44,3 @@ def fit_light_curve(file_name,algo):
         return 0,0,0
 
 
-i=int(7)
-fit_light_curve(path_model+f'Event_{i}.txt', 'TRF')
-
