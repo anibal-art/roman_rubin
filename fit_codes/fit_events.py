@@ -91,7 +91,7 @@ def fit_rubin_roman(n,event_params,algo, wfirst_lc, lsst_u,lsst_g,lsst_r,lsst_i,
 
         e.telescopes.append(tel5)
         tel_list.append('Rubin_i')
-    if len(lsst_z)!=0:    
+    if len(lsst_z)!=0:  
 
         # Add a PyLIMA telescope object to the event with the LCO lightcurve
         tel6 = telescopes.Telescope(name='Rubin_z', camera_filter='z',
@@ -129,14 +129,18 @@ def fit_rubin_roman(n,event_params,algo, wfirst_lc, lsst_u,lsst_g,lsst_r,lsst_i,
 
         if algo == 'TRF':
             fit_2 = TRF_fit.TRFfit(psbl)
-            fit_2.model_parameters_guess = lensing_parameters 
+            
+            fit_2.model_parameters_guess = [float(event_params['t0'])+2, float(event_params['u0'])+float(event_params['u0'])*0.05, float(event_params['te'])+4,
+                              10**float(event_params['s'])+0.05*10**float(event_params['s']),10**float(event_params['q'])+0.05*10**float(event_params['q']),0.05*float(event_params['alpha'])+float(event_params['alpha']), float(event_params['piEN'])+0.01*float(event_params['piEN']),float(event_params['piEE'])+0.01*float(event_params['piEE'])]
+
+            #fit_2.model_parameters_guess = lensing_parameters 
             rango = 0.1
 
-            fit_2.fit_parameters['t0'][1] = [float(event_params['t0'])-abs(float(event_params['t0']))*rango,float(event_params['t0'])+abs(float(event_params['t0']))*rango] # t0 limits
+            fit_2.fit_parameters['t0'][1] = [float(event_params['t0'])-10,float(event_params['t0'])+10] # t0 limits
             fit_2.fit_parameters['u0'][1] = [float(event_params['u0'])-abs(float(event_params['u0']))*rango,float(event_params['u0'])+abs(float(event_params['u0']))*rango] # u0 limits
             fit_2.fit_parameters['tE'][1] = [float(event_params['te'])-abs(float(event_params['te']))*rango,float(event_params['te'])+abs(float(event_params['te']))*rango] # logtE limits in days
-            fit_2.fit_parameters['separation'][1] = [float(event_params['s'])-abs(float(event_params['s']))*rango,float(event_params['s'])+abs(float(event_params['s']))*rango] # logs limits
-            fit_2.fit_parameters['mass_ratio'][1] = [float(event_params['q'])-abs(float(event_params['q']))*rango,float(event_params['q'])+abs(float(event_params['q']))*rango] # logq limits
+            fit_2.fit_parameters['separation'][1] = [10**(float(event_params['s']))-10**(abs(float(event_params['s'])))*rango,10**(float(event_params['s']))+10**(abs(float(event_params['s'])))*rango] # logs limits
+            fit_2.fit_parameters['mass_ratio'][1] = [10**(float(event_params['q']))-10**(abs(float(event_params['q'])))*rango,10**(float(event_params['q']))+10**(abs(float(event_params['q'])))*rango] # logq limits
             fit_2.fit_parameters['alpha'][1] = [float(event_params['alpha'])-abs(float(event_params['alpha']))*rango,float(event_params['alpha'])+abs(float(event_params['alpha']))*rango] # alpha limits (in radians)
             fit_2.fit_parameters['piEE'][1] = [float(event_params['piEE'])-abs(float(event_params['piEE']))*rango,float(event_params['piEE'])+abs(float(event_params['piEE']))*rango]
             fit_2.fit_parameters['piEN'][1]= [float(event_params['piEN'])-abs(float(event_params['piEN']))*rango,float(event_params['piEN'])+abs(float(event_params['piEN']))*rango]
@@ -266,14 +270,15 @@ def fit_roman(n,event_params,algo, wfirst_lc):
 
     if algo == 'TRF':
         fit_2 = TRF_fit.TRFfit(psbl)
-        fit_2.model_parameters_guess = lensing_parameters 
+        fit_2.model_parameters_guess = [float(event_params['t0'])+2, float(event_params['u0'])+float(event_params['u0'])*0.05, float(event_params['te'])+4,
+                              10**float(event_params['s'])+0.05*10**float(event_params['s']),10**float(event_params['q'])+0.05*10**float(event_params['q']),0.05*float(event_params['alpha'])+float(event_params['alpha']), float(event_params['piEN'])+0.01*float(event_params['piEN']),float(event_params['piEE'])+0.01*float(event_params['piEE'])] 
         rango = 0.1
 
-        fit_2.fit_parameters['t0'][1] = [float(event_params['t0'])-abs(float(event_params['t0']))*rango,float(event_params['t0'])+abs(float(event_params['t0']))*rango] # t0 limits
+        fit_2.fit_parameters['t0'][1] = [float(event_params['t0'])-10,float(event_params['t0'])+10] # t0 limits
         fit_2.fit_parameters['u0'][1] = [float(event_params['u0'])-abs(float(event_params['u0']))*rango,float(event_params['u0'])+abs(float(event_params['u0']))*rango] # u0 limits
         fit_2.fit_parameters['tE'][1] = [float(event_params['te'])-abs(float(event_params['te']))*rango,float(event_params['te'])+abs(float(event_params['te']))*rango] # logtE limits in days
-        fit_2.fit_parameters['separation'][1] = [float(event_params['s'])-abs(float(event_params['s']))*rango,float(event_params['s'])+abs(float(event_params['s']))*rango] # logs limits
-        fit_2.fit_parameters['mass_ratio'][1] = [float(event_params['q'])-abs(float(event_params['q']))*rango,float(event_params['q'])+abs(float(event_params['q']))*rango] # logq limits
+        fit_2.fit_parameters['separation'][1] = [10**float(event_params['s'])-(10**abs(float(event_params['s'])))*rango,10**float(event_params['s'])+10**(abs(float(event_params['s'])))*rango] # logs limits
+        fit_2.fit_parameters['mass_ratio'][1] = [10**float(event_params['q'])-(10**abs(float(event_params['q'])))*rango,10**float(event_params['q'])+10**(abs(float(event_params['q'])))*rango] # logq limits
         fit_2.fit_parameters['alpha'][1] = [float(event_params['alpha'])-abs(float(event_params['alpha']))*rango,float(event_params['alpha'])+abs(float(event_params['alpha']))*rango] # alpha limits (in radians)
         fit_2.fit_parameters['piEE'][1] = [float(event_params['piEE'])-abs(float(event_params['piEE']))*rango,float(event_params['piEE'])+abs(float(event_params['piEE']))*rango]
         fit_2.fit_parameters['piEN'][1]= [float(event_params['piEN'])-abs(float(event_params['piEN']))*rango,float(event_params['piEN'])+abs(float(event_params['piEN']))*rango]
