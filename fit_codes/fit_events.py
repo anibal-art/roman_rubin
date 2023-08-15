@@ -107,9 +107,7 @@ def fit_rubin_roman(event_params, path_save, path_ephemerides, algo, wfirst_lc, 
     psbl = PSBL_model.PSBLmodel(e, parallax=['Full', event_params['t0']])
 
     # Give the model initial guess values somewhere near their actual values so that the fit doesn't take all day
-    lensing_parameters = [float(event_params['t0']), float(event_params['u0']), float(event_params['te']),
-                          float(event_params['s']), float(event_params['q']), float(event_params['alpha']),
-                          float(event_params['piEN']), float(event_params['piEE'])]
+    t0,u0,tE,log_s,log_q,alpha,piEN,piEE = float(event_params['t0']),float(event_params['u0']),float(event_params['te']),float(event_params['s']),float(event_params['q']), float(event_params['alpha']),float(event_params['piEN']), float(event_params['piEE'])
 
     if algo == 'TRF':
         fit_2 = TRF_fit.TRFfit(psbl)
@@ -125,18 +123,19 @@ def fit_rubin_roman(event_params, path_save, path_ephemerides, algo, wfirst_lc, 
 
     rango = 0.1
 
-    fit_2.fit_parameters['t0'][1] = [float(event_params['t0']) - 10, float(event_params['t0']) + 10]  # t0 limits
-    fit_2.fit_parameters['u0'][1] = [float(event_params['u0']) - abs(float(event_params['u0'])) * rango, float(event_params['u0']) + abs(float(event_params['u0'])) * rango]  # u0 limits
-    fit_2.fit_parameters['tE'][1] = [float(event_params['te']) - abs(float(event_params['te'])) * rango, float(event_params['te']) + abs(float(event_params['te'])) * rango]  # logtE limits in days
-    fit_2.fit_parameters['separation'][1] = [10 ** (float(event_params['s'])) - 10 ** (abs(float(event_params['s']))) * rango, 10 ** (float(event_params['s'])) + 10 ** (abs(float(event_params['s']))) * rango]  # logs limits
-    fit_2.fit_parameters['mass_ratio'][1] = [10 ** (float(event_params['q'])) - 10 ** (abs(float(event_params['q']))) * rango, 10 ** (float(event_params['q'])) + 10 ** (abs(float(event_params['q']))) * rango]  # logq limits
-    fit_2.fit_parameters['alpha'][1] = [float(event_params['alpha']) - abs(float(event_params['alpha'])) * rango, float(event_params['alpha']) + abs(float(event_params['alpha'])) * rango]  # alpha limits (in radians)
-    fit_2.fit_parameters['piEE'][1] = [float(event_params['piEE']) - abs(float(event_params['piEE'])) * rango, float(event_params['piEE']) + abs(float(event_params['piEE'])) * rango]
-    fit_2.fit_parameters['piEN'][1] = [float(event_params['piEN']) - abs(float(event_params['piEN'])) * rango, float(event_params['piEN']) + abs(float(event_params['piEN'])) * rango]
+    fit_2.fit_parameters['t0'][1] = [t0 - 10, t0 + 10]  # t0 limits
+    fit_2.fit_parameters['u0'][1] = [u0 - u0 * rango, u0 + u0 * rango]  # u0 limits
+    fit_2.fit_parameters['tE'][1] = [tE - tE * rango, tE + tE * rango]  # tE limits in days
+    fit_2.fit_parameters['separation'][1] = [10 ** (log_s) - 10 ** (abs(log_s)) * rango, 10 ** (log_s) + 10 ** (abs(log_s)) * rango]  # s limits
+    fit_2.fit_parameters['mass_ratio'][1] = [10 ** (log_q) - 10 ** (abs(log_q)) * rango, 10 ** (log_q) + 10 ** (abs(log_q)) * rango]  # q limits
+    fit_2.fit_parameters['alpha'][1] = [alpha - abs(alpha) * rango, alpha + abs(alpha) * rango]  # alpha limits (in radians)
+    fit_2.fit_parameters['piEE'][1] = [piEE - abs(piEE) * rango, piEE + abs(piEE) * rango] #parallax vector parameter boundaries
+    fit_2.fit_parameters['piEN'][1] = [piEN - abs(piEN) * rango, piEN+ abs(piEN) * rango] #parallax vector parameter boundaries
 
     pool = mul.Pool(processes=16)
 
     fit_2.fit()
+    
     true_values = np.array(event_params)
     time_fit = fit_2.fit_results['fit_time']
     best_fit = np.array(fit_2.fit_results["best_model"])
