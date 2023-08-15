@@ -14,14 +14,12 @@ import pandas as pd
 
 
 
-#example
-path_ephemerides = '/home/anibal/files_db/james_webb.txt'
-path_save = '/home/anibal/roman_rubin/event_7_analisys/DE/'
+
 #--------
 
 
 
-def fit_rubin_roman(n,event_params,algo, wfirst_lc, lsst_u,lsst_g,lsst_r,lsst_i,lsst_z,lsst_y):
+def fit_rubin_roman(n,event_params,path_save,path_ephemerides,algo, wfirst_lc, lsst_u,lsst_g,lsst_r,lsst_i,lsst_z,lsst_y):
     tlsst = 60350.38482057137+2400000.5
     RA, DEC= 267.92497054815516, -29.152232510353276
     e = event.Event(ra=RA, dec=DEC)
@@ -221,7 +219,7 @@ def fit_rubin_roman(n,event_params,algo, wfirst_lc, lsst_u,lsst_g,lsst_r,lsst_i,
             return fit_2, e, tel_list
 
 
-def fit_roman(n,event_params,algo, wfirst_lc):
+def fit_roman(n,event_params,path_save,path_ephemerides,algo, wfirst_lc):
     tlsst = 60350.38482057137+ 2400000.5
     RA, DEC= 267.92497054815516, -29.152232510353276
     e = event.Event(ra=RA, dec=DEC)
@@ -263,15 +261,13 @@ def fit_roman(n,event_params,algo, wfirst_lc):
 
     psbl = PSBL_model.PSBLmodel(e, parallax=['Full', event_params['t0']])
 
-    # Give the model initial guess values somewhere near their actual values so that the fit doesn't take all day
-    lensing_parameters = [float(event_params['t0']), float(event_params['u0']), float(event_params['te']), 
-                              float(event_params['s']),float(event_params['q']),float(event_params['alpha']), float(event_params['piEN']), float(event_params['piEE'])]
-
 
     if algo == 'TRF':
         fit_2 = TRF_fit.TRFfit(psbl)
+        
         fit_2.model_parameters_guess = [float(event_params['t0'])+2, float(event_params['u0'])+float(event_params['u0'])*0.05, float(event_params['te'])+4,
                               10**float(event_params['s'])+0.05*10**float(event_params['s']),10**float(event_params['q'])+0.05*10**float(event_params['q']),0.05*float(event_params['alpha'])+float(event_params['alpha']), float(event_params['piEN'])+0.01*float(event_params['piEN']),float(event_params['piEE'])+0.01*float(event_params['piEE'])] 
+                              
         rango = 0.1
 
         fit_2.fit_parameters['t0'][1] = [float(event_params['t0'])-10,float(event_params['t0'])+10] # t0 limits
