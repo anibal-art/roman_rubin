@@ -12,16 +12,18 @@ from pyLIMA import telescopes
 from pyLIMA.outputs import file_outputs
 import pandas as pd
 
-
-
-
-#--------
-
-def fit_rubin_roman(n, event_params, path_save, path_ephemerides, algo, wfirst_lc, lsst_u, lsst_g, lsst_r, lsst_i, lsst_z, lsst_y):
+def fit_rubin_roman(event_params, path_save, path_ephemerides, algo, wfirst_lc, lsst_u, lsst_g, lsst_r, lsst_i, lsst_z, lsst_y):
+    '''
+    Perform fit for Rubin and Roman data
+    '''
     tlsst = 60350.38482057137 + 2400000.5
     RA, DEC = 267.92497054815516, -29.152232510353276
     e = event.Event(ra=RA, dec=DEC)
-    e.name = 'Event_RR_' + str(int(n))
+    
+    if len(lsst_u)+len(lsst_g)+len(lsst_r)+len(lsst_i)+len(lsst_z)+len(lsst_y)==0:
+        e.name = 'Event_Roman_' + str(int(event_params['Source']))
+    else:
+        e.name = 'Event_RR_' + str(int(event_params['Source']))
     tel_list = []
 
     # Add a PyLIMA telescope object to the event with the Gaia lightcurve
