@@ -104,30 +104,31 @@ def fit_rubin_roman(event_params, path_save, path_ephemerides, algo, wfirst_lc, 
         tel_list.append('Rubin_y')
     
     e.check_event()
-    psbl = PSBL_model.PSBLmodel(e, parallax=['Full', event_params['t0']])
 
     # Give the model initial guess values somewhere near their actual values so that the fit doesn't take all day
     t0,u0,tE,log_s,log_q,alpha,piEN,piEE = float(event_params['t0']),float(event_params['u0']),float(event_params['te']),float(event_params['s']),float(event_params['q']), float(event_params['alpha']),float(event_params['piEN']), float(event_params['piEE'])
 
+    psbl = PSBL_model.PSBLmodel(e, parallax=['Full', t0])
+
     if algo == 'TRF':
         fit_2 = TRF_fit.TRFfit(psbl)
     elif algo == 'MCMC':
-        fit_2 = MCMC_fit.MCMCfit(psbl)
+        fit_2 = MCMC_fit.MCMCfit(psbl,MCMC_links=7000)
     elif algo == 'DE':
         fit_2 = DE_fit.DEfit(psbl, telescopes_fluxes_method='polyfit', DE_population_size=20, max_iteration=10000, display_progress=True)
 
-    fit_2.model_parameters_guess = [float(event_params['t0']) + 2, float(event_params['u0']) + float(event_params['u0']) * 0.05,
-                                    float(event_params['te']) + 4, 10 ** float(event_params['s']) + 0.05 * 10 ** float(event_params['s']),
-                                    10 ** float(event_params['q']) + 0.05 * 10 ** float(event_params['q']), 0.05 * float(event_params['alpha']) + float(event_params['alpha']),
-                                    float(event_params['piEN']) + 0.01 * float(event_params['piEN']), float(event_params['piEE']) + 0.01 * float(event_params['piEE'])]
+    fit_2.model_parameters_guess = [t0 + 2, u0 + u0 * 0.05,
+                                    tE + 4, 10 ** log_s + 0.05 * (10 ** log_s),
+                                    10 ** log_q + 0.05 * (10 ** log_q), 0.05 * alpha + alpha,
+                                    piEN + 0.01 * piEN, piEE + 0.01 * piEE]
 
     rango = 0.1
 
     fit_2.fit_parameters['t0'][1] = [t0 - 10, t0 + 10]  # t0 limits
-    fit_2.fit_parameters['u0'][1] = [u0 - u0 * rango, u0 + u0 * rango]  # u0 limits
+    fit_2.fit_parameters['u0'][1] = [u0 - abs(u0) * rango, u0 + abs(u0) * rango]  # u0 limits
     fit_2.fit_parameters['tE'][1] = [tE - tE * rango, tE + tE * rango]  # tE limits in days
-    fit_2.fit_parameters['separation'][1] = [10 ** (log_s) - 10 ** (abs(log_s)) * rango, 10 ** (log_s) + 10 ** (abs(log_s)) * rango]  # s limits
-    fit_2.fit_parameters['mass_ratio'][1] = [10 ** (log_q) - 10 ** (abs(log_q)) * rango, 10 ** (log_q) + 10 ** (abs(log_q)) * rango]  # q limits
+    fit_2.fit_parameters['separation'][1] = [10 ** log_s - abs(10 ** log_s) * rango, 10 ** log_s + abs(10 ** log_s) * rango]  # s limits
+    fit_2.fit_parameters['mass_ratio'][1] = [10 ** log_q - abs(10 ** log_q) * rango, 10 ** log_q + abs(10 ** log_q) * rango]  # q limits
     fit_2.fit_parameters['alpha'][1] = [alpha - abs(alpha) * rango, alpha + abs(alpha) * rango]  # alpha limits (in radians)
     fit_2.fit_parameters['piEE'][1] = [piEE - abs(piEE) * rango, piEE + abs(piEE) * rango] #parallax vector parameter boundaries
     fit_2.fit_parameters['piEN'][1] = [piEN - abs(piEN) * rango, piEN+ abs(piEN) * rango] #parallax vector parameter boundaries
