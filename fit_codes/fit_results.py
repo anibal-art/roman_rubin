@@ -23,6 +23,15 @@ def chi_dof(path_model, path_file):
         dof = npoints-len(best_model)
         return chi2/dof
 
+def chi_dofRR(path_model, path_file):
+    data = np.load(path_file,allow_pickle=True)
+    curvas, params = filtros(path_model)
+    npoints = len(curvas['w'])+len(curvas['u'])+len(curvas['g'])+len(curvas['r'])+len(curvas['i'])+len(curvas['z'])+len(curvas['y'])
+    chi2 = data.item()['chi2']
+    best_model = data.item()['best_model']
+    dof = npoints-len(best_model)
+    return chi2/dof
+
 def errors(name_file):
     data = np.load(name_file,allow_pickle=True)
     covariance_matrix = data.item()['covariance_matrix']
