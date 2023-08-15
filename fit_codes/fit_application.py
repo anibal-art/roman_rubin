@@ -16,9 +16,8 @@ import pygtc
 from filter_curves import filtros
 from fit_events import fit_rubin_roman, fit_roman
 
-#--------example
-path_ephemerides = '/home/anibal/files_db/james_webb.txt' #PATH TO EPHEMERIDES
-path_save = '/home/anibal/roman_rubin/event_7_analisys/DE/' #PATH TO WHERE THE OUTPUT WILL BE SAVED
+path_ephemerides = '/home/anibal/files_db/james_webb.txt'
+path_save = '/home/anibal/roman_rubin/event_7_analisys/DE/'
 path_model = '/home/anibal/files_db/full_curves/' #PATH OF THE LIGHT CURVE THAT I WANT TO FIT
 #--------
 
@@ -36,11 +35,14 @@ def fit_light_curve(file_name,algo):
         te = PARAMS['te']
         model_type = 'PSBL'
 
-        fit_2, e, tel_list = fit_rubin_roman(PARAMS['Source'],PARAMS,algo, array_w149, array_u, array_g, array_r, array_i, array_z, array_y)
-        fit_2, e, tel_list = fit_roman(PARAMS['Source'],PARAMS,algo, array_w149)
+        fit_2, e, tel_list = fit_rubin_roman(PARAMS['Source'],PARAMS,path_save,path_ephemerides,algo, array_w149, array_u, array_g, array_r, array_i, array_z, array_y)
+        fit_2, e, tel_list = fit_roman(PARAMS['Source'],PARAMS,path_save,path_ephemerides,algo, array_w149)
         return fit_2, e, tel_list
     else:
         print('This event is not selected and can´t be fitted.')
         return 0,0,0
 
+i=int(7)
+path_model = '/home/anibal/files_db/full_curves/'
 
+fit_light_curve(path_model+f'Event_{i}.txt', 'TRF')
