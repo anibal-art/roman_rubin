@@ -47,13 +47,14 @@ def filtros(file_name):
     '''
     evento = pd.read_csv(file_name , sep = ',' , decimal = '.', skiprows = 19)
     params = pd.read_csv(file_name , sep = ':' , decimal = '.', skiprows = 0)
-    
+    ix = int(params.index[params['TRILEGAL simulation']=='band,mjd,mag,magerr,m5'][0])
+
     filtercolor = {'w':'b','u':'c', 'g':'g', 'r':'y', 'i':'r', 'z':'m', 'y':'k'}
     mag_sat = {'w':14.8, 'u':14.7, 'g': 15.7, 'r': 15.8, 'i': 15.8, 'z': 15.3, 'y': 13.9}
     
     dict_params = {}
-    for i in range(len(params[0:17].values[:,1])):
-        dict_params[params[0:17].values[:,0][i]] = params[0:17].values[:,1][i]
+    for i in range(len(params[0:ix].values[:,1])):
+        dict_params[params[0:ix].values[:,0][i]] = params[0:ix].values[:,1][i]
 
     t0 = dict_params['t0']
     dict_params['te'] = dict_params.pop('tE')
