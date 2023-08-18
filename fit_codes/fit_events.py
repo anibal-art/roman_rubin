@@ -112,7 +112,7 @@ def fit_rubin_roman(event_params, path_save, path_ephemerides, algo, wfirst_lc, 
     s = float(event_params['s'])
     q = float(event_params['q'])
     alpha = float(event_params['alpha'])
-    piEN = float(event_params['piEN']),
+    piEN = float(event_params['piEN'])
     piEE = float(event_params['piEE'])
 
     psbl = PSBL_model.PSBLmodel(e, parallax=['Full', t0])
