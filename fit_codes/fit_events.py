@@ -106,7 +106,14 @@ def fit_rubin_roman(event_params, path_save, path_ephemerides, algo, wfirst_lc, 
     e.check_event()
 
     # Give the model initial guess values somewhere near their actual values so that the fit doesn't take all day
-    t0,u0,tE,s,q,alpha,piEN,piEE = float(event_params['t0']),float(event_params['u0']),float(event_params['te']),float(event_params['s']),float(event_params['q']), float(event_params['alpha']),float(event_params['piEN']), float(event_params['piEE'])
+    t0 = float(event_params['t0'])
+    u0 = float(event_params['u0'])
+    tE = float(event_params['te'])
+    s = float(event_params['s'])
+    q = float(event_params['q'])
+    alpha = float(event_params['alpha'])
+    piEN = float(event_params['piEN']),
+    piEE = float(event_params['piEE'])
 
     psbl = PSBL_model.PSBLmodel(e, parallax=['Full', t0])
 
