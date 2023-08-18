@@ -16,17 +16,12 @@ import pygtc
 from filter_curves import filtros
 from fit_events import fit_rubin_roman
 
-path_ephemerides = '/home/anibal/files_db/james_webb.txt'
-path_save = '/home/anibal/roman_rubin/event_7_analisys/DE/'
-path_model = '/home/anibal/files_db/full_curves/' #PATH OF THE LIGHT CURVE THAT I WANT TO FIT
-
-def fit_light_curve(file_name,algo):
+def fit_light_curve(file_name,algo, path_ephemerides,path_save,path_model):
     '''
     This function take the name of the file that contains the light curves
     if pass all the selection criteria then fit the event and save the true parameters
     with the fited ones and his errors
     '''
-    filtercolor = {'w':'b','u':'c', 'g':'g', 'r':'y', 'i':'r', 'z':'m', 'y':'k'}
     light_curve,PARAMS = filtros(file_name)
     if not light_curve == 0:
         array_w149, array_u, array_g, array_r, array_i, array_z, array_y = light_curve['w'],light_curve['u'],light_curve['g'],light_curve['r'],light_curve['i'],light_curve['z'],light_curve['y']
@@ -37,8 +32,3 @@ def fit_light_curve(file_name,algo):
     else:
         print('This event is not selected and can´t be fitted.')
         return 0,0,0
-
-i=int(7)
-path_model = '/home/anibal/files_db/full_curves/'
-
-fit_light_curve(path_model+f'Event_{i}.txt', 'TRF')
