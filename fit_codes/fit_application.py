@@ -16,7 +16,11 @@ import pygtc
 from filter_curves import filtros
 from fit_events import fit_rubin_roman
 
-def fit_light_curve(file_name,algo, path_ephemerides,path_save,path_model):
+path_ephemerides = '/home/anibal/files_db/james_webb.txt'
+path_save = '/home/anibal/roman_rubin/set_august/'
+path_model = '/home/anibal/files_db/august_2023/' #PATH OF THE DIRECTORY OF THE LIGHT CURVE THAT I WANT TO FIT
+
+def fit_light_curve(file_name,algo):#, path_ephemerides,path_save,path_model):
     '''
     This function take the name of the file that contains the light curves
     if pass all the selection criteria then fit the event and save the true parameters
