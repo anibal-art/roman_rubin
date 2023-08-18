@@ -110,7 +110,7 @@ def plot_fit_rr(i,path_model, path_file):
     list_of_fake_telescopes = []
     print(your_event.name)
     pyLIMA_plots.plot_lightcurves(psbl,  fit_params)
-    plot_LCmodel(psbl,  model_params)
+    #plot_LCmodel(psbl,  model_params)
 #     plt.savefig('/home/anibal/Desktop/results_fitted/'+'fit_rr_'+str(int(params['Source']))+'.png')
     pyLIMA_plots.plot_geometry(psbl,  fit_params)
 #     plt.savefig('/home/anibal/Desktop/results_fitted/'+'caustic_rr_'+str(int(params['Source']))+'.png')
