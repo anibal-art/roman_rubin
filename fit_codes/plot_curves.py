@@ -16,7 +16,7 @@ from filter_curves import filtros
 path_ephemerides = '/home/anibal/files_db/james_webb.txt' #PATH TO EPHEMERIDES
 from plot_models import plot_LCmodel
 
-def plot_fit_rr(i,path_model, path_file):
+def plot_fit_rr(path_model, path_file):
     fit_params = best_model(path_file)
     curvas, params = filtros(path_model)
     
@@ -115,7 +115,7 @@ def plot_fit_rr(i,path_model, path_file):
     pyLIMA_plots.plot_geometry(psbl,  fit_params)
 #     plt.savefig('/home/anibal/Desktop/results_fitted/'+'caustic_rr_'+str(int(params['Source']))+'.png')
 
-def plot_fit_roman(i,path_model, path_file):
+def plot_fit_roman(path_model, path_file):
     fit_params = best_model(path_file)
     curvas, params = filtros(path_model)
          
