@@ -69,11 +69,11 @@ def filtros(file_name):
     evento = filtered_evento
     
     #----if the band have less than 4 pints is not considered----------------    
-    value_counts = evento['band'].value_counts()   #cuenta el número de filas(datos) en cada banda
+    #value_counts = evento['band'].value_counts()   #cuenta el número de filas(datos) en cada banda
     # Get the bands with less than 4 values
-    classes_to_drop = value_counts[value_counts < 6].index.tolist()
+    #classes_to_drop = value_counts[value_counts < 6].index.tolist()
     # Drop the classes with less than 4 values from the DataFrame
-    evento = evento[~evento['band'].isin(classes_to_drop)]
+    #evento = evento[~evento['band'].isin(classes_to_drop)]
     evento = evento.groupby('band').filter(lambda group: len(group) >= 10) #chequea que existan al menos 10 puntos por banda
 
     #----------------Extraction of the main part of the event for the binning -----------------------------------
@@ -162,5 +162,38 @@ def no_filtros(file_name,tit, N,binning):
                 
     return crit_1, dict_params
     
-    
-    
+
+def read_curves(file_name):
+    '''
+	List of selected criteria for filtering events where the peak is detected:
+
+	- Only consider points that are within 1 sigma distance from the limiting magnitude.
+	- Only consider events that have observations in both the Roman and Rubin bands.
+	- Require a minimum of 10 data points in any given filter.
+	- Consider points that fall outside the time range of t0 ± 5tE; compute their mean value to establish the magnitude baseline.
+	- Calculate the chi-squared value for the entire light curve, assuming a constant baseline magnitude model as previously computed.
+	- If the chi-squared value is > 2 for any filter, consider it as an event.
+    '''
+    df = pd.read_csv(file_name , sep = ',' , decimal = '.', skiprows = 19)
+    params = pd.read_csv(file_name , sep = ':' , decimal = '.', skiprows = 0)
+    ix = int(params.index[params['TRILEGAL simulation']=='band,mjd,mag,magerr,m5'][0])
+
+    dict_params = {}
+    for i in range(len(params[0:ix].values[:,1])):
+        dict_params[params[0:ix].values[:,0][i]] = params[0:ix].values[:,1][i]
+
+    t0 = dict_params['t0']
+    dict_params['te'] = dict_params.pop('tE')
+    te = dict_params['te']
+    crit_1 = {}
+    for fil in ('w','u','g','r','i','z','y'):
+        if fil in df['band'].values:
+            mjd = df[df['band']==fil][['mjd','mag','magerr']].values[:,0]
+            mag = df[df['band']==fil][['mjd','mag','magerr']].values[:,1]
+            magerr = df[df['band']==fil][['mjd','mag','magerr']].values[:,2]
+            crit_1[fil] = np.c_[mjd,mag,magerr]
+        else:
+            crit_1[fil]=[]
+    return crit_1, dict_params
+
+
