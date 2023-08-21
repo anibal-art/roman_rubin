@@ -42,3 +42,7 @@ def best_model(name_file):
     data = np.load(name_file,allow_pickle=True)
     return data.item()['best_model'][0:8]
 
+def best_full_model(name_file):
+    data = np.load(name_file,allow_pickle=True)
+    return data.item()['best_model']
+
