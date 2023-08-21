@@ -11,47 +11,35 @@ from pyLIMA.models import PSBL_model
 import pandas as pd
 import os
 import re
-from fit_functions import filtros
+from filter_curves import read_curves
+from fit_results import best_model,errors,cov_matrix
 from tqdm.auto import tqdm
 import warnings 
-#path = '/home/anibal/Roman_Rubin/ajustes/trf/'
-path = '/home/anibal/Roman_Rubin/ajustes/trf_chisq/trf/'
-files_fits = os.listdir(path)
-path_model = '/home/anibal/Desktop/roman-rubin/home/anibal-art/ROMAN-RUBIN/simulation/lightcurves/binarios_pylimav2/'
 
-
-def m1(name_file,path):
-    #path = '/home/anibal/Roman_Rubin/ajustes/trf/'
-    data = np.load(path+name_file,allow_pickle=True)
-    #path_model = '/home/anibal/Roman_Rubin/curvas/'
-    curvas, params = filtros(path_model+'Event_'+str(int(re.findall(r'\d+', name_file)[0]))+'.txt','100',100,False)
+def m1(path_file,path_model):
+    data = np.load(path_file,allow_pickle=True)
+    curvas, params = read_curves(path_model)
     true = np.array([params['t0'],params['u0'],params['te'],np.log10(params['s']),np.log10(params['q']),params['alpha'],params['piEN'],params['piEE']])
-    fit = best_model(name_file)
+    fit = best_model(path_file)
     return (abs(fit)-abs(true))/true
 
-def m2(name_file,path):
-    #path = '/home/anibal/Roman_Rubin/ajustes/trf/'
-    data = np.load(path+name_file,allow_pickle=True)
-    #path_model = '/home/anibal/Roman_Rubin/curvas/'
-    curvas, params = filtros(path_model+'Event_'+str(int(re.findall(r'\d+', name_file)[0]))+'.txt','100',100,False)
+def m2(path_file,path_model):
+    data = np.load(path_file,allow_pickle=True)
+    curvas, params = read_curves(path_model)
     true = [params['t0'],params['u0'],params['te'],np.log10(params['s']),np.log10(params['q']),params['alpha'],params['piEN'],params['piEE']]
-    fit = best_model(name_file)
-    err = errors(name_file)[0:8]
-    # Check if there is a zero in the entire array
+    fit = best_model(path_file)
+    err = errors(path_file)[0:8]
     if np.any(err == 0, axis=None):
         return np.zeros(len(true))
     else:
         return (abs(fit)-abs(np.array(true)))/err
 
-def m3(name_file,path):
-    #path = '/home/anibal/Roman_Rubin/ajustes/trf/'
-    data = np.load(path+name_file,allow_pickle=True)
-    #path_model = '/home/anibal/Roman_Rubin/curvas/'
-    curvas, params = filtros(path_model+'Event_'+str(int(re.findall(r'\d+', name_file)[0]))+'.txt','100',100,False)
-    true = [params['t0'],params['u0'],params['te'],np.log10(params['s']),np.log10(params['q']),params['alpha'],params['piEN'],params['piEE']]
-    fit = best_model(name_file)
-    err = errors(name_file)[0:8]
-    # Check if there is a zero in the entire array
+def m3(path_file,path_model):
+    data = np.load(path_file,allow_pickle=True)
+    curvas, params = read_curves(path_model)
+    true = [params['t0'],params['u0'],params['te'],np.log10(params['s']),(params['q']),params['alpha'],params['piEN'],params['piEE']]
+    fit = best_model(path_file)
+    err = errors(path_file)[0:8]
     if np.any(err == 0, axis=None):
         return np.zeros(len(true))
     else:
