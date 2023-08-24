@@ -12,13 +12,15 @@ from pyLIMA.outputs import pyLIMA_plots
 from pyLIMA.outputs import file_outputs
 import pandas as pd
 from fit_results import chi_dof, best_model, errors
-from filter_curves import filtros
+#from filter_curves import filtros
 path_ephemerides = '/home/anibal/files_db/james_webb.txt' #PATH TO EPHEMERIDES
 from plot_models import plot_LCmodel
+from filter_curves import read_curves
+save_figures = '/home/anibal/figures_presentation/'
 
 def plot_fit_rr(path_model, path_file):
     fit_params = best_model(path_file)
-    curvas, params = filtros(path_model)
+    curvas, params = read_curves(path_model)
     
     RA, DEC= 267.92497054815516, -29.152232510353276
     your_event = event.Event(ra=RA, dec=DEC)
@@ -101,7 +103,7 @@ def plot_fit_rr(path_model, path_file):
         telescope_7.location = 'Earth'
         your_event.telescopes.append(telescope_7)
 
-    model_params = [params['t0'],params['u0'],params['te'],np.log10(params['s']),np.log10(params['q']),params['alpha'],params['piEN'],params['piEE']]
+    model_params = [params['t0'],params['u0'],params['te'],params['s'],params['q'],params['alpha'],params['piEN'],params['piEE']]
 
     your_event.check_event()
 
@@ -109,15 +111,15 @@ def plot_fit_rr(path_model, path_file):
 
     list_of_fake_telescopes = []
     print(your_event.name)
-    pyLIMA_plots.plot_lightcurves(psbl,  fit_params)
+    pyLIMA_plots.plot_lightcurves(psbl,  fit_params,model_params)
     #plot_LCmodel(psbl,  model_params)
-#     plt.savefig('/home/anibal/Desktop/results_fitted/'+'fit_rr_'+str(int(params['Source']))+'.png')
-    pyLIMA_plots.plot_geometry(psbl,  fit_params)
-#     plt.savefig('/home/anibal/Desktop/results_fitted/'+'caustic_rr_'+str(int(params['Source']))+'.png')
+    plt.savefig(save_figures+'fit_rr_'+str(int(params['Source']))+'.png')
+    #pyLIMA_plots.plot_geometry(psbl,  fit_params)
+    #plt.savefig(save_figures+'caustic_rr_'+str(int(params['Source']))+'.png')
 
 def plot_fit_roman(path_model, path_file):
     fit_params = best_model(path_file)
-    curvas, params = filtros(path_model)
+    curvas, params = read_curves(path_model)
          
     RA, DEC= 267.92497054815516, -29.152232510353276
     roman_event = event.Event(ra=RA, dec=DEC)
@@ -143,14 +145,49 @@ def plot_fit_roman(path_model, path_file):
     roman_event.check_event()
 
     psbl_roman = PSBL_model.PSBLmodel(roman_event, parallax=['Full', params['t0']])
-    model_params = [params['t0'],params['u0'],params['te'],np.log10(params['s']),np.log10(params['q']),params['alpha'],params['piEN'],params['piEE']]
+    model_params = [params['t0'],params['u0'],params['te'],params['s'],params['q'],params['alpha'],params['piEN'],params['piEE']]
 
     list_of_fake_telescopes = []
     print(roman_event.name)
-    pyLIMA_plots.plot_lightcurves(psbl_roman, fit_params)
-#     plt.savefig('/home/anibal/Desktop/results_fitted/'+'fit_roman_'+str(int(params['Source']))+'.png')
-    pyLIMA_plots.plot_geometry(psbl_roman, fit_params)
-#     plt.savefig('/home/anibal/Desktop/results_fitted/'+'caustic_roman_'+str(int(params['Source']))+'.png')
+    pyLIMA_plots.plot_lightcurves(psbl_roman, fit_params,model_params)
+    plt.savefig(save_figures+'fit_roman_'+str(int(params['Source']))+'.png')
+    #pyLIMA_plots.plot_geometry(psbl_roman, fit_params)
+    #plt.savefig(save_figures+'caustic_roman_'+str(int(params['Source']))+'.png')
 
 
+from pyLIMA import event
+from pyLIMA import telescopes
+from pyLIMA.models import PSBL_model
+path_ephemerides = '/home/anibal/files_db/james_webb.txt'
+def plot_fit_model(path_model):
+    #fit_params = best_model(path_file)
+    curvas, params = read_curves(path_model)
+         
+    RA, DEC= 267.92497054815516, -29.152232510353276
+    roman_event = event.Event(ra=RA, dec=DEC)
+    
+    roman_event.name = 'fit_Roman:'+str(int(params['Source']))#+'\n chi_sq='+str(round(chi_dof(path_model, path_file),4))
 
+    telescope_1 = telescopes.Telescope(name = 'F146', 
+                                       camera_filter = 'F146',
+                                       light_curve = curvas['w'].astype(float),
+                                       light_curve_names = ['time','mag','err_mag'],
+                                       light_curve_units = ['JD','mag','mag'])
+
+    telescope_1.location = 'Space'
+
+    tlsst = 60350.38482057137+2400000.5
+    ephemerides = np.loadtxt(path_ephemerides)
+    ephemerides[:,0] = ephemerides[:,0]
+    ephemerides[:,3] *=  60*300000/150000000
+    deltaT = tlsst-ephemerides[:,0][0]
+    ephemerides[:,0] = ephemerides[:,0]+deltaT
+    telescope_1.spacecraft_positions ={'astrometry':[],'photometry':ephemerides}
+    roman_event.telescopes.append(telescope_1)
+    roman_event.check_event()
+
+    psbl_roman = PSBL_model.PSBLmodel(roman_event, parallax=['Full', params['t0']])
+    model_params = [params['t0'],params['u0'],params['te'],params['s'],params['q'],params['alpha'],params['piEN'],params['piEE']]
+
+    list_of_fake_telescopes = []
+    plot_LCmodel(psbl_roman, model_params)
