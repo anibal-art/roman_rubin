@@ -19,14 +19,14 @@ import warnings
 def m1(path_file,path_model):
     data = np.load(path_file,allow_pickle=True)
     curvas, params = read_curves(path_model)
-    true = np.array([params['t0'],params['u0'],params['te'],np.log10(params['s']),np.log10(params['q']),params['alpha'],params['piEN'],params['piEE']])
+    true = np.array([params['t0'],params['u0'],params['te'],params['s'],params['q'],params['alpha'],params['piEN'],params['piEE']])
     fit = best_model(path_file)
     return (abs(fit)-abs(true))/true
 
 def m2(path_file,path_model):
     data = np.load(path_file,allow_pickle=True)
     curvas, params = read_curves(path_model)
-    true = [params['t0'],params['u0'],params['te'],np.log10(params['s']),np.log10(params['q']),params['alpha'],params['piEN'],params['piEE']]
+    true = [params['t0'],params['u0'],params['te'],params['s'],params['q'],params['alpha'],params['piEN'],params['piEE']]
     fit = best_model(path_file)
     err = errors(path_file)[0:8]
     if np.any(err == 0, axis=None):
@@ -37,7 +37,7 @@ def m2(path_file,path_model):
 def m3(path_file,path_model):
     data = np.load(path_file,allow_pickle=True)
     curvas, params = read_curves(path_model)
-    true = [params['t0'],params['u0'],params['te'],np.log10(params['s']),(params['q']),params['alpha'],params['piEN'],params['piEE']]
+    true = [params['t0'],params['u0'],params['te'],params['s'],params['q'],params['alpha'],params['piEN'],params['piEE']]
     fit = best_model(path_file)
     err = errors(path_file)[0:8]
     if np.any(err == 0, axis=None):
