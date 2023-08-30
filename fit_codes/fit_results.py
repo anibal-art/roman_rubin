@@ -38,6 +38,13 @@ def errors(name_file):
     errors = np.sqrt(abs(np.diagonal(covariance_matrix)))
     return errors
 
+def sigmas(name_file):
+    data = np.load(name_file,allow_pickle=True)
+    covariance_matrix = data.item()['covariance_matrix']
+    errors = np.sqrt(abs(np.diagonal(covariance_matrix)))
+    dicc = {'t0':errors[0], 'tE':errors[2], 'u0':errors[1], 's':errors[3],'q':errors[4],'alpha':errors[5],'piEE':errors[6],'piEN':errors[7]}
+    return dicc
+
 def best_model(name_file):
     data = np.load(name_file,allow_pickle=True)
     return data.item()['best_model'][0:8]
