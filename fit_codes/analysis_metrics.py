@@ -21,8 +21,10 @@ def m1(path_file,path_model):
     curvas, params = read_curves(path_model)
     true = np.array([params['t0'],params['u0'],params['te'],params['s'],params['q'],params['alpha'],params['piEN'],params['piEE']])
     fit = best_model(path_file)
-    return (abs(fit)-abs(true))/true
-
+    met1 = abs(fit-true)/true
+    m1t0 = abs(fit-true)
+    met1[0] = m1t0[0]
+    return met1
 def m2(path_file,path_model):
     data = np.load(path_file,allow_pickle=True)
     curvas, params = read_curves(path_model)
@@ -32,7 +34,7 @@ def m2(path_file,path_model):
     if np.any(err == 0, axis=None):
         return np.zeros(len(true))
     else:
-        return (abs(fit)-abs(np.array(true)))/err
+        return (abs(fit-np.array(true)))/err
 
 def m3(path_file,path_model):
     data = np.load(path_file,allow_pickle=True)
@@ -69,4 +71,22 @@ def stats_plot(lista_1,lista_2,ub,lb,LABEL):
     plt.hist(LISTA_2,bins=Bins(LISTA_1, LISTA_2,nbins),color='blue',hatch='/',alpha=0.5)
     plt.xlabel(LABEL)
     plt.show()
+    
+def m4(rr_file,roman_file):
+    
+    data_rr = np.load(rr_file,allow_pickle=True)
+    data_roman = np.load(roman_file,allow_pickle=True)
+    
+    err_rr = errors(rr_file)[0:8]
+    fit_roman = best_model(roman_file)
+    err_roman = errors(roman_file)[0:8]
+    fit_rr = best_model(rr_file)
+    
+    if np.any(err_rr == 0, axis=None):
+        return np.zeros(len(true))
+    else:
+        # return (err_rr - err_roman )/abs(fit_roman)
+        return err_rr/abs(fit_rr) - err_roman/abs(fit_roman) 
+
+
 
