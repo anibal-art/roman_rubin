@@ -161,7 +161,30 @@ def no_filtros(file_name,tit, N,binning):
             crit_1[fil] = np.array([])
                 
     return crit_1, dict_params
-    
+
+
+def df_source(file_path):
+    # Open and read the data file, reading only the first few lines
+    with open(file_path, "r") as file:
+        # Read the first 8 lines (adjust the number as needed)
+        lines = file.readlines()[:8]
+
+    # Initialize an empty dictionary to store the extracted data
+    data_dict = {}
+
+    # Iterate through the lines and extract key-value pairs
+    for line in lines:
+        # Split each line at ':'
+        parts = line.split(':')
+        if len(parts) == 2:
+            key = parts[0].strip()
+            value = parts[1].strip()
+            data_dict[key] = value
+
+    # Convert the dictionary into a Pandas DataFrame
+    df = pd.DataFrame([data_dict])
+    return df
+
 
 def read_curves(file_name):
     '''
@@ -174,17 +197,22 @@ def read_curves(file_name):
 	- Calculate the chi-squared value for the entire light curve, assuming a constant baseline magnitude model as previously computed.
 	- If the chi-squared value is > 2 for any filter, consider it as an event.
     '''
-    df = pd.read_csv(file_name , sep = ',' , decimal = '.', skiprows = 19)
+#    df = pd.read_csv(file_name , sep = ',' , decimal = '.', skiprows = 19)
     params = pd.read_csv(file_name , sep = ':' , decimal = '.', skiprows = 0)
     ix = int(params.index[params['TRILEGAL simulation']=='band,mjd,mag,magerr,m5'][0])
-
+    df = pd.read_csv(file_name , sep = ',' , decimal = '.', skiprows = int(ix)+1)
     dict_params = {}
     for i in range(len(params[0:ix].values[:,1])):
-        dict_params[params[0:ix].values[:,0][i]] = params[0:ix].values[:,1][i]
+        if params[0:ix].values[:,0][i] in ('t0','u0','tE','rho','piEE','piEN','alpha','q','s'):
+            # print(params[0:ix].values[:,0][i])
+            if params[0:ix].values[:,0][i]=='tE':
+                dict_params['te'] = params[0:ix].values[:, 1][i]
+            else:
+                dict_params[params[0:ix].values[:,0][i]] = params[0:ix].values[:,1][i]
 
-    t0 = dict_params['t0']
-    dict_params['te'] = dict_params.pop('tE')
-    te = dict_params['te']
+    # t0 = dict_params['t0']
+    # dict_params['te'] = dict_params.pop('tE')
+    # te = dict_params['te']
     crit_1 = {}
     for fil in ('w','u','g','r','i','z','y'):
         if fil in df['band'].values:
@@ -195,5 +223,4 @@ def read_curves(file_name):
         else:
             crit_1[fil]=[]
     return crit_1, dict_params
-
 
