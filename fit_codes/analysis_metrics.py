@@ -12,7 +12,7 @@ import pandas as pd
 import os
 import re
 from filter_curves import read_curves
-from fit_results import chi_dof, best_model, event_fits, sigmas
+from fit_results import chi_dof, best_model,  sigmas, event_fits
 from tqdm.auto import tqdm
 import warnings
 
