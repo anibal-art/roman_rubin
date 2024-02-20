@@ -17,130 +17,136 @@ path_ephemerides = '/home/anibal/files_db/james_webb.txt' #PATH TO EPHEMERIDES
 from plot_models import plot_LCmodel
 from filter_curves import read_curves
 save_figures = '/home/anibal/figures_presentation/'
+from fit_results import chi_dof, best_model, errors,best_full_model
 
-def plot_tiny_fit_rr(path_model, path_file, mat_figure, mat_figure_axes):
+from filter_curves import read_curves
+# save_figures = '/home/anibal/figures_presentation/'
+
+def plot_tiny_fit_rr(path_model, path_file,mat_figure, mat_figure_axes):
     fit_params = best_full_model(path_file)
     curvas, params = read_curves(path_model)
-
-    RA, DEC = 267.92497054815516, -29.152232510353276
+    
+    RA, DEC= 267.92497054815516, -29.152232510353276
     your_event = event.Event(ra=RA, dec=DEC)
-    your_event.name = 'fit_rr:' + str(int(params['Source'])) + '\n chi_sq=' + str(
-        round(chi_dof(path_model, path_file), 4))
+    your_event.name = 'fit_rr:'+str(int(params['Source']))+'\n chi_sq='+str(round(chi_dof(path_model, path_file),4))
 
-    telescope_1 = telescopes.Telescope(name='F146',
-                                       camera_filter='F146',
-                                       light_curve=curvas['w'].astype(float),
-                                       light_curve_names=['time', 'mag', 'err_mag'],
-                                       light_curve_units=['JD', 'mag', 'mag'])
+    telescope_1 = telescopes.Telescope(name = 'F146', 
+                                       camera_filter = 'F146',
+                                       light_curve = curvas['w'].astype(float),
+                                       light_curve_names = ['time','mag','err_mag'],
+                                       light_curve_units = ['JD','mag','mag'])
 
     telescope_1.location = 'Space'
 
-    tlsst = 60350.38482057137 + 2400000.5
+    tlsst = 60350.38482057137+2400000.5
     ephemerides = np.loadtxt(path_ephemerides)
-    ephemerides[:, 0] = ephemerides[:, 0]
-    ephemerides[:, 3] *= 60 * 300000 / 150000000
-    deltaT = tlsst - ephemerides[:, 0][0]
-    ephemerides[:, 0] = ephemerides[:, 0] + deltaT
-    telescope_1.spacecraft_positions = {'astrometry': [], 'photometry': ephemerides}
+    ephemerides[:,0] = ephemerides[:,0]
+    ephemerides[:,3] *=  60*300000/150000000
+    deltaT = tlsst-ephemerides[:,0][0]
+    ephemerides[:,0] = ephemerides[:,0]+deltaT
+    telescope_1.spacecraft_positions ={'astrometry':[],'photometry':ephemerides}
     your_event.telescopes.append(telescope_1)
     if not len(curvas['u']) == 0:
-        telescope_2 = telescopes.Telescope(name='LSST_u',
-                                           camera_filter='u',
-                                           light_curve=curvas['u'].astype(float),
-                                           light_curve_names=['time', 'mag', 'err_mag'],
-                                           light_curve_units=['JD', 'mag', 'mag'])
+        telescope_2 = telescopes.Telescope(name = 'LSST_u', 
+                                           camera_filter = 'u',
+                                           light_curve = curvas['u'].astype(float),
+                                           light_curve_names = ['time','mag','err_mag'],
+                                           light_curve_units = ['JD','mag','mag'])
         telescope_2.location = 'Earth'
         your_event.telescopes.append(telescope_2)
 
     if not len(curvas['g']) == 0:
-        telescope_3 = telescopes.Telescope(name='LSST_g',
-                                           camera_filter='g',
-                                           light_curve=curvas['g'].astype(float),
-                                           light_curve_names=['time', 'mag', 'err_mag'],
-                                           light_curve_units=['JD', 'mag', 'mag'])
+
+        telescope_3 = telescopes.Telescope(name = 'LSST_g', 
+                                           camera_filter = 'g',
+                                           light_curve = curvas['g'].astype(float),
+                                           light_curve_names = ['time','mag','err_mag'],
+                                           light_curve_units = ['JD','mag','mag'])
         telescope_3.location = 'Earth'
         your_event.telescopes.append(telescope_3)
 
     if not len(curvas['r']) == 0:
-        telescope_4 = telescopes.Telescope(name='LSST_r',
-                                           camera_filter='r',
-                                           light_curve=curvas['r'].astype(float),
-                                           light_curve_names=['time', 'mag', 'err_mag'],
-                                           light_curve_units=['JD', 'mag', 'mag'])
+
+        telescope_4 = telescopes.Telescope(name = 'LSST_r', 
+                                           camera_filter = 'r',
+                                           light_curve = curvas['r'].astype(float),
+                                           light_curve_names = ['time','mag','err_mag'],
+                                           light_curve_units = ['JD','mag','mag'])
         telescope_4.location = 'Earth'
         your_event.telescopes.append(telescope_4)
 
     if not len(curvas['i']) == 0:
-        telescope_5 = telescopes.Telescope(name='LSST_i',
-                                           camera_filter='i',
-                                           light_curve=curvas['i'].astype(float),
-                                           light_curve_names=['time', 'mag', 'err_mag'],
-                                           light_curve_units=['JD', 'mag', 'mag'])
+
+        telescope_5 = telescopes.Telescope(name = 'LSST_i', 
+                                           camera_filter = 'i',
+                                           light_curve = curvas['i'].astype(float),
+                                           light_curve_names = ['time','mag','err_mag'],
+                                           light_curve_units = ['JD','mag','mag'])
         telescope_5.location = 'Earth'
         your_event.telescopes.append(telescope_5)
 
+
     if not len(curvas['z']) == 0:
-        telescope_6 = telescopes.Telescope(name='LSST_z',
-                                           camera_filter='z',
-                                           light_curve=curvas['z'].astype(float),
-                                           light_curve_names=['time', 'mag', 'err_mag'],
-                                           light_curve_units=['JD', 'mag', 'mag'])
+
+        telescope_6 = telescopes.Telescope(name = 'LSST_z', 
+                                           camera_filter = 'z',
+                                           light_curve = curvas['z'].astype(float),
+                                           light_curve_names = ['time','mag','err_mag'],
+                                           light_curve_units = ['JD','mag','mag'])
         telescope_6.location = 'Earth'
         your_event.telescopes.append(telescope_6)
 
+
     if not len(curvas['y']) == 0:
-        telescope_7 = telescopes.Telescope(name='LSST_y',
-                                           camera_filter='y',
-                                           light_curve=curvas['y'].astype(float),
-                                           light_curve_names=['time', 'mag', 'err_mag'],
-                                           light_curve_units=['JD', 'mag', 'mag'])
+
+        telescope_7 = telescopes.Telescope(name = 'LSST_y', 
+                                           camera_filter = 'y',
+                                           light_curve = curvas['y'].astype(float),
+                                           light_curve_names = ['time','mag','err_mag'],
+                                           light_curve_units = ['JD','mag','mag'])
         telescope_7.location = 'Earth'
         your_event.telescopes.append(telescope_7)
 
-    model_params = [params['t0'], params['u0'], params['te'], params['s'], params['q'], params['alpha'], params['piEN'],
-                    params['piEE']]
+    model_params = [params['t0'],params['u0'],params['te'],params['s'],params['q'],params['alpha'],params['piEN'],params['piEE']]
 
     your_event.check_event()
 
     psbl = PSBL_model.PSBLmodel(your_event, parallax=['Full', params['t0']])
 
     list_of_fake_telescopes = []
+    
+    plot_LCmodel(psbl,  fit_params,mat_figure, mat_figure_axes)
 
-    plot_LCmodel(psbl, fit_params, mat_figure, mat_figure_axes)
-
-
-def plot_tiny_fit_roman(path_model, path_file, mat_figure, mat_figure_axes):
+def plot_tiny_fit_roman(path_model, path_file,mat_figure, mat_figure_axes):
     fit_params = best_full_model(path_file)
     curvas, params = read_curves(path_model)
-
-    RA, DEC = 267.92497054815516, -29.152232510353276
+         
+    RA, DEC= 267.92497054815516, -29.152232510353276
     roman_event = event.Event(ra=RA, dec=DEC)
+    
+    roman_event.name = 'fit_Roman:'+str(int(params['Source']))+'\n chi_sq='+str(round(chi_dof(path_model, path_file),4))
 
-    roman_event.name = 'fit_Roman:' + str(int(params['Source'])) + '\n chi_sq=' + str(
-        round(chi_dof(path_model, path_file), 4))
-
-    telescope_1 = telescopes.Telescope(name='F146',
-                                       camera_filter='F146',
-                                       light_curve=curvas['w'].astype(float),
-                                       light_curve_names=['time', 'mag', 'err_mag'],
-                                       light_curve_units=['JD', 'mag', 'mag'])
+    telescope_1 = telescopes.Telescope(name = 'F146', 
+                                       camera_filter = 'F146',
+                                       light_curve = curvas['w'].astype(float),
+                                       light_curve_names = ['time','mag','err_mag'],
+                                       light_curve_units = ['JD','mag','mag'])
 
     telescope_1.location = 'Space'
 
-    tlsst = 60350.38482057137 + 2400000.5
+    tlsst = 60350.38482057137+2400000.5
     ephemerides = np.loadtxt(path_ephemerides)
-    ephemerides[:, 0] = ephemerides[:, 0]
-    ephemerides[:, 3] *= 60 * 300000 / 150000000
-    deltaT = tlsst - ephemerides[:, 0][0]
-    ephemerides[:, 0] = ephemerides[:, 0] + deltaT
-    telescope_1.spacecraft_positions = {'astrometry': [], 'photometry': ephemerides}
+    ephemerides[:,0] = ephemerides[:,0]
+    ephemerides[:,3] *=  60*300000/150000000
+    deltaT = tlsst-ephemerides[:,0][0]
+    ephemerides[:,0] = ephemerides[:,0]+deltaT
+    telescope_1.spacecraft_positions ={'astrometry':[],'photometry':ephemerides}
     roman_event.telescopes.append(telescope_1)
     roman_event.check_event()
 
     psbl_roman = PSBL_model.PSBLmodel(roman_event, parallax=['Full', params['t0']])
-    model_params = [params['t0'], params['u0'], params['te'], params['s'], params['q'], params['alpha'], params['piEN'],
-                    params['piEE']]
+    model_params = [params['t0'],params['u0'],params['te'],params['s'],params['q'],params['alpha'],params['piEN'],params['piEE']]
 
     list_of_fake_telescopes = []
 
-    mat_figure, figure_bokeh = plot_LCmodel(psbl_roman, fit_params, mat_figure, mat_figure_axes)
+    mat_figure, figure_bokeh = plot_LCmodel(psbl_roman, fit_params,mat_figure, mat_figure_axes)
