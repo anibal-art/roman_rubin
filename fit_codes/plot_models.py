@@ -67,12 +67,12 @@ def create_telescopes_to_plot_model(microlensing_model, pyLIMA_parameters):
                             tel.lightcurve_magnitude['time'].value),
                                 pyLIMA_parameters.t0 + 5 *
                                 pyLIMA_parameters.tE)),
-                        1).round(2)
+                        0.05).round(2)
 
                     model_time2 = np.arange(
                         pyLIMA_parameters.t0 - 1 * pyLIMA_parameters.tE,
                         pyLIMA_parameters.t0 + 1 * pyLIMA_parameters.tE,
-                        1).round(2)
+                        0.05).round(2)
 
                     model_time = np.r_[model_time1, model_time2]
 
@@ -249,17 +249,118 @@ def plot_LCmodel(microlensing_model, model_parameters,mat_figure, mat_figure_axe
 
         model_parameters = np.r_[model_parameters, telescopes_fluxes]
 
-
-    plot_photometric_models(mat_figure_axes, microlensing_model, model_parameters,
-                            plot_unit='Mag',
-                            bokeh_plot=bokeh_lightcurves)
-    plot_aligned_data(mat_figure_axes, microlensing_model, model_parameters,
+    dict_save = plot_aligned_data(mat_figure_axes, microlensing_model, model_parameters,
                       plot_unit='Mag',
                       bokeh_plot=bokeh_lightcurves)
+
+    dict_model = plot_photometric_models(mat_figure_axes, microlensing_model, model_parameters,'darkblue',
+                            plot_unit='Mag',
+                            bokeh_plot=bokeh_lightcurves)
+
+    #mat_figure_axes.set_title(microlensing_model.event.name)
+    #mat_figure_axes.invert_yaxis()
+    # mat_figure_axes.set_xlim(model_parameters[0]-5*model_parameters[2],model_parameters[0]+5*model_parameters[2])
+    # mat_figure_axes.axvspan(model_parameters[0]-model_parameters[2],model_parameters[0]+model_parameters[2],color='blue',alpha=0.35)
+
+    # mat_figure_axes.set_xlabel(r'$JD$', fontsize=20)
+    # mat_figure_axes.set_ylabel(r'MAG', fontsize=20)
+    # mat_figure_axes.legend(shadow=True, fontsize='large',
+    #                           bbox_to_anchor=(0, 1.02, 1, 0.2),
+    #                           loc="lower left",
+    #                           mode="expand", borderaxespad=0, ncol=3)
+
+    try:
+        bokeh_lightcurves.legend.click_policy = "mute"
+        # legend = bokeh_lightcurves.legend[0]
+
+    except AttributeError:
+
+        pass
+
+    figure_bokeh = gridplot([[bokeh_lightcurves], [bokeh_residuals]],
+                            toolbar_location=None)
+
+    return mat_figure, dict_save, dict_model
+
+def plot_only_model(microlensing_model, model_parameters,mat_figure, mat_figure_axes, bokeh_plot=None):
+    # Change matplotlib default colors
+    n_telescopes = len(microlensing_model.event.telescopes)
+
+    # mat_figure, mat_figure_axes = initialize_light_curves_plot(
+        # event_name=microlensing_model.event.name)
+
+
+    bokeh_lightcurves = None
+    bokeh_residuals = None
+
+    if len(model_parameters) != len(microlensing_model.model_dictionnary):
+        telescopes_fluxes = microlensing_model.find_telescopes_fluxes(model_parameters)
+        telescopes_fluxes = [getattr(telescopes_fluxes, key) for key in
+                             telescopes_fluxes._fields]
+
+        model_parameters = np.r_[model_parameters, telescopes_fluxes]
+
+
+    plot_photometric_models(mat_figure_axes, microlensing_model, model_parameters,'red',
+                            plot_unit='Mag',
+                            bokeh_plot=bokeh_lightcurves)
+
                       
+    #mat_figure_axes.set_title(microlensing_model.event.name)
+    #mat_figure_axes.invert_yaxis()
+    # mat_figure_axes.set_xlim(model_parameters[0]-5*model_parameters[2],model_parameters[0]+5*model_parameters[2])
+    # mat_figure_axes.axvspan(model_parameters[0]-model_parameters[2],model_parameters[0]+model_parameters[2],color='blue',alpha=0.35)
+
+    #mat_figure_axes.set_xlabel(r'$JD$', fontsize=20)
+    #mat_figure_axes.set_ylabel(r'MAG', fontsize=20)
+    # mat_figure_axes.legend(shadow=True, fontsize='large',
+    #                           bbox_to_anchor=(0, 1.02, 1, 0.2),
+    #                           loc="lower left",
+    #                           mode="expand", borderaxespad=0, ncol=3)
+
+    try:
+        bokeh_lightcurves.legend.click_policy = "mute"
+        # legend = bokeh_lightcurves.legend[0]
+
+    except AttributeError:
+
+        pass
+
+    figure_bokeh = gridplot([[bokeh_lightcurves], [bokeh_residuals]],
+                            toolbar_location=None)
+
+    return mat_figure, figure_bokeh
+
+
+def plot_true_model(microlensing_model, model_parameters, mat_figure, mat_figure_axes, bokeh_plot=None):
+    # Change matplotlib default colors
+    n_telescopes = len(microlensing_model.event.telescopes)
+
+    # mat_figure, mat_figure_axes = initialize_light_curves_plot(
+    # event_name=microlensing_model.event.name)
+
+    bokeh_lightcurves = None
+    bokeh_residuals = None
+
+    if len(model_parameters) != len(microlensing_model.model_dictionnary):
+        telescopes_fluxes = microlensing_model.find_telescopes_fluxes(model_parameters)
+        telescopes_fluxes = [getattr(telescopes_fluxes, key) for key in
+                             telescopes_fluxes._fields]
+
+        model_parameters = np.r_[model_parameters, telescopes_fluxes]
+
+    plot_photometric_models(mat_figure_axes, microlensing_model, model_parameters, 'black',
+                            plot_unit='Mag',
+                            bokeh_plot=bokeh_lightcurves)
+
     mat_figure_axes.set_title(microlensing_model.event.name)
     mat_figure_axes.invert_yaxis()
-    mat_figure_axes.set_xlim(model_parameters[0]-5*model_parameters[2],model_parameters[0]+5*model_parameters[2])
+    mat_figure_axes.set_xlim(model_parameters[0] - 5 * model_parameters[2],
+                             model_parameters[0] + 5 * model_parameters[2])
+    # mat_figure_axes.axvspan(model_parameters[0]-model_parameters[2],model_parameters[0]+model_parameters[2],color='blue',alpha=0.35)
+
+    mat_figure_axes.set_xlabel(r'$JD$', fontsize=20)
+    mat_figure_axes.set_ylabel(r'MAG', fontsize=20)
     # mat_figure_axes.legend(shadow=True, fontsize='large',
     #                           bbox_to_anchor=(0, 1.02, 1, 0.2),
     #                           loc="lower left",
@@ -303,7 +404,7 @@ def plot_LCmodel(microlensing_model, model_parameters,mat_figure, mat_figure_axe
 #     return mat_figure, mat_figure_axes
 
 
-def plot_photometric_models(figure_axe, microlensing_model, model_parameters,
+def plot_photometric_models(figure_axe, microlensing_model, model_parameters,Color,
                             bokeh_plot=None, plot_unit='Mag'):
     pyLIMA_parameters = microlensing_model.compute_pyLIMA_parameters(model_parameters)
 
@@ -313,7 +414,7 @@ def plot_photometric_models(figure_axe, microlensing_model, model_parameters,
 
     # plot models
     index = 0
-
+    dict_save = {}
     for tel in list_of_telescopes:
 
         if tel.lightcurve_flux is not None:
@@ -346,12 +447,15 @@ def plot_photometric_models(figure_axe, microlensing_model, model_parameters,
             else:
 
                 linestyle = '-'
-
+            # print(tel.lightcurve_magnitude['time'].value)
+            # plt.plot(tel.lightcurve_magnitude['time'].value, np.ones(tel.lightcurve_magnitude['time'].value), marker='o',linestlye='')
             plot_light_curve_magnitude(tel.lightcurve_magnitude['time'].value,
                                              magnitude, figure_axe=figure_axe,
-                                             name=name, color='darkblue',
+                                             name=name, color=Color,
                                              linestyle=linestyle)
-
+            dict_save[tel.name]=[tel.lightcurve_magnitude['time'].value,
+                                             magnitude]
+    return dict_save
 
 
 
@@ -387,6 +491,7 @@ def plot_aligned_data(figure_axe, microlensing_model, model_parameters, bokeh_pl
         ref_magnification.append(model_magnification)
         ref_fluxes.append([f_source, f_blend])
 
+    dict_save = {}
     for ind, tel in enumerate(microlensing_model.event.telescopes):
 
         if tel.lightcurve_flux is not None:
@@ -425,7 +530,7 @@ def plot_aligned_data(figure_axe, microlensing_model, model_parameters, bokeh_pl
             color = {'F146':'b', 'LSST_u':'c', 'LSST_g':'g', 'LSST_r':'y', 'LSST_i':'r', 'LSST_z':'m', 'LSST_y':'k'}
 #             color = plt.rcParams["axes.prop_cycle"].by_key()["color"][ind]
             
-            marker = 'o'
+            marker = 'D'
 
             plot_light_curve_magnitude(tel.lightcurve_magnitude['time'].value,
                                              magnitude + residus_in_mag,
@@ -433,4 +538,6 @@ def plot_aligned_data(figure_axe, microlensing_model, model_parameters, bokeh_pl
                                              figure_axe=figure_axe, color=color[tel.name],
                                              marker=marker, name=tel.name)
 
-
+            dict_save[tel.name]=[tel.lightcurve_magnitude['time'].value,
+                                             magnitude + residus_in_mag,tel.lightcurve_magnitude['err_mag'].value]
+    return dict_save
