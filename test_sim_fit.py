@@ -1,7 +1,6 @@
 from functions_roman_rubin import sim_fit
 import os
-import numpy as np
-import pandas as pd
+
 current_path = os.getcwd()
 
 i=0
