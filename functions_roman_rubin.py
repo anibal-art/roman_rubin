@@ -2,7 +2,8 @@ import numpy as np
 import os, sys, re, copy, math
 import pandas as pd
 # home='/home/anibalvarela/'
-sys.path.append('/home/anibal/roman_rubin_paper/photutils/')
+current_path = os.getcwd()
+sys.path.append(current_path+'/photutils/')
 from bandpass import Bandpass
 from signaltonoise import calc_mag_error_m5
 from photometric_parameters import PhotometricParameters
@@ -45,7 +46,7 @@ def tel_roman_rubin(path_ephemerides, path_dataslice):
     lsst_filterlist = 'ugrizy'
     for f in lsst_filterlist:
         LSST_BandPass[f] = Bandpass()
-        LSST_BandPass[f].read_throughput('/home/anibal/roman_rubin_paper/troughputs/' + f'total_{f}.dat')
+        LSST_BandPass[f].read_throughput(current_path+'/troughputs/' + f'total_{f}.dat')
     dataSlice = np.load(path_dataslice, allow_pickle=True)
     rubin_ts = {}
     for fil in lsst_filterlist:
