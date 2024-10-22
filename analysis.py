@@ -292,7 +292,7 @@ def categories_function(true,path_dataslice):
 labels_params: list[str] = ['t0','u0','te','piEN','piEE']
 
 #path_ephemerides = '/home/anibal/files_db/james_webb.txt' #PATH TO EPHEMERIDES
-path_ephemerides = '/home/anibalvarela/ajustes/james_webb.txt'
+path_ephemerides = '~./roman_rubin/ajustes/Gaia.txt'
 path = '/share/storage3/rubin/microlensing/romanrubin/BH/'
 #path ='/home/anibal/results_roman_rubin/PB_new_format2/PB/'# "/share/storage3/rubin/microlensing/romanrubin/PB/"
 save_results = path+'results/'

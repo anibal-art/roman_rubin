@@ -1,8 +1,13 @@
 import numpy as np
 import os, sys, re, copy, math
 import pandas as pd
-# home='/home/anibalvarela/'
-sys.path.append('/home/anibal/roman_rubin/photutils/')
+from pathlib import Path
+
+# Get the directory where the script is located
+script_dir = Path(__file__).parent
+print(script_dir)
+sys.path.append(str(script_dir)+'/photutils/')
+# print(os.getcwd()+'/photutils/')
 from bandpass import Bandpass
 from signaltonoise import calc_mag_error_m5
 from photometric_parameters import PhotometricParameters
@@ -37,6 +42,7 @@ def tel_roman_rubin(path_ephemerides, path_dataslice):
     :param opsim:
     :return:
     '''
+    print(str(script_dir))
     gc = SkyCoord(l=0.5 * u.degree, b=-1.25 * u.degree, frame='galactic')
     gc.icrs.dec.value
     Ra = gc.icrs.ra.value
@@ -45,7 +51,7 @@ def tel_roman_rubin(path_ephemerides, path_dataslice):
     lsst_filterlist = 'ugrizy'
     for f in lsst_filterlist:
         LSST_BandPass[f] = Bandpass()
-        LSST_BandPass[f].read_throughput('/home/anibalvarela/troughputs/' + f'total_{f}.dat')
+        LSST_BandPass[f].read_throughput(str(script_dir)+'/troughputs/' + f'total_{f}.dat')
     dataSlice = np.load(path_dataslice, allow_pickle=True)
     rubin_ts = {}
     for fil in lsst_filterlist:
