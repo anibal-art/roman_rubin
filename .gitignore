@@ -2,10 +2,10 @@ __pycache__/
 notebooks/.ipynb_checkpoints/
 .idea/
 .ipynb_checkpoints/
-photutils/__pycache__/bandpass.cpython-311.pyc
-photutils/__pycache__/bandpass_dict.cpython-311.pyc
-photutils/__pycache__/lsst_defaults.cpython-311.pyc
-photutils/__pycache__/photometric_parameters.cpython-311.pyc
-photutils/__pycache__/physical_parameters.cpython-311.pyc
-photutils/__pycache__/sed.cpython-311.pyc
-photutils/__pycache__/signaltonoise.cpython-311.pyc
+/photutils/__pycache__/bandpass.cpython-311.pyc
+/photutils/__pycache__/bandpass_dict.cpython-311.pyc
+/photutils/__pycache__/lsst_defaults.cpython-311.pyc
+/photutils/__pycache__/photometric_parameters.cpython-311.pyc
+/photutils/__pycache__/physical_parameters.cpython-311.pyc
+/photutils/__pycache__/sed.cpython-311.pyc
+/photutils/__pycache__/signaltonoise.cpython-311.pyc
