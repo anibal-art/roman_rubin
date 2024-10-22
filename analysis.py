@@ -294,11 +294,8 @@ script_dir = str(Path(__file__).parent)
 print(script_dir)
 
 path_ephemerides = script_dir+'/ajustes/Gaia.txt'
-path = '/share/storage3/rubin/microlensing/romanrubin/BH/'
-#path ='/home/anibal/results_roman_rubin/PB_new_format2/PB/'# "/share/storage3/rubin/microlensing/romanrubin/PB/"
+path = '/share/storage3/rubin/microlensing/romanrubin/BH/' # path in the CHE cluster
 save_results = path+'results/'
-#path_dataslice = '/home/anibal/roman_rubin/simulation/dataSlice_baseline.npy'
-#path_dataslice = '/home/anibal/roman_rubin/simulation/dataSlice_baseline.npy'
 path_dataslice =script_dir+'/opsims/baseline/dataSlice.npy'
 nominal_seasons = [
     {'start': '2027-02-11T00:00:00', 'end': '2027-04-24T00:00:00'},
