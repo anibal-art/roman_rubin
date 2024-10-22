@@ -2,7 +2,7 @@ import numpy as np
 import os, sys, re, copy, math
 import pandas as pd
 # home='/home/anibalvarela/'
-sys.path.append('/home/anibalvarela/photutils/')
+sys.path.append('/home/anibal/roman_rubin/photutils/')
 from bandpass import Bandpass
 from signaltonoise import calc_mag_error_m5
 from photometric_parameters import PhotometricParameters
