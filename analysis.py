@@ -290,7 +290,7 @@ def categories_function(true,path_dataslice):
 from pathlib import Path
 #labels_params: list[str] = ['t0','u0','te','rho',"s","q","alpha",'piEN','piEE']
 labels_params: list[str] = ['t0','u0','te','piEN','piEE']
-script_dir = Path(__file__).parent
+script_dir = str(Path(__file__).parent)
 print(script_dir)
 
 path_ephemerides = script_dir+'/ajustes/Gaia.txt'
