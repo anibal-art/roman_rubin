@@ -9,8 +9,8 @@ from functions_roman_rubin import sim_fit
 from functions_roman_rubin import model_rubin_roman
 from functions_roman_rubin import read_data
 
-current_path = os.path.dirname(os.getcwd())
-print(str(os.getcwd()))
+current_path = str(os.getcwd())#os.path.dirname(os.getcwd())
+# print()
 i=18
 model='USBL'
 algo='MCMC'
