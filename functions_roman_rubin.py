@@ -241,12 +241,14 @@ def fit_rubin_roman(Source, event_params, path_save, path_ephemerides, model, al
 
     if len(lsst_u) + len(lsst_g) + len(lsst_r) + len(lsst_i) + len(lsst_z) + len(lsst_y) == 0:
         e.name = 'Event_Roman_' + str(int(Source))
+        name_roman = 'Roman'
     else:
         e.name = 'Event_RR_' + str(int(Source))
+        name_roman = 'Roman'
     tel_list = []
 
     # Add a PyLIMA telescope object to the event with the Gaia lightcurve
-    tel1 = telescopes.Telescope(name='Roman', camera_filter='W149',
+    tel1 = telescopes.Telescope(name = name_roman, camera_filter='W149',
                                 light_curve=wfirst_lc,
                                 light_curve_names=['time', 'mag', 'err_mag'],
                                 light_curve_units=['JD', 'mag', 'mag'],
@@ -605,12 +607,14 @@ def model_rubin_roman(Source, true_model, event_params, path_ephemerides, model,
 
     if len(lsst_u) + len(lsst_g) + len(lsst_r) + len(lsst_i) + len(lsst_z) + len(lsst_y) == 0:
         e.name = 'Event_Roman_' + str(int(Source))
+        name_roman = 'Roman (Roman)'
     else:
         e.name = 'Event_RR_' + str(int(Source))
+        name_roman = 'Roman (Roman+Rubin)'
     tel_list = []
 
     # Add a PyLIMA telescope object to the event with the Gaia lightcurve
-    tel1 = telescopes.Telescope(name='Roman', camera_filter='W149',
+    tel1 = telescopes.Telescope(name=name_roman, camera_filter='W149',
                                 light_curve=wfirst_lc,
                                 light_curve_names=['time', 'mag', 'err_mag'],
                                 light_curve_units=['JD', 'mag', 'mag'],
