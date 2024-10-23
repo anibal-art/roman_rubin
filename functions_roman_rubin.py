@@ -633,7 +633,7 @@ def model_rubin_roman(Source, true_model, event_params, path_ephemerides, model,
     lsst_bands = "ugrizy"
     for j in range(len(lsst_lc_list)):
         if len(lsst_lc_list[j]) != 0:
-            tel = telescopes.Telescope(name=lsst_bands[j], camera_filter=lsst_bands[j],
+            tel = telescopes.Telescope(name=lsst_bands[j]+' (Rubin)', camera_filter=lsst_bands[j],
                                        light_curve=lsst_lc_list[j],
                                        light_curve_names=['time', 'mag', 'err_mag'],
                                        light_curve_units=['JD', 'mag', 'mag'],
