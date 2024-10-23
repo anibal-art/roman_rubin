@@ -284,7 +284,7 @@ def fit_rubin_roman(Source, event_params, path_save, path_ephemerides, model, al
    # q = float(event_params['q'])
    # alpha = float(event_params['alpha'])
 
-    rango = 1
+    rango = 10
     if model == 'FSPL':
         rho = float(event_params['rho'])
         pyLIMAmodel = FSPLarge_model.FSPLargemodel(e,blend_flux_parameter='ftotal', parallax=['Full', t0])
@@ -504,7 +504,8 @@ def sim_fit(i, model, algo,path_TRILEGAL_set, path_to_save_model,path_to_save_fi
     event_params = pd_planets.iloc[int(i)]
     my_own_model, pyLIMA_parameters, decision = sim_event(i, event_params, path_ephemerides, path_dataslice,model)
     Source = i
-
+    print(event_params)
+    print(pyLIMA_parameters)
     if decision:
         print("Save the data and fit with ",algo)
         save(i, path_TRILEGAL_set, path_to_save_model, my_own_model, pyLIMA_parameters)
