@@ -10,7 +10,7 @@ from functions_roman_rubin import model_rubin_roman
 from functions_roman_rubin import read_data
 
 current_path = os.path.dirname(os.getcwd())
-# print(current_path)
+print(str(os.getcwd()))
 i=18
 model='USBL'
 algo='MCMC'
