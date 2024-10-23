@@ -521,3 +521,137 @@ def sim_fit(i, model, algo,path_TRILEGAL_set, path_to_save_model,path_to_save_fi
                                                lc_to_fit["i"], lc_to_fit["z"],lc_to_fit["y"])
         fit_roman, event_fit_roman, pyLIMAmodel_roman = fit_rubin_roman(Source,event_params, path_to_save_fit, path_ephemerides,model,algo,origin,
                                    lc_to_fit["W149"], [], [], [], [], [],[])
+
+        
+# def model_rubin_roman(Source,true_model,event_params, path_ephemerides,model, wfirst_lc, lsst_u, lsst_g, lsst_r, lsst_i, lsst_z,
+#                     lsst_y):
+#     '''
+#     Model Rubin and Roman data for plot
+#     '''
+    
+#     tlsst = 60350.38482057137 + 2400000.5
+#     RA, DEC = 267.92497054815516, -29.152232510353276
+#     e = event.Event(ra=RA, dec=DEC)
+
+#     if len(lsst_u) + len(lsst_g) + len(lsst_r) + len(lsst_i) + len(lsst_z) + len(lsst_y) == 0:
+#         e.name = 'Event_Roman_' + str(int(Source))
+#     else:
+#         e.name = 'Event_RR_' + str(int(Source))
+#     tel_list = []
+
+#     # Add a PyLIMA telescope object to the event with the Gaia lightcurve
+#     tel1 = telescopes.Telescope(name='Roman', camera_filter='W149',
+#                                 light_curve=wfirst_lc,
+#                                 light_curve_names=['time', 'mag', 'err_mag'],
+#                                 light_curve_units=['JD', 'mag', 'mag'],
+#                                 location='Space')
+
+#     ephemerides = np.loadtxt(path_ephemerides)
+#     ephemerides[:, 0] = ephemerides[:, 0]
+#     ephemerides[:, 3] *= 60 * 300000 / 150000000
+#     deltaT = tlsst - ephemerides[:, 0][0]
+#     ephemerides[:, 0] = ephemerides[:, 0] + deltaT
+#     tel1.spacecraft_positions = {'astrometry': [], 'photometry': ephemerides}
+#     e.telescopes.append(tel1)
+#     tel_list.append('Roman')
+    
+#     lsst_lc_list = [lsst_u,lsst_g,lsst_r,lsst_i,lsst_z,lsst_y]
+#     lsst_bands = "ugrizy"
+#     for j in range(len(lsst_lc_list)):
+#         if not len(lsst_lc_list[j])==0:
+#             tel = telescopes.Telescope(name=lsst_bands[j], camera_filter=lsst_bands[j],
+#                                 light_curve=lsst_lc_list[j],
+#                                 light_curve_names=['time', 'mag', 'err_mag'],
+#                                 light_curve_units=['JD', 'mag', 'mag'],
+#                                 location='Earth')
+#             e.telescopes.append(tel)
+#             tel_list.append(lsst_bands[j])
+#     e.check_event()
+#     # Give the model initial guess values somewhere near their actual values so that the fit doesn't take all day
+#         # Determine the initial guess values for the model
+#     t0 = float(event_params['t0']) if 't0' in event_params else None
+#     t_center = float(event_params['t_center']) if 't_center' in event_params else None
+    
+#     # Use t_center if available; otherwise, fall back to t0
+#     t_guess = t_center if t_center is not None else t0
+
+#     # t0 = float(event_params['t0'])
+#         # t0 = float(event_params['t_center'])
+#     # u0 = float(event_params['u_center'])
+    
+#     # rango = 0.5
+#     if model == 'FSPL':
+#         pyLIMAmodel = FSPLarge_model.FSPLargemodel(e, parallax=['Full', t_guess])
+#     elif model=='USBL':
+#         if true_model:
+#             pyLIMAmodel = USBL_model.USBLmodel(e, origin=['third_caustic', [0, 0]],
+#                                                blend_flux_parameter='ftotal',
+#                                                parallax=['Full', t_guess])
+#         else:
+#             pyLIMAmodel = USBL_model.USBLmodel(e, blend_flux_parameter='ftotal', parallax=['Full', t_guess])
+#     elif model=='PSPL':
+#         pyLIMAmodel = PSPL_model.PSPLmodel(e, parallax=['Full', t_guess])
+#     return pyLIMAmodel
+
+def model_rubin_roman(Source, true_model, event_params, path_ephemerides, model, wfirst_lc, lsst_u, lsst_g, lsst_r, lsst_i, lsst_z, lsst_y):
+    '''
+    Perform fit for Rubin and Roman data for fspl, usbl and pspl
+    '''
+    
+    tlsst = 60350.38482057137 + 2400000.5
+    RA, DEC = 267.92497054815516, -29.152232510353276
+    e = event.Event(ra=RA, dec=DEC)
+
+    if len(lsst_u) + len(lsst_g) + len(lsst_r) + len(lsst_i) + len(lsst_z) + len(lsst_y) == 0:
+        e.name = 'Event_Roman_' + str(int(Source))
+    else:
+        e.name = 'Event_RR_' + str(int(Source))
+    tel_list = []
+
+    # Add a PyLIMA telescope object to the event with the Gaia lightcurve
+    tel1 = telescopes.Telescope(name='Roman', camera_filter='W149',
+                                light_curve=wfirst_lc,
+                                light_curve_names=['time', 'mag', 'err_mag'],
+                                light_curve_units=['JD', 'mag', 'mag'],
+                                location='Space')
+
+    ephemerides = np.loadtxt(path_ephemerides)
+    ephemerides[:, 0] = ephemerides[:, 0]
+    ephemerides[:, 3] *= 60 * 300000 / 150000000
+    deltaT = tlsst - ephemerides[:, 0][0]
+    ephemerides[:, 0] = ephemerides[:, 0] + deltaT
+    tel1.spacecraft_positions = {'astrometry': [], 'photometry': ephemerides}
+    e.telescopes.append(tel1)
+    tel_list.append('Roman')
+    
+    lsst_lc_list = [lsst_u, lsst_g, lsst_r, lsst_i, lsst_z, lsst_y]
+    lsst_bands = "ugrizy"
+    for j in range(len(lsst_lc_list)):
+        if len(lsst_lc_list[j]) != 0:
+            tel = telescopes.Telescope(name=lsst_bands[j], camera_filter=lsst_bands[j],
+                                       light_curve=lsst_lc_list[j],
+                                       light_curve_names=['time', 'mag', 'err_mag'],
+                                       light_curve_units=['JD', 'mag', 'mag'],
+                                       location='Earth')
+            e.telescopes.append(tel)
+            tel_list.append(lsst_bands[j])
+    
+    e.check_event()
+    
+    # Use t_center if available; otherwise, use t0
+    t_guess = float(event_params['t_center']) if 't_center' in event_params else float(event_params.get('t0', None))
+
+    # Check if model is specified and create the appropriate model instance
+    if model == 'FSPL':
+        pyLIMAmodel = FSPLarge_model.FSPLargemodel(e, parallax=['Full', t_guess])
+    elif model == 'USBL':
+        if true_model:
+            pyLIMAmodel = USBL_model.USBLmodel(e, origin=['third_caustic', [0, 0]],
+                                               blend_flux_parameter='ftotal',
+                                               parallax=['Full', t_guess])
+        else:
+            pyLIMAmodel = USBL_model.USBLmodel(e, blend_flux_parameter='ftotal', parallax=['Full', t_guess])
+    elif model == 'PSPL':
+        pyLIMAmodel = PSPL_model.PSPLmodel(e, parallax=['Full', t_guess])
+
+    return pyLIMAmodel
