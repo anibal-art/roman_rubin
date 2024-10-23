@@ -309,7 +309,7 @@ def fit_rubin_roman(Source, event_params, path_save, path_ephemerides, model, al
         fit_2 = TRF_fit.TRFfit(pyLIMAmodel)
         pool = None
     elif algo == 'MCMC':
-        fit_2 = MCMC_fit.MCMCfit(pyLIMAmodel, MCMC_links=7000)
+        fit_2 = MCMC_fit.MCMCfit(pyLIMAmodel, MCMC_links=20000)
         pool = mul.Pool(processes=32)
     elif algo == 'DE':
         fit_2 = DE_fit.DEfit(pyLIMAmodel, telescopes_fluxes_method='polyfit', DE_population_size=20,
