@@ -11,7 +11,10 @@ path_ephemerides = str(script_dir)+'/ephemerides/Gaia.txt'
 path_dataslice = str(script_dir)+'/opsims/baseline/dataSlice.npy'
 path_storage = '/share/storage3/rubin/microlensing/romanrubin'
 j=1
-path_TRILEGAL_set =str(script_dir)+f'/TRILEGAL/FFP_uni_split_{j}.csv'#PB_planet_split_{j}.csv'# "/home/anibal/results_roman_rubin/PB_planet_split_1.csv"FFP_uni_split_3.csv
+path_TRILEGAL_set =str(script_dir)+f'/TRILEGAL/FFP_uni_split_{j}.csv'
+#"PB_planet_split_{j}.csv"
+#"FFP_uni_split_{j}.csv"
+#"BH_split_{j}.csv"
 path_to_save_model = path_storage+f"/test/set_sim{j}/"
 path_to_save_fit = path_storage+f"/test/set_fit{j}/"
 
