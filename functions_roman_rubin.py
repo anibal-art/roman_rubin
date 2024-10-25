@@ -489,8 +489,7 @@ def sim_event(i, data, path_ephemerides, path_dataslice, model):
     # This first if holds for an event with at least one Roman and Rubin band
     if Rubin_band and Roman_band:
         # This second if holds for a "detectable" event to fit
-        if True:#filter5points(pyLIMA_parameters, new_creation.telescopes) and deviation_from_constant(pyLIMA_parameters,
-                 #                                                                                new_creation.telescopes):
+        if filter5points(pyLIMA_parameters, new_creation.telescopes) and deviation_from_constant(pyLIMA_parameters, new_creation.telescopes):
             print("A good event to fit")
             return my_own_model, pyLIMA_parameters, True
         else:
