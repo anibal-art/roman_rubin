@@ -34,4 +34,4 @@ piEN = mean_for_sampling[8]
 piE_err = (1/piE)*np.sqrt((piEN_err*piEN)**2+(piEE_err*piEE)**2+2*piEE*piEN*cov_piEE_piEN)
 print("The value estimated is ", piE)
 print("The uncertainty using MC is ", np.std(piE_dist))
-print("The uncertainty using formulae for error propagation is ", piE_err)
+print("The uncertainty using formulae for error propagation is ", piE_err[0][0])
