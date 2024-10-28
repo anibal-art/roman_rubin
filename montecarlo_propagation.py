@@ -7,8 +7,8 @@ params_str = ["t0","u0", "te","rho","s","q","alpha","piEN", "piEE" ]
 path = "/share/storage3/rubin/microlensing/romanrubin/PB/set_fit1/"
 import os
 files_fit = os.listdir(path)
-
-data_fit = np.load(path+files_fit[0], allow_pickle=True).item()
+rand_index = np.random.randint(0,len(files_fit))
+data_fit = np.load(path+files_fit[rand_index], allow_pickle=True).item()
 mean_for_sampling = data_fit["best_model"][0:9]
 cov_for_sampling = data_fit['covariance_matrix'][0:9,0:9]
 
