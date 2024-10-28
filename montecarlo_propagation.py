@@ -4,9 +4,11 @@ import pygtc
 import matplotlib.pyplot as plt
 params_str = ["t0","u0", "te","rho","s","q","alpha","piEN", "piEE" ]
 
-path = "/home/anibal/roman_rubin/test_sim_fit/Event_RR_18_TRF.npy"
+path = "/share/storage3/rubin/microlensing/romanrubin/PB/set_fit1/"
+import os
+files_fit = os.listdir(path)
 
-data_fit = np.load(path, allow_pickle=True).item()
+data_fit = np.load(path+files_fit[0], allow_pickle=True).item()
 mean_for_sampling = data_fit["best_model"][0:9]
 cov_for_sampling = data_fit['covariance_matrix'][0:9,0:9]
 
