@@ -4,8 +4,14 @@ import pygtc
 
 params_str = ["t0","u0", "te","rho","s","q","alpha","piEN", "piEE" ]
 
-path = "/share/storage3/rubin/microlensing/romanrubin/PB/set_fit1/"
+path = "/home/anibal/roman_rubin/test_sim_fit/"#"/share/storage3/rubin/microlensing/romanrubin/PB/set_fit1/"
 import os
+
+#%%
+true_model = pd.read_csv("/home/anibal/roman_rubin/TRILEGAL/PB_planet_split_1.csv")
+mu_rel = true_model.iloc[18]["mu_rel"]
+mu_rel = true_model.iloc[18]["radius"]
+#%%
 files_fit = os.listdir(path)
 rand_index = np.random.randint(0,len(files_fit))
 data_fit = np.load(path+files_fit[rand_index], allow_pickle=True).item()
@@ -18,8 +24,6 @@ samples = np.random.multivariate_normal(mean_for_sampling, cov_for_sampling, n_s
 piEN_dist = np.array(samples)[:,7]
 piEE_dist = np.array(samples)[:,8]
 piE_dist = np.sqrt(piEN_dist**2+piEE_dist**2)
-
-
 
 errors = np.sqrt(np.diag(data_fit['covariance_matrix'][0:9,0:9]))
 piEE_err = errors[7]
