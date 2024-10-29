@@ -300,7 +300,7 @@ def thetaE(best_model, covariance_matrix, indx_tE_rho):
 
 
 
-def mass(path,fit_rr,fit_roman):
+def mass(path,fit_rr,fit_roman, labels_params):
     """
     Parameters
     ----------
@@ -326,31 +326,37 @@ def mass(path,fit_rr,fit_roman):
     mass = {}
     mass_MC = {}
     
-    path_TRILEGAL_set= current_path+'/TRILEGAL/PB_planet_split_1.csv'
+    
     if len(labels_params)==len(['t0','u0','te','rho',"s","q","alpha",'piEN','piEE']):
-        indx_piE = [7,8]
+        indx_tE_rho = [2,3]
+        path_TRILEGAL = lambda nset: f'/TRILEGAL/PB_planet_split_{nset}.csv'
     elif len(labels_params)==len(['t0','u0','te','rho','piEN','piEE']):
-        indx_piE = [4,5]
+        indx_tE_rho = [2,3]
+        path_TRILEGAL = lambda nset: f'/TRILEGAL/FFP_split_{nset}.csv'
     elif len(labels_params)==len(['t0','u0','te','piEN','piEE']):
-        indx_piE = [3,4]
+        indx_tE_rho = [2]
+        path_TRILEGAL = lambda nset: f'/TRILEGAL/BH_split_{nset}.csv'
         
+    for i in tqdm(range(len(fit_rr))):
+        nsource = fit_rr["Source"].iloc[i]
+        nset = int(nsource / 5000)
+        nevent = nsource - nset * 5000
+        data = np.load(path + f"set_fit{nset}/Event_RR_{nevent}_TRF.npy", allow_pickle=True)
+        data_rom = np.load(path + f"set_fit{nset}/Event_Roman_{nevent}_TRF.npy", allow_pickle=True)
+        path_TRILEGAL_set= path+ path_TRILEGAL(nset)
+        TRILEGAL_data = pd.read_csv(path_TRILEGAL_set)
+        mu_rel = TRILEGAL_data["mu_rel"]
+        thetas = TRILEGAL_data["radius"]
         
-    # for i in tqdm(range(len(fit_rr))):
-    #     nsource = fit_rr["Source"].iloc[i]
-    #     nset = int(nsource / 5000)
-    #     nevent = nsource - nset * 5000
-    #     data = np.load(path + f"set_fit{nset}/Event_RR_{nevent}_TRF.npy", allow_pickle=True)
-    #     data_rom = np.load(path + f"set_fit{nset}/Event_Roman_{nevent}_TRF.npy", allow_pickle=True)
+        best_model = data.item()['best_model']
+        covariance_matrix = data.item()['covariance_matrix']
+        # cov_piEE_piEN[nsource] = covariance_matrix[indx_piE[0], indx_piE[1]]
+        # piE_MC_rr[nsource] = montecarlo_propagation_piE(best_model, covariance_matrix, indx_piE)
         
-    #     best_model = data.item()['best_model']
-    #     covariance_matrix = data.item()['covariance_matrix']
-    #     cov_piEE_piEN[nsource] = covariance_matrix[indx_piE[0], indx_piE[1]]
-    #     piE_MC_rr[nsource] = montecarlo_propagation_piE(best_model, covariance_matrix, indx_piE)
-        
-    #     best_model_rom = data_rom.item()['best_model']
-    #     covariance_matrix_rom = data_rom.item()['covariance_matrix']
-    #     cov_piEE_piEN_rom[nsource] = covariance_matrix_rom[indx_piE[0], indx_piE[1]]
-    #     piE_MC_roman[nsource] = montecarlo_propagation_piE(best_model_rom, covariance_matrix_rom, indx_piE)
+        best_model_rom = data_rom.item()['best_model']
+        covariance_matrix_rom = data_rom.item()['covariance_matrix']
+        # cov_piEE_piEN_rom[nsource] = covariance_matrix_rom[indx_piE[0], indx_piE[1]]
+        # piE_MC_roman[nsource] = montecarlo_propagation_piE(best_model_rom, covariance_matrix_rom, indx_piE)
         
     # fit_rr["cov_piEE_piEN"] = fit_rr['Source'].map(cov_piEE_piEN)
     # fit_roman["cov_piEE_piEN"] = fit_rr['Source'].map(cov_piEE_piEN_rom)
