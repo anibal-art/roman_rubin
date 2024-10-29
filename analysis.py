@@ -215,16 +215,6 @@ def montecarlo_propagation_piE(best_model, covariance_matrix, indx_piE):
     return np.std(piE_dist)
 
 
-def MC_thetaE_tE(best_model, covariance_matrix, indx_piE):
-    
-    samples = np.random.multivariate_normal(best_model, covariance_matrix, 30000)
-    
-    piEN_dist = np.array(samples)[:,indx_piE[0]]
-    piEE_dist = np.array(samples)[:,indx_piE[1]]
-    
-    piE_dist = np.sqrt(piEN_dist**2+piEE_dist**2)
-    
-    return np.std(piE_dist)
 
 def piE_cov_terms(path, fit_rr, fit_roman, labels_params):
     cov_piEE_piEN = {}
@@ -275,6 +265,41 @@ def piE_cov_terms(path, fit_rr, fit_roman, labels_params):
     
     return fit_rr, fit_roman
 
+
+def thetaE(best_model, covariance_matrix, indx_tE_rho):
+    """
+    Parameters
+    ----------
+    best_model : numpy array
+        Array containing best model from fit.
+    covariance_matrix : numpy matrix
+        Covariance matrix.
+    indx_piE : TYPE
+        indices for tE and rho in best_model_array or covariance_matrix.
+    Returns
+    -------
+    thetaE_true
+    thetaE_MC_tE
+    thetaE_MC_rho
+
+    """
+    
+    thetaE_true = 1
+    mu_rel = 1
+    theta_star = 1
+    
+    samples = np.random.multivariate_normal(best_model, covariance_matrix, 30000)
+    if len(indx_tE_rho)==2:
+        thetaE_MC_tE = np.array(samples)[:,indx_tE_rho[0]]
+        thetaE_MC_rho = np.array(samples)[:,indx_tE_rho[1]]
+    else:
+        thetaE_MC_tE = np.array(samples)[:,indx_tE_rho[0]]
+        
+    return thetaE_true, thetaE_MC_tE, thetaE_MC_rho
+
+
+
+
 def mass(path,fit_rr,fit_roman):
     """
     Parameters
@@ -301,12 +326,13 @@ def mass(path,fit_rr,fit_roman):
     mass = {}
     mass_MC = {}
     
-    # if len(labels_params)==len(['t0','u0','te','rho',"s","q","alpha",'piEN','piEE']):
-    #     indx_piE = [7,8]
-    # elif len(labels_params)==len(['t0','u0','te','rho','piEN','piEE']):
-    #     indx_piE = [4,5]
-    # elif len(labels_params)==len(['t0','u0','te','piEN','piEE']):
-    #     indx_piE = [3,4]
+    path_TRILEGAL_set= current_path+'/TRILEGAL/PB_planet_split_1.csv'
+    if len(labels_params)==len(['t0','u0','te','rho',"s","q","alpha",'piEN','piEE']):
+        indx_piE = [7,8]
+    elif len(labels_params)==len(['t0','u0','te','rho','piEN','piEE']):
+        indx_piE = [4,5]
+    elif len(labels_params)==len(['t0','u0','te','piEN','piEE']):
+        indx_piE = [3,4]
         
         
     # for i in tqdm(range(len(fit_rr))):
