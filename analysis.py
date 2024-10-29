@@ -82,8 +82,8 @@ def fit_true(path, labels_params):
             path_roman = PATH+list_files_roman[i]
             try:
             # if i==4:
-                new_row_true, new_row_rr = new_rows(path_rr,st)
-                new_row_true2, new_row_roman = new_rows(path_roman,st)
+                new_row_true, new_row_rr = new_rows(path_rr,st, labels_params)
+                new_row_true2, new_row_roman = new_rows(path_roman,st, labels_params)
                 true = pd.concat([true, new_row_true], ignore_index=True)
                 fit_rr = pd.concat([fit_rr, new_row_rr], ignore_index=True)
                 fit_roman = pd.concat([fit_roman, new_row_roman], ignore_index=True)
