@@ -1,14 +1,7 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Created on Tue Oct 29 10:43:01 2024
-
-@author: anibal
-"""
-
 from analysis import fit_true, chichi_to_fits_files, piE_cov_terms, categories_function
 from pathlib import Path
 #labels_params: list[str] = ['t0','u0','te','rho',"s","q","alpha",'piEN','piEE']
+#labels_params: list[str] = ['t0','u0','te','rho','piEN','piEE']
 labels_params: list[str] = ['t0','u0','te','piEN','piEE']
 script_dir = str(Path(__file__).parent)
 print(script_dir)
@@ -23,15 +16,7 @@ elif len(labels_params)==6:
 elif len(labels_params)==9:
     save_results = script_dir+'/all_results/PB/results/'
 
-path_dataslice =script_dir+'/opsims/baseline/dataSlice.npy'
-# nominal_seasons = [
-#     {'start': '2027-02-11T00:00:00', 'end': '2027-04-24T00:00:00'},
-#     {'start': '2027-08-16T00:00:00', 'end': '2027-10-27T00:00:00'},
-#     {'start': '2028-02-11T00:00:00', 'end': '2028-04-24T00:00:00'},
-#     {'start': '2030-02-11T00:00:00', 'end': '2030-04-24T00:00:00'},
-#     {'start': '2030-08-16T00:00:00', 'end': '2030-10-27T00:00:00'},
-#     {'start': '2031-02-11T00:00:00', 'end': '2031-04-24T00:00:00'},
-# ]
+path_dataslice = script_dir+'/opsims/baseline/dataSlice.npy'
 
 path_model = ['set_sim'+str(i)+'/' for i in range(1,9)]
 path_fit = ['set_fit'+str(i)+'/' for i in range(1,9)]

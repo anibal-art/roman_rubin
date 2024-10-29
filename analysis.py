@@ -85,8 +85,8 @@ def fit_true(path, labels_params):
                 new_row_true, new_row_rr = new_rows(path_rr,st, labels_params)
                 new_row_true2, new_row_roman = new_rows(path_roman,st, labels_params)
 
-                new_row_true = new_row_true.dropna(how='all', axis=1)  # Drop all-NA columns in new_row_true
-                new_row_true2 = new_row_true2.dropna(how='all', axis=1)  # Drop all-NA columns in new_row_true
+                # new_row_true = new_row_true.dropna(how='all', axis=1)  # Drop all-NA columns in new_row_true
+                # new_row_true2 = new_row_true2.dropna(how='all', axis=1)  # Drop all-NA columns in new_row_true
 
                 true = pd.concat([true, new_row_true], ignore_index=True)
                 fit_rr = pd.concat([fit_rr, new_row_rr], ignore_index=True)
