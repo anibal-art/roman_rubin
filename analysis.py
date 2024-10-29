@@ -346,7 +346,9 @@ def mass(path,fit_rr,fit_roman, labels_params):
         path_TRILEGAL_set= path+ path_TRILEGAL(nset)
         TRILEGAL_data = pd.read_csv(path_TRILEGAL_set)
         mu_rel = TRILEGAL_data["mu_rel"]
-        thetas = TRILEGAL_data["radius"]
+        Rstar = TRILEGAL_data["radius"]
+        DS = TRILEGAL_data["D_S"]
+        thetas = np.arctan(Rstar/DS).decompose().to('mas').value
         
         best_model = data.item()['best_model']
         covariance_matrix = data.item()['covariance_matrix']
