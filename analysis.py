@@ -188,7 +188,8 @@ def chichi_to_fits_files(path,fit_rr, fit_roman):
     id_to_chi2_roman = {}
     id_to_dof_rr = {}
     id_to_dof_roman = {}
-    for i in tqdm(range(1,9)):
+    ndir = len(os.listdir(path))/2
+    for i in tqdm(range(1,ndir+1)):
         common_elements_list = event_fits(path+f"set_fit{i}/")
         if not len(common_elements_list)==0:
             for j in range(len(common_elements_list)):
@@ -215,9 +216,12 @@ def montecarlo_propagation_piE(best_model, covariance_matrix, indx_piE):
 
 
 def MC_thetaE_tE(best_model, covariance_matrix, indx_piE):
+    
     samples = np.random.multivariate_normal(best_model, covariance_matrix, 30000)
+    
     piEN_dist = np.array(samples)[:,indx_piE[0]]
     piEE_dist = np.array(samples)[:,indx_piE[1]]
+    
     piE_dist = np.sqrt(piEN_dist**2+piEE_dist**2)
     
     return np.std(piE_dist)
@@ -259,11 +263,11 @@ def piE_cov_terms(path, fit_rr, fit_roman, labels_params):
 
     fit_rr['piE'] = np.sqrt(fit_rr['piEN'] ** 2 + fit_rr['piEE'] ** 2)
     fit_rr['piE_err'] = (1 / fit_rr['piE']) * np.sqrt((fit_rr['piEN_err'] * fit_rr['piEN']) ** 2 + (
-                fit_rr['piEE_err'] * fit_rr['piEE']) ** 2)  # +2*fit_rr['piEE']*fit_rr['piEN']*fit_rr['cov_piEE_piEN'])
+                fit_rr['piEE_err'] * fit_rr['piEE']) ** 2 +2*fit_rr['piEE']*fit_rr['piEN']*fit_rr['cov_piEE_piEN'])
     fit_roman['piE'] = np.sqrt(fit_roman['piEN'] ** 2 + fit_roman['piEE'] ** 2)
     fit_roman['piE_err'] = (1 / fit_roman['piE']) * np.sqrt((fit_roman['piEN_err'] * fit_roman['piEN']) ** 2 + (
                 fit_roman['piEE_err'] * fit_roman[
-            'piEE']) ** 2)  # +2*fit_roman['piEE']*fit_roman['piEN']*fit_roman['cov_piEE_piEN'])
+            'piEE']) ** 2 +2*fit_roman['piEE']*fit_roman['piEN']*fit_roman['cov_piEE_piEN'])
     #true['piE'] = np.sqrt(true['piEN'] ** 2 + true['piEE'] ** 2)
     
     fit_rr['piE_err_MC'] = fit_rr['Source'].map(piE_MC_rr)
@@ -271,70 +275,73 @@ def piE_cov_terms(path, fit_rr, fit_roman, labels_params):
     
     return fit_rr, fit_roman
 
-# def mass(path,fit_rr,fit_roman):
-#     """
+def mass(path,fit_rr,fit_roman):
+    """
+    Parameters
+    ----------
+    path : str
+        path to the directory where the fit and sims are saved.
+    fit_rr : dataframe
+        Pandas dataframe with the results of the fitting process 
+    fit_roman : dataframe
+        Pandas dataframe with the results of the fitting process
 
-#     Parameters
-#     ----------
-#     path : str
-#         path to the directory where the fit and sims are saved.
-#     fit_rr : dataframe
-#         Pandas dataframe with the results of the fitting process 
-#     fit_roman : dataframe
-#         Pandas dataframe with the results of the fitting process
-
-#     Returns
-#     -------
-#     fit_rr : dataframe
-#         add a column with the mass and othe with the mass obtained from MonteCarlo propagation
-#     fit_roman : dataframe
-#         DESCRIPTION.
-
-#     """
-#     mass = {}
-#     mass_MC = {}
-        
-#     if len(labels_params)==len(['t0','u0','te','rho',"s","q","alpha",'piEN','piEE']):
-#         indx_piE = [7,8]
-#     elif len(labels_params)==len(['t0','u0','te','rho','piEN','piEE']):
-#         indx_piE = [4,5]
-#     elif len(labels_params)==len(['t0','u0','te','piEN','piEE']):
-#         indx_piE = [3,4]
-        
-        
-#     for i in tqdm(range(len(fit_rr))):
-#         nsource = fit_rr["Source"].iloc[i]
-#         nset = int(nsource / 5000)
-#         nevent = nsource - nset * 5000
-#         data = np.load(path + f"set_fit{nset}/Event_RR_{nevent}_TRF.npy", allow_pickle=True)
-#         data_rom = np.load(path + f"set_fit{nset}/Event_Roman_{nevent}_TRF.npy", allow_pickle=True)
-        
-#         best_model = data.item()['best_model']
-#         covariance_matrix = data.item()['covariance_matrix']
-#         cov_piEE_piEN[nsource] = covariance_matrix[indx_piE[0], indx_piE[1]]
-#         piE_MC_rr[nsource] = montecarlo_propagation_piE(best_model, covariance_matrix, indx_piE)
-        
-#         best_model_rom = data_rom.item()['best_model']
-#         covariance_matrix_rom = data_rom.item()['covariance_matrix']
-#         cov_piEE_piEN_rom[nsource] = covariance_matrix_rom[indx_piE[0], indx_piE[1]]
-#         piE_MC_roman[nsource] = montecarlo_propagation_piE(best_model_rom, covariance_matrix_rom, indx_piE)
-        
-#     fit_rr["cov_piEE_piEN"] = fit_rr['Source'].map(cov_piEE_piEN)
-#     fit_roman["cov_piEE_piEN"] = fit_rr['Source'].map(cov_piEE_piEN_rom)
-
-#     fit_rr['piE'] = np.sqrt(fit_rr['piEN'] ** 2 + fit_rr['piEE'] ** 2)
-#     fit_rr['piE_err'] = (1 / fit_rr['piE']) * np.sqrt((fit_rr['piEN_err'] * fit_rr['piEN']) ** 2 + (
-#                 fit_rr['piEE_err'] * fit_rr['piEE']) ** 2)  # +2*fit_rr['piEE']*fit_rr['piEN']*fit_rr['cov_piEE_piEN'])
-#     fit_roman['piE'] = np.sqrt(fit_roman['piEN'] ** 2 + fit_roman['piEE'] ** 2)
-#     fit_roman['piE_err'] = (1 / fit_roman['piE']) * np.sqrt((fit_roman['piEN_err'] * fit_roman['piEN']) ** 2 + (
-#                 fit_roman['piEE_err'] * fit_roman[
-#             'piEE']) ** 2)  # +2*fit_roman['piEE']*fit_roman['piEN']*fit_roman['cov_piEE_piEN'])
-#     true['piE'] = np.sqrt(true['piEN'] ** 2 + true['piEE'] ** 2)
+    Returns
+    -------
+    fit_rr : dataframe
+        Add a column with the mass_true.
+        Add a column with the mass obtained from MonteCarlo propagation.
+        Add a column with the mass obtained from propagation formulae.
+    fit_roman : dataframe
+        Add a column with the mass_true.
+        Add a column with the mass obtained from MonteCarlo propagation.
+        Add a column with the mass obtained from propagation formulae.
+    """
+    mass_true = {}
+    mass = {}
+    mass_MC = {}
     
-#     fit_rr['piE_err_MC'] = fit_rr['Source'].map(piE_MC_rr)
-#     fit_roman['piE_err_MC'] = fit_roman['Source'].map(piE_MC_roman)
+    # if len(labels_params)==len(['t0','u0','te','rho',"s","q","alpha",'piEN','piEE']):
+    #     indx_piE = [7,8]
+    # elif len(labels_params)==len(['t0','u0','te','rho','piEN','piEE']):
+    #     indx_piE = [4,5]
+    # elif len(labels_params)==len(['t0','u0','te','piEN','piEE']):
+    #     indx_piE = [3,4]
+        
+        
+    # for i in tqdm(range(len(fit_rr))):
+    #     nsource = fit_rr["Source"].iloc[i]
+    #     nset = int(nsource / 5000)
+    #     nevent = nsource - nset * 5000
+    #     data = np.load(path + f"set_fit{nset}/Event_RR_{nevent}_TRF.npy", allow_pickle=True)
+    #     data_rom = np.load(path + f"set_fit{nset}/Event_Roman_{nevent}_TRF.npy", allow_pickle=True)
+        
+    #     best_model = data.item()['best_model']
+    #     covariance_matrix = data.item()['covariance_matrix']
+    #     cov_piEE_piEN[nsource] = covariance_matrix[indx_piE[0], indx_piE[1]]
+    #     piE_MC_rr[nsource] = montecarlo_propagation_piE(best_model, covariance_matrix, indx_piE)
+        
+    #     best_model_rom = data_rom.item()['best_model']
+    #     covariance_matrix_rom = data_rom.item()['covariance_matrix']
+    #     cov_piEE_piEN_rom[nsource] = covariance_matrix_rom[indx_piE[0], indx_piE[1]]
+    #     piE_MC_roman[nsource] = montecarlo_propagation_piE(best_model_rom, covariance_matrix_rom, indx_piE)
+        
+    # fit_rr["cov_piEE_piEN"] = fit_rr['Source'].map(cov_piEE_piEN)
+    # fit_roman["cov_piEE_piEN"] = fit_rr['Source'].map(cov_piEE_piEN_rom)
+
+    # fit_rr['piE'] = np.sqrt(fit_rr['piEN'] ** 2 + fit_rr['piEE'] ** 2)
+    # fit_rr['piE_err'] = (1 / fit_rr['piE']) * np.sqrt((fit_rr['piEN_err'] * fit_rr['piEN']) ** 2 + (
+    #             fit_rr['piEE_err'] * fit_rr['piEE']) ** 2)  # +2*fit_rr['piEE']*fit_rr['piEN']*fit_rr['cov_piEE_piEN'])
+    # fit_roman['piE'] = np.sqrt(fit_roman['piEN'] ** 2 + fit_roman['piEE'] ** 2)
+    # fit_roman['piE_err'] = (1 / fit_roman['piE']) * np.sqrt((fit_roman['piEN_err'] * fit_roman['piEN']) ** 2 + (
+    #             fit_roman['piEE_err'] * fit_roman[
+    #         'piEE']) ** 2)  # +2*fit_roman['piEE']*fit_roman['piEN']*fit_roman['cov_piEE_piEN'])
+    # true['piE'] = np.sqrt(true['piEN'] ** 2 + true['piEE'] ** 2)
     
-#     return fit_rr, fit_roman
+    # fit_rr['piE_err_MC'] = fit_rr['Source'].map(piE_MC_rr)
+    # fit_roman['piE_err_MC'] = fit_roman['Source'].map(piE_MC_roman)
+    
+    # return fit_rr, fit_roman
 
 
 # keys = labels_params
