@@ -8,7 +8,8 @@ from tqdm.auto import tqdm
 import pandas as pd
 import numpy as np
 import warnings
-
+from astropy import constants as const
+from astropy import units as u
 
 def event_fits(path_fits):
     '''
@@ -343,12 +344,23 @@ def mass(path,fit_rr,fit_roman, labels_params):
         nevent = nsource - nset * 5000
         data = np.load(path + f"set_fit{nset}/Event_RR_{nevent}_TRF.npy", allow_pickle=True)
         data_rom = np.load(path + f"set_fit{nset}/Event_Roman_{nevent}_TRF.npy", allow_pickle=True)
+        
         path_TRILEGAL_set= path+ path_TRILEGAL(nset)
         TRILEGAL_data = pd.read_csv(path_TRILEGAL_set)
         mu_rel = TRILEGAL_data["mu_rel"]
         Rstar = TRILEGAL_data["radius"]
         DS = TRILEGAL_data["D_S"]
         thetas = np.arctan(Rstar/DS).decompose().to('mas').value
+        rho_true = TRILEGAL_data["rho"]
+        c = const.c
+        G = const.G
+        yr2day = 365.25
+        # print(pi_rel)
+        k = 4 * G / (c ** 2)
+        aconv = (180 * 60 * 60 * 1000) / np.pi
+        piE_true = np.sqrt(TRILEGAL_data["piEE"]**2+TRILEGAL_data["piEN"]**2)
+        thetaE_true = TRILEGAL_data["te"]*TRILEGAL_data["mu_rel"]
+        m_true = thetaE_true/(k*piE_true)
         
         best_model = data.item()['best_model']
         covariance_matrix = data.item()['covariance_matrix']
@@ -362,10 +374,10 @@ def mass(path,fit_rr,fit_roman, labels_params):
         
     # fit_rr["cov_piEE_piEN"] = fit_rr['Source'].map(cov_piEE_piEN)
     # fit_roman["cov_piEE_piEN"] = fit_rr['Source'].map(cov_piEE_piEN_rom)
-
     # fit_rr['piE'] = np.sqrt(fit_rr['piEN'] ** 2 + fit_rr['piEE'] ** 2)
     # fit_rr['piE_err'] = (1 / fit_rr['piE']) * np.sqrt((fit_rr['piEN_err'] * fit_rr['piEN']) ** 2 + (
     #             fit_rr['piEE_err'] * fit_rr['piEE']) ** 2)  # +2*fit_rr['piEE']*fit_rr['piEN']*fit_rr['cov_piEE_piEN'])
+    
     # fit_roman['piE'] = np.sqrt(fit_roman['piEN'] ** 2 + fit_roman['piEE'] ** 2)
     # fit_roman['piE_err'] = (1 / fit_roman['piE']) * np.sqrt((fit_roman['piEN_err'] * fit_roman['piEN']) ** 2 + (
     #             fit_roman['piEE_err'] * fit_roman[
