@@ -267,70 +267,70 @@ def piE_cov_terms(path,fit_rr,fit_roman):
     
     return fit_rr, fit_roman
 
-def mass(path,fit_rr,fit_roman):
-    """
+# def mass(path,fit_rr,fit_roman):
+#     """
 
-    Parameters
-    ----------
-    path : str
-        path to the directory where the fit and sims are saved.
-    fit_rr : dataframe
-        Pandas dataframe with the results of the fitting process 
-    fit_roman : dataframe
-        Pandas dataframe with the results of the fitting process
+#     Parameters
+#     ----------
+#     path : str
+#         path to the directory where the fit and sims are saved.
+#     fit_rr : dataframe
+#         Pandas dataframe with the results of the fitting process 
+#     fit_roman : dataframe
+#         Pandas dataframe with the results of the fitting process
 
-    Returns
-    -------
-    fit_rr : dataframe
-        add a column with the mass and othe with the mass obtained from MonteCarlo propagation
-    fit_roman : dataframe
-        DESCRIPTION.
+#     Returns
+#     -------
+#     fit_rr : dataframe
+#         add a column with the mass and othe with the mass obtained from MonteCarlo propagation
+#     fit_roman : dataframe
+#         DESCRIPTION.
 
-    """
-    mass = {}
-    mass_MC = {}
+#     """
+#     mass = {}
+#     mass_MC = {}
         
-    if len(labels_params)==len(['t0','u0','te','rho',"s","q","alpha",'piEN','piEE']):
-        indx_piE = [7,8]
-    elif len(labels_params)==len(['t0','u0','te','rho','piEN','piEE']):
-        indx_piE = [4,5]
-    elif len(labels_params)==len(['t0','u0','te','piEN','piEE']):
-        indx_piE = [3,4]
+#     if len(labels_params)==len(['t0','u0','te','rho',"s","q","alpha",'piEN','piEE']):
+#         indx_piE = [7,8]
+#     elif len(labels_params)==len(['t0','u0','te','rho','piEN','piEE']):
+#         indx_piE = [4,5]
+#     elif len(labels_params)==len(['t0','u0','te','piEN','piEE']):
+#         indx_piE = [3,4]
         
         
-    for i in tqdm(range(len(fit_rr))):
-        nsource = fit_rr["Source"].iloc[i]
-        nset = int(nsource / 5000)
-        nevent = nsource - nset * 5000
-        data = np.load(path + f"set_fit{nset}/Event_RR_{nevent}_TRF.npy", allow_pickle=True)
-        data_rom = np.load(path + f"set_fit{nset}/Event_Roman_{nevent}_TRF.npy", allow_pickle=True)
+#     for i in tqdm(range(len(fit_rr))):
+#         nsource = fit_rr["Source"].iloc[i]
+#         nset = int(nsource / 5000)
+#         nevent = nsource - nset * 5000
+#         data = np.load(path + f"set_fit{nset}/Event_RR_{nevent}_TRF.npy", allow_pickle=True)
+#         data_rom = np.load(path + f"set_fit{nset}/Event_Roman_{nevent}_TRF.npy", allow_pickle=True)
         
-        best_model = data.item()['best_model']
-        covariance_matrix = data.item()['covariance_matrix']
-        cov_piEE_piEN[nsource] = covariance_matrix[indx_piE[0], indx_piE[1]]
-        piE_MC_rr[nsource] = montecarlo_propagation_piE(best_model, covariance_matrix, indx_piE)
+#         best_model = data.item()['best_model']
+#         covariance_matrix = data.item()['covariance_matrix']
+#         cov_piEE_piEN[nsource] = covariance_matrix[indx_piE[0], indx_piE[1]]
+#         piE_MC_rr[nsource] = montecarlo_propagation_piE(best_model, covariance_matrix, indx_piE)
         
-        best_model_rom = data_rom.item()['best_model']
-        covariance_matrix_rom = data_rom.item()['covariance_matrix']
-        cov_piEE_piEN_rom[nsource] = covariance_matrix_rom[indx_piE[0], indx_piE[1]]
-        piE_MC_roman[nsource] = montecarlo_propagation_piE(best_model_rom, covariance_matrix_rom, indx_piE)
+#         best_model_rom = data_rom.item()['best_model']
+#         covariance_matrix_rom = data_rom.item()['covariance_matrix']
+#         cov_piEE_piEN_rom[nsource] = covariance_matrix_rom[indx_piE[0], indx_piE[1]]
+#         piE_MC_roman[nsource] = montecarlo_propagation_piE(best_model_rom, covariance_matrix_rom, indx_piE)
         
-    fit_rr["cov_piEE_piEN"] = fit_rr['Source'].map(cov_piEE_piEN)
-    fit_roman["cov_piEE_piEN"] = fit_rr['Source'].map(cov_piEE_piEN_rom)
+#     fit_rr["cov_piEE_piEN"] = fit_rr['Source'].map(cov_piEE_piEN)
+#     fit_roman["cov_piEE_piEN"] = fit_rr['Source'].map(cov_piEE_piEN_rom)
 
-    fit_rr['piE'] = np.sqrt(fit_rr['piEN'] ** 2 + fit_rr['piEE'] ** 2)
-    fit_rr['piE_err'] = (1 / fit_rr['piE']) * np.sqrt((fit_rr['piEN_err'] * fit_rr['piEN']) ** 2 + (
-                fit_rr['piEE_err'] * fit_rr['piEE']) ** 2)  # +2*fit_rr['piEE']*fit_rr['piEN']*fit_rr['cov_piEE_piEN'])
-    fit_roman['piE'] = np.sqrt(fit_roman['piEN'] ** 2 + fit_roman['piEE'] ** 2)
-    fit_roman['piE_err'] = (1 / fit_roman['piE']) * np.sqrt((fit_roman['piEN_err'] * fit_roman['piEN']) ** 2 + (
-                fit_roman['piEE_err'] * fit_roman[
-            'piEE']) ** 2)  # +2*fit_roman['piEE']*fit_roman['piEN']*fit_roman['cov_piEE_piEN'])
-    true['piE'] = np.sqrt(true['piEN'] ** 2 + true['piEE'] ** 2)
+#     fit_rr['piE'] = np.sqrt(fit_rr['piEN'] ** 2 + fit_rr['piEE'] ** 2)
+#     fit_rr['piE_err'] = (1 / fit_rr['piE']) * np.sqrt((fit_rr['piEN_err'] * fit_rr['piEN']) ** 2 + (
+#                 fit_rr['piEE_err'] * fit_rr['piEE']) ** 2)  # +2*fit_rr['piEE']*fit_rr['piEN']*fit_rr['cov_piEE_piEN'])
+#     fit_roman['piE'] = np.sqrt(fit_roman['piEN'] ** 2 + fit_roman['piEE'] ** 2)
+#     fit_roman['piE_err'] = (1 / fit_roman['piE']) * np.sqrt((fit_roman['piEN_err'] * fit_roman['piEN']) ** 2 + (
+#                 fit_roman['piEE_err'] * fit_roman[
+#             'piEE']) ** 2)  # +2*fit_roman['piEE']*fit_roman['piEN']*fit_roman['cov_piEE_piEN'])
+#     true['piE'] = np.sqrt(true['piEN'] ** 2 + true['piEE'] ** 2)
     
-    fit_rr['piE_err_MC'] = fit_rr['Source'].map(piE_MC_rr)
-    fit_roman['piE_err_MC'] = fit_roman['Source'].map(piE_MC_roman)
+#     fit_rr['piE_err_MC'] = fit_rr['Source'].map(piE_MC_rr)
+#     fit_roman['piE_err_MC'] = fit_roman['Source'].map(piE_MC_roman)
     
-    return fit_rr, fit_roman
+#     return fit_rr, fit_roman
 
 
 # keys = labels_params
@@ -380,36 +380,43 @@ def categories_function(true,path_dataslice):
 
 
 
-from pathlib import Path
-#labels_params: list[str] = ['t0','u0','te','rho',"s","q","alpha",'piEN','piEE']
-labels_params: list[str] = ['t0','u0','te','piEN','piEE']
-script_dir = str(Path(__file__).parent)
-print(script_dir)
+# from pathlib import Path
+# #labels_params: list[str] = ['t0','u0','te','rho',"s","q","alpha",'piEN','piEE']
+# labels_params: list[str] = ['t0','u0','te','piEN','piEE']
+# script_dir = str(Path(__file__).parent)
+# print(script_dir)
 
-path_ephemerides = script_dir+'/ajustes/Gaia.txt'
-path = '/share/storage3/rubin/microlensing/romanrubin/BH/' # path in the CHE cluster
-save_results = path+'results/'
-path_dataslice =script_dir+'/opsims/baseline/dataSlice.npy'
-nominal_seasons = [
-    {'start': '2027-02-11T00:00:00', 'end': '2027-04-24T00:00:00'},
-    {'start': '2027-08-16T00:00:00', 'end': '2027-10-27T00:00:00'},
-    {'start': '2028-02-11T00:00:00', 'end': '2028-04-24T00:00:00'},
-    {'start': '2030-02-11T00:00:00', 'end': '2030-04-24T00:00:00'},
-    {'start': '2030-08-16T00:00:00', 'end': '2030-10-27T00:00:00'},
-    {'start': '2031-02-11T00:00:00', 'end': '2031-04-24T00:00:00'},
-]
+# path_ephemerides = script_dir+'/ajustes/Gaia.txt'
+# path = '/share/storage3/rubin/microlensing/romanrubin/BH/' # path in the CHE cluster
 
-path_model = ['set_sim'+str(i)+'/' for i in range(1,9)]
-path_fit = ['set_fit'+str(i)+'/' for i in range(1,9)]
-path_set_sim = [path+'set_sim'+str(i)+'/' for i in range(1,9)]
-path_set_fit = [path+'set_fit'+str(i)+'/' for i in range(1,9)]
+# if len(labels_params)==5:
+#     save_results = script_dir+'/all_results/BH/results/'
+# elif len(labels_params)==6:
+#     save_results = script_dir+'/all_results/FFP/results/'
+# elif len(labels_params)==9:
+#     save_results = script_dir+'/all_results/PB/results/'
+
+# path_dataslice =script_dir+'/opsims/baseline/dataSlice.npy'
+# nominal_seasons = [
+#     {'start': '2027-02-11T00:00:00', 'end': '2027-04-24T00:00:00'},
+#     {'start': '2027-08-16T00:00:00', 'end': '2027-10-27T00:00:00'},
+#     {'start': '2028-02-11T00:00:00', 'end': '2028-04-24T00:00:00'},
+#     {'start': '2030-02-11T00:00:00', 'end': '2030-04-24T00:00:00'},
+#     {'start': '2030-08-16T00:00:00', 'end': '2030-10-27T00:00:00'},
+#     {'start': '2031-02-11T00:00:00', 'end': '2031-04-24T00:00:00'},
+# ]
+
+# path_model = ['set_sim'+str(i)+'/' for i in range(1,9)]
+# path_fit = ['set_fit'+str(i)+'/' for i in range(1,9)]
+# path_set_sim = [path+'set_sim'+str(i)+'/' for i in range(1,9)]
+# path_set_fit = [path+'set_fit'+str(i)+'/' for i in range(1,9)]
 
 
-true, fit_rr, fit_roman = fit_true(path)
-fit_rr1, fit_roman1 = chichi_to_fits_files(path, fit_rr, fit_roman)
-fit_rr2, fit_roman2 = piE_cov_terms(path,fit_rr1,fit_roman1)
-true1 = categories_function(true, path_dataslice)
+# true, fit_rr, fit_roman = fit_true(path)
+# fit_rr1, fit_roman1 = chichi_to_fits_files(path, fit_rr, fit_roman)
+# fit_rr2, fit_roman2 = piE_cov_terms(path,fit_rr1,fit_roman1)
+# true1 = categories_function(true, path_dataslice)
 
-fit_rr2.to_csv(save_results+'fit_rr_ffp.csv', index=False)
-fit_roman2.to_csv(save_results+'fit_roman_ffp.csv', index=False)
-true1.to_csv(save_results+'true_ffp.csv', index=False)
+# fit_rr2.to_csv(save_results+'fit_rr_ffp.csv', index=False)
+# fit_roman2.to_csv(save_results+'fit_roman_ffp.csv', index=False)
+# true1.to_csv(save_results+'true_ffp.csv', index=False)
