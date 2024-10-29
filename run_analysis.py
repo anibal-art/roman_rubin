@@ -1,27 +1,37 @@
 from analysis import fit_true, chichi_to_fits_files, piE_cov_terms, categories_function
 from pathlib import Path
+import os
+
 #labels_params: list[str] = ['t0','u0','te','rho',"s","q","alpha",'piEN','piEE']
-#labels_params: list[str] = ['t0','u0','te','rho','piEN','piEE']
-labels_params: list[str] = ['t0','u0','te','piEN','piEE']
+labels_params: list[str] = ['t0','u0','te','rho','piEN','piEE']
+#labels_params: list[str] = ['t0','u0','te','piEN','piEE']
 script_dir = str(Path(__file__).parent)
 print(script_dir)
 
+
 path_ephemerides = script_dir+'/ajustes/Gaia.txt'
-path = '/share/storage3/rubin/microlensing/romanrubin/BH/' # path in the CHE cluster
-
-if len(labels_params)==5:
-    save_results = script_dir+'/all_results/BH/results/'
-elif len(labels_params)==6:
-    save_results = script_dir+'/all_results/FFP/results/'
-elif len(labels_params)==9:
-    save_results = script_dir+'/all_results/PB/results/'
-
+path_storage = '/share/storage3/rubin/microlensing/romanrubin/'
+path_set = 'test/'
+path = path_storage+path_set
 path_dataslice = script_dir+'/opsims/baseline/dataSlice.npy'
 
-path_model = ['set_sim'+str(i)+'/' for i in range(1,9)]
-path_fit = ['set_fit'+str(i)+'/' for i in range(1,9)]
-path_set_sim = [path+'set_sim'+str(i)+'/' for i in range(1,9)]
-path_set_fit = [path+'set_fit'+str(i)+'/' for i in range(1,9)]
+
+# def save_data(labels_params): # path in the CHE cluster
+
+if len(labels_params)==5:
+    save_results = script_dir+'/all_results/BH/'+path_set
+    os.makedirs(save_results, exist_ok=True)
+elif len(labels_params)==6:
+    save_results = script_dir+'/all_results/FFP/'+path_set
+    os.makedirs(save_results, exist_ok=True)
+elif len(labels_params)==9:
+    save_results = script_dir+'/all_results/PB/'+path_set
+    os.makedirs(save_results, exist_ok=True)
+
+# path_model = ['set_sim'+str(i)+'/' for i in range(1,9)]
+# path_fit = ['set_fit'+str(i)+'/' for i in range(1,9)]
+# path_set_sim = [path+'set_sim'+str(i)+'/' for i in range(1,9)]
+# path_set_fit = [path+'set_fit'+str(i)+'/' for i in range(1,9)]
 
 
 true, fit_rr, fit_roman = fit_true(path, labels_params)
