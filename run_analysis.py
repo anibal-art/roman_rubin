@@ -39,9 +39,9 @@ path_set_sim = [path+'set_sim'+str(i)+'/' for i in range(1,9)]
 path_set_fit = [path+'set_fit'+str(i)+'/' for i in range(1,9)]
 
 
-true, fit_rr, fit_roman = fit_true(path)
+true, fit_rr, fit_roman = fit_true(path, labels_params)
 fit_rr1, fit_roman1 = chichi_to_fits_files(path, fit_rr, fit_roman)
-fit_rr2, fit_roman2 = piE_cov_terms(path,fit_rr1,fit_roman1)
+fit_rr2, fit_roman2 = piE_cov_terms(path,fit_rr1,fit_roman1, labels_params)
 true1 = categories_function(true, path_dataslice)
 
 fit_rr2.to_csv(save_results+'fit_rr_ffp.csv', index=False)
