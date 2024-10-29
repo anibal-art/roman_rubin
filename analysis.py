@@ -41,7 +41,7 @@ def event_fits(path_fits):
     return common_elements_list
 
 
-def new_rows(camino,st):
+def new_rows(camino, st, labels_params):
     data_rr = np.load(camino,allow_pickle=True).item()
 
     fit_values = dict(zip(labels_params,
@@ -63,7 +63,7 @@ def new_rows(camino,st):
     new_row_fit = pd.DataFrame([fit_values])
     return new_row_true, new_row_fit
 
-def fit_true(path):
+def fit_true(path, labels_params):
     cols_true = ['Source']+labels_params
     cols_fit=cols_true+[t+'_err' for t in labels_params]
     true = pd.DataFrame(columns=cols_true)
@@ -218,7 +218,7 @@ def MC_thetaE_tE(best_model, covariance_matrix, indx_piE):
     
     return np.std(piE_dist)
 
-def piE_cov_terms(path,fit_rr,fit_roman):
+def piE_cov_terms(path, fit_rr, fit_roman, labels_params):
     cov_piEE_piEN = {}
     cov_piEE_piEN_rom = {}
     
@@ -260,7 +260,7 @@ def piE_cov_terms(path,fit_rr,fit_roman):
     fit_roman['piE_err'] = (1 / fit_roman['piE']) * np.sqrt((fit_roman['piEN_err'] * fit_roman['piEN']) ** 2 + (
                 fit_roman['piEE_err'] * fit_roman[
             'piEE']) ** 2)  # +2*fit_roman['piEE']*fit_roman['piEN']*fit_roman['cov_piEE_piEN'])
-    true['piE'] = np.sqrt(true['piEN'] ** 2 + true['piEE'] ** 2)
+    #true['piE'] = np.sqrt(true['piEN'] ** 2 + true['piEE'] ** 2)
     
     fit_rr['piE_err_MC'] = fit_rr['Source'].map(piE_MC_rr)
     fit_roman['piE_err_MC'] = fit_roman['Source'].map(piE_MC_roman)
@@ -336,6 +336,15 @@ def piE_cov_terms(path,fit_rr,fit_roman):
 # keys = labels_params
 
 def categories_function(true,path_dataslice):
+    nominal_seasons = [
+        {'start': '2027-02-11T00:00:00', 'end': '2027-04-24T00:00:00'},
+        {'start': '2027-08-16T00:00:00', 'end': '2027-10-27T00:00:00'},
+        {'start': '2028-02-11T00:00:00', 'end': '2028-04-24T00:00:00'},
+        {'start': '2030-02-11T00:00:00', 'end': '2030-04-24T00:00:00'},
+        {'start': '2030-08-16T00:00:00', 'end': '2030-10-27T00:00:00'},
+        {'start': '2031-02-11T00:00:00', 'end': '2031-04-24T00:00:00'},
+    ]
+
     dataSlice = np.load(path_dataslice, allow_pickle=True)
     # dataSlice['observationStartMJD']
     consecutive_numbers = dataSlice['observationStartMJD']
