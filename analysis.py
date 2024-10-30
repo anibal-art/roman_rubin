@@ -242,11 +242,13 @@ def piE_cov_terms(path, fit_rr, fit_roman, labels_params):
         best_model = data.item()['best_model']
         covariance_matrix = data.item()['covariance_matrix']
         cov_piEE_piEN[nsource] = covariance_matrix[indx_piE[0], indx_piE[1]]
-        piE_MC_rr[nsource] = montecarlo_propagation_piE(best_model, covariance_matrix, indx_piE)
+
         
         best_model_rom = data_rom.item()['best_model']
         covariance_matrix_rom = data_rom.item()['covariance_matrix']
         cov_piEE_piEN_rom[nsource] = covariance_matrix_rom[indx_piE[0], indx_piE[1]]
+
+        piE_MC_rr[nsource] = montecarlo_propagation_piE(best_model, covariance_matrix, indx_piE)
         piE_MC_roman[nsource] = montecarlo_propagation_piE(best_model_rom, covariance_matrix_rom, indx_piE)
         
     fit_rr["cov_piEE_piEN"] = fit_rr['Source'].map(cov_piEE_piEN)
@@ -267,7 +269,7 @@ def piE_cov_terms(path, fit_rr, fit_roman, labels_params):
     return fit_rr, fit_roman
 
 
-def thetaE(best_model, covariance_matrix, indx_tE_rho):
+def MC_tE_rho_piE(best_model, covariance_matrix, indx_tE_rho, indx_piE):
     """
     Parameters
     ----------
@@ -284,19 +286,22 @@ def thetaE(best_model, covariance_matrix, indx_tE_rho):
     thetaE_MC_rho
 
     """
-    
-    thetaE_true = 1
-    mu_rel = 1
-    theta_star = 1
-    
+
     samples = np.random.multivariate_normal(best_model, covariance_matrix, 30000)
     if len(indx_tE_rho)==2:
-        thetaE_MC_tE = np.array(samples)[:,indx_tE_rho[0]]
-        thetaE_MC_rho = np.array(samples)[:,indx_tE_rho[1]]
+        MC_tE = np.array(samples)[:,indx_tE_rho[0]]
+        MC_rho = np.array(samples)[:,indx_tE_rho[1]]
+        piEN_dist = np.array(samples)[:, indx_piE[0]]
+        piEE_dist = np.array(samples)[:, indx_piE[1]]
+        MC_piE = np.sqrt(piEN_dist ** 2 + piEE_dist ** 2)
+
     else:
-        thetaE_MC_tE = np.array(samples)[:,indx_tE_rho[0]]
-        
-    return thetaE_true, thetaE_MC_tE, thetaE_MC_rho
+        MC_tE = np.array(samples)[:,indx_tE_rho[0]]
+        piEN_dist = np.array(samples)[:, indx_piE[0]]
+        piEE_dist = np.array(samples)[:, indx_piE[1]]
+        MC_piE = np.sqrt(piEN_dist ** 2 + piEE_dist ** 2)
+        MC_rho = None
+    return MC_tE, MC_rho, MC_piE
 
 
 
@@ -311,7 +316,6 @@ def mass(path,fit_rr,fit_roman, labels_params):
         Pandas dataframe with the results of the fitting process 
     fit_roman : dataframe
         Pandas dataframe with the results of the fitting process
-
     Returns
     -------
     fit_rr : dataframe
@@ -324,18 +328,28 @@ def mass(path,fit_rr,fit_roman, labels_params):
         Add a column with the mass obtained from propagation formulae.
     """
     mass_true = {}
-    mass = {}
-    mass_MC = {}
-    
-    
+    mass_MC_rho_rr = {}
+    mass_MC_rho_rom = {}
+    mass_MC_te_rr = {}
+    mass_MC_te_rom = {}
+
+    cov_piEE_piEN = {}
+    cov_piEE_piEN_rom = {}
+
+    piE_MC_rr = {}
+    piE_MC_roman = {}
+
     if len(labels_params)==len(['t0','u0','te','rho',"s","q","alpha",'piEN','piEE']):
         indx_tE_rho = [2,3]
+        indx_piE = [7, 8]
         path_TRILEGAL = lambda nset: f'/TRILEGAL/PB_planet_split_{nset}.csv'
     elif len(labels_params)==len(['t0','u0','te','rho','piEN','piEE']):
         indx_tE_rho = [2,3]
+        indx_piE = [4, 5]
         path_TRILEGAL = lambda nset: f'/TRILEGAL/FFP_split_{nset}.csv'
     elif len(labels_params)==len(['t0','u0','te','piEN','piEE']):
         indx_tE_rho = [2]
+        indx_piE = [3, 4]
         path_TRILEGAL = lambda nset: f'/TRILEGAL/BH_split_{nset}.csv'
         
     for i in tqdm(range(len(fit_rr))):
@@ -355,7 +369,6 @@ def mass(path,fit_rr,fit_roman, labels_params):
         c = const.c
         G = const.G
         yr2day = 365.25
-        # print(pi_rel)
         k = 4 * G / (c ** 2)
         aconv = (180 * 60 * 60 * 1000) / np.pi
         piE_true = np.sqrt(TRILEGAL_data["piEE"]**2+TRILEGAL_data["piEN"]**2)
@@ -364,30 +377,44 @@ def mass(path,fit_rr,fit_roman, labels_params):
         
         best_model = data.item()['best_model']
         covariance_matrix = data.item()['covariance_matrix']
-        # cov_piEE_piEN[nsource] = covariance_matrix[indx_piE[0], indx_piE[1]]
-        # piE_MC_rr[nsource] = montecarlo_propagation_piE(best_model, covariance_matrix, indx_piE)
-        
+        MC_tE, MC_rho, MC_piE = MC_tE_rho_piE(best_model, covariance_matrix, indx_tE_rho, indx_piE)
+        thetaE_tE = MC_tE*mu_rel
+        thetaE_rho = thetas/MC_rho
+        mass_rr_tE = thetaE_tE/(k*MC_piE)
+        mass_rr_rho = thetaE_rho/(k*MC_piE)
+
         best_model_rom = data_rom.item()['best_model']
         covariance_matrix_rom = data_rom.item()['covariance_matrix']
-        # cov_piEE_piEN_rom[nsource] = covariance_matrix_rom[indx_piE[0], indx_piE[1]]
-        # piE_MC_roman[nsource] = montecarlo_propagation_piE(best_model_rom, covariance_matrix_rom, indx_piE)
-    print('hola')
-    # fit_rr["cov_piEE_piEN"] = fit_rr['Source'].map(cov_piEE_piEN)
-    # fit_roman["cov_piEE_piEN"] = fit_rr['Source'].map(cov_piEE_piEN_rom)
-    # fit_rr['piE'] = np.sqrt(fit_rr['piEN'] ** 2 + fit_rr['piEE'] ** 2)
-    # fit_rr['piE_err'] = (1 / fit_rr['piE']) * np.sqrt((fit_rr['piEN_err'] * fit_rr['piEN']) ** 2 + (
-    #             fit_rr['piEE_err'] * fit_rr['piEE']) ** 2)  # +2*fit_rr['piEE']*fit_rr['piEN']*fit_rr['cov_piEE_piEN'])
+        MC_tE_rom, MC_rho_rom, MC_piE_rom = MC_tE_rho_piE(best_model_rom, covariance_matrix_rom, indx_tE_rho,indx_piE)
+        thetaE_tE_rom = MC_tE_rom*mu_rel
+        thetaE_rho_rom = thetas/MC_rho_rom
+        mass_rom_tE = thetaE_tE_rom/(k*MC_piE_rom)
+        mass_rom_rho = thetaE_rho_rom/(k*MC_piE_rom)
+
+        mass_MC_rho_rr[nsource] = np.std(mass_rr_rho)
+        mass_MC_rho_rom[nsource] = np.std(mass_rom_rho)
+
+        mass_MC_te_rr[nsource] = np.std(mass_rr_tE)
+        mass_MC_te_rom[nsource] = np.std(mass_rom_tE)
+
+        piE_MC_rr[nsource] = np.std(MC_piE)
+        piE_MC_roman[nsource] = np.std(MC_piE_rom)
+
+    fit_rr["cov_piEE_piEN"] = fit_rr['Source'].map(cov_piEE_piEN)
+    fit_roman["cov_piEE_piEN"] = fit_rr['Source'].map(cov_piEE_piEN_rom)
+    fit_rr['piE'] = np.sqrt(fit_rr['piEN'] ** 2 + fit_rr['piEE'] ** 2)
+    fit_rr['piE_err'] = (1 / fit_rr['piE']) * np.sqrt((fit_rr['piEN_err'] * fit_rr['piEN']) ** 2 + (
+                fit_rr['piEE_err'] * fit_rr['piEE']) ** 2 +2*fit_rr['piEE']*fit_rr['piEN']*fit_rr['cov_piEE_piEN'])
     
-    # fit_roman['piE'] = np.sqrt(fit_roman['piEN'] ** 2 + fit_roman['piEE'] ** 2)
-    # fit_roman['piE_err'] = (1 / fit_roman['piE']) * np.sqrt((fit_roman['piEN_err'] * fit_roman['piEN']) ** 2 + (
-    #             fit_roman['piEE_err'] * fit_roman[
-    #         'piEE']) ** 2)  # +2*fit_roman['piEE']*fit_roman['piEN']*fit_roman['cov_piEE_piEN'])
-    # true['piE'] = np.sqrt(true['piEN'] ** 2 + true['piEE'] ** 2)
+    fit_roman['piE'] = np.sqrt(fit_roman['piEN'] ** 2 + fit_roman['piEE'] ** 2)
+    fit_roman['piE_err'] = (1 / fit_roman['piE']) * np.sqrt((fit_roman['piEN_err'] * fit_roman['piEN']) ** 2 + (
+                fit_roman['piEE_err'] * fit_roman[
+            'piEE']) ** 2 +2*fit_roman['piEE']*fit_roman['piEN']*fit_roman['cov_piEE_piEN'])
     
-    # fit_rr['piE_err_MC'] = fit_rr['Source'].map(piE_MC_rr)
-    # fit_roman['piE_err_MC'] = fit_roman['Source'].map(piE_MC_roman)
+    fit_rr['piE_err_MC'] = fit_rr['Source'].map(piE_MC_rr)
+    fit_roman['piE_err_MC'] = fit_roman['Source'].map(piE_MC_roman)
     
-    # return fit_rr, fit_roman
+    return fit_rr, fit_roman
 
 
 # keys = labels_params
