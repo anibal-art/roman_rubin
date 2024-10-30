@@ -371,7 +371,7 @@ def mass(path,fit_rr,fit_roman, labels_params):
         covariance_matrix_rom = data_rom.item()['covariance_matrix']
         # cov_piEE_piEN_rom[nsource] = covariance_matrix_rom[indx_piE[0], indx_piE[1]]
         # piE_MC_roman[nsource] = montecarlo_propagation_piE(best_model_rom, covariance_matrix_rom, indx_piE)
-        
+    print('hola')
     # fit_rr["cov_piEE_piEN"] = fit_rr['Source'].map(cov_piEE_piEN)
     # fit_roman["cov_piEE_piEN"] = fit_rr['Source'].map(cov_piEE_piEN_rom)
     # fit_rr['piE'] = np.sqrt(fit_rr['piEN'] ** 2 + fit_rr['piEE'] ** 2)
