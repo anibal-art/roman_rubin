@@ -363,6 +363,8 @@ def piE_cov_terms(path,fit_rr,fit_roman, labels_params):
         
         path_TRILEGAL_set= path_TRILEGAL(nset)
         TRILEGAL_data = pd.read_csv(path_TRILEGAL_set)
+        
+        
         mu_rel = TRILEGAL_data["mu_rel"]
         Rstar = TRILEGAL_data["radius"]
         DS = TRILEGAL_data["D_S"]
