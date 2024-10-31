@@ -365,15 +365,15 @@ def mass(path,fit_rr,fit_roman, labels_params):
         Rstar = TRILEGAL_data["radius"]
         DS = TRILEGAL_data["D_S"]
         thetas = np.arctan(Rstar/DS).decompose().to('mas').value
-        rho_true = TRILEGAL_data["rho"]
+        # rho_true = TRILEGAL_data["rho"]
         c = const.c
         G = const.G
-        yr2day = 365.25
+        # yr2day = 365.25
         k = 4 * G / (c ** 2)
-        aconv = (180 * 60 * 60 * 1000) / np.pi
-        piE_true = np.sqrt(TRILEGAL_data["piEE"]**2+TRILEGAL_data["piEN"]**2)
-        thetaE_true = TRILEGAL_data["te"]*TRILEGAL_data["mu_rel"]
-        m_true = thetaE_true/(k*piE_true)
+        # aconv = (180 * 60 * 60 * 1000) / np.pi
+        # piE_true = np.sqrt(TRILEGAL_data["piEE"]**2+TRILEGAL_data["piEN"]**2)
+        # thetaE_true = TRILEGAL_data["te"]*TRILEGAL_data["mu_rel"]
+        # m_true = thetaE_true/(k*piE_true)
         
         best_model = data.item()['best_model']
         covariance_matrix = data.item()['covariance_matrix']
