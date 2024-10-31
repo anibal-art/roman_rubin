@@ -365,11 +365,11 @@ def piE_cov_terms(path,fit_rr,fit_roman, labels_params):
         TRILEGAL_data = pd.read_csv(path_TRILEGAL_set)
         
         
-        mu_rel = TRILEGAL_data["mu_rel"]
+        mu_rel = TRILEGAL_data["mu_rel"].iloc[int(nevent)]
         print(mu_rel)
-        Rstar = TRILEGAL_data["radius"]
+        Rstar = TRILEGAL_data["radius"].iloc[int(nevent)]
         print(Rstar)
-        DS = TRILEGAL_data["D_S"]
+        DS = TRILEGAL_data["D_S"].iloc[int(nevent)]
         print(DS)
         thetas = np.arctan(Rstar/DS)*u.rad.to('mas')
         print(thetas)
