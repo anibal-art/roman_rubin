@@ -348,7 +348,7 @@ def piE_cov_terms(path,fit_rr,fit_roman, labels_params):
     elif len(labels_params)==len(['t0','u0','te','rho','piEN','piEE']):
         indx_tE_rho = [2,3]
         indx_piE = [4, 5]
-        path_TRILEGAL = lambda nset: current_directory+f'/TRILEGAL/FFP_split_{nset}.csv'
+        path_TRILEGAL = lambda nset: current_directory+f'/TRILEGAL/FFP_uni_split_{nset}.csv'
     elif len(labels_params)==len(['t0','u0','te','piEN','piEE']):
         indx_tE_rho = [2]
         indx_piE = [3, 4]
