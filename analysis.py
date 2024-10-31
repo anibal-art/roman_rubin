@@ -339,18 +339,20 @@ def piE_cov_terms(path,fit_rr,fit_roman, labels_params):
     piE_MC_rr = {}
     piE_MC_roman = {}
 
+
+    current_directory = os.getcwd()
     if len(labels_params)==len(['t0','u0','te','rho',"s","q","alpha",'piEN','piEE']):
         indx_tE_rho = [2,3]
         indx_piE = [7, 8]
-        path_TRILEGAL = lambda nset: f'/TRILEGAL/PB_planet_split_{nset}.csv'
+        path_TRILEGAL = lambda nset: current_directory+f'/TRILEGAL/PB_planet_split_{nset}.csv'
     elif len(labels_params)==len(['t0','u0','te','rho','piEN','piEE']):
         indx_tE_rho = [2,3]
         indx_piE = [4, 5]
-        path_TRILEGAL = lambda nset: f'/TRILEGAL/FFP_split_{nset}.csv'
+        path_TRILEGAL = lambda nset: current_directory+f'/TRILEGAL/FFP_split_{nset}.csv'
     elif len(labels_params)==len(['t0','u0','te','piEN','piEE']):
         indx_tE_rho = [2]
         indx_piE = [3, 4]
-        path_TRILEGAL = lambda nset: f'/TRILEGAL/BH_split_{nset}.csv'
+        path_TRILEGAL = lambda nset: current_directory+f'/TRILEGAL/BH_split_{nset}.csv'
         
     for i in tqdm(range(len(fit_rr))):
         nsource = fit_rr["Source"].iloc[i]
@@ -359,7 +361,7 @@ def piE_cov_terms(path,fit_rr,fit_roman, labels_params):
         data = np.load(path + f"set_fit{nset}/Event_RR_{nevent}_TRF.npy", allow_pickle=True)
         data_rom = np.load(path + f"set_fit{nset}/Event_Roman_{nevent}_TRF.npy", allow_pickle=True)
         
-        path_TRILEGAL_set= path+ path_TRILEGAL(nset)
+        path_TRILEGAL_set= path_TRILEGAL(nset)
         TRILEGAL_data = pd.read_csv(path_TRILEGAL_set)
         mu_rel = TRILEGAL_data["mu_rel"]
         Rstar = TRILEGAL_data["radius"]
