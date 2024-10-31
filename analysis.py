@@ -400,8 +400,20 @@ def mass(path,fit_rr,fit_roman, labels_params):
         piE_MC_rr[nsource] = np.std(MC_piE)
         piE_MC_roman[nsource] = np.std(MC_piE_rom)
 
+
+    #mapeo a los df fit_rr y fit_roman
     fit_rr["cov_piEE_piEN"] = fit_rr['Source'].map(cov_piEE_piEN)
     fit_roman["cov_piEE_piEN"] = fit_rr['Source'].map(cov_piEE_piEN_rom)
+    fit_rr['piE_err_MC'] = fit_rr['Source'].map(piE_MC_rr)
+    fit_roman['piE_err_MC'] = fit_roman['Source'].map(piE_MC_roman)
+
+    fit_rr['mass_MC_te'] = fit_rr['Source'].map(mass_MC_te_rr)
+    fit_roman['mass_MC_te'] = fit_roman['Source'].map(mass_MC_te_rom)
+
+    fit_rr['mass_MC_rho'] = fit_rr['Source'].map(mass_MC_rho_rr)
+    fit_roman['mass_MC_rho'] = fit_roman['Source'].map(mass_MC_rho_rom)
+
+    #opero solo con los df
     fit_rr['piE'] = np.sqrt(fit_rr['piEN'] ** 2 + fit_rr['piEE'] ** 2)
     fit_rr['piE_err'] = (1 / fit_rr['piE']) * np.sqrt((fit_rr['piEN_err'] * fit_rr['piEN']) ** 2 + (
                 fit_rr['piEE_err'] * fit_rr['piEE']) ** 2 +2*fit_rr['piEE']*fit_rr['piEN']*fit_rr['cov_piEE_piEN'])
@@ -411,9 +423,7 @@ def mass(path,fit_rr,fit_roman, labels_params):
                 fit_roman['piEE_err'] * fit_roman[
             'piEE']) ** 2 +2*fit_roman['piEE']*fit_roman['piEN']*fit_roman['cov_piEE_piEN'])
     
-    fit_rr['piE_err_MC'] = fit_rr['Source'].map(piE_MC_rr)
-    fit_roman['piE_err_MC'] = fit_roman['Source'].map(piE_MC_roman)
-    
+
     return fit_rr, fit_roman
 
 
