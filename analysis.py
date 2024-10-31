@@ -366,8 +366,11 @@ def piE_cov_terms(path,fit_rr,fit_roman, labels_params):
         
         
         mu_rel = TRILEGAL_data["mu_rel"]
+        print(mu_rel)
         Rstar = TRILEGAL_data["radius"]
+        print(Rstar)
         DS = TRILEGAL_data["D_S"]
+        print(DS)
         thetas = np.arctan(Rstar/DS)*u.rad.to('mas')
         print(thetas)
          # rho_true = TRILEGAL_data["rho"]
