@@ -445,4 +445,5 @@ def plot_aligned_data(figure_axe, microlensing_model, model_parameters, bokeh_pl
                                              marker=marker, name=tel.name)
 
 
+print("test")
 
