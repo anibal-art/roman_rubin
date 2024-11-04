@@ -189,7 +189,8 @@ def chichi_to_fits_files(path,fit_rr, fit_roman):
     id_to_chi2_roman = {}
     id_to_dof_rr = {}
     id_to_dof_roman = {}
-    ndir = len(os.listdir(path))/2
+    ndir = len([f for f in os.listdir(path) if 'set_' in f])
+    
     for i in tqdm(range(1,int(ndir+1))):
         common_elements_list = event_fits(path+f"set_fit{i}/")
         if not len(common_elements_list)==0:
