@@ -19,13 +19,14 @@ import warnings
 from astropy import constants as const
 from astropy import units as u
 
-class Analysis_Microlensing:
+class Analysis_Event:
     description = "This is a simple class example."
     
-    def __init__(self, model, path_model, path_fit):
+    def __init__(self, model, path_model, path_fit_rr, path_fit_roman):
         self.model = model
         self.path_model = path_model
-        self.path_fit   = path_fit
+        self.path_fit_rr   = path_fit_rr
+        self.path_fit_roman   = path_fit_roman
         
     def labels_params(self):
         if self.model == "USBL":
@@ -36,97 +37,115 @@ class Analysis_Microlensing:
             labels_params: list[str] = ['t0','u0','te','piEN','piEE']
         return labels_params
     
-    def event_fits(self):
-        '''
-        return events in common with roman and rubin
-        we have events that fits only one of two for unknown reasons
-        '''
+    # def event_fits(self):
+    #     '''
+    #     return events in common with roman and rubin
+    #     we have events that fits only one of two for unknown reasons
+    #     '''
     
-        files_fits = os.listdir(self.path_fit)
+    #     files_fits = os.listdir(self.path_fit)
     
-        files_roman = [f for f in files_fits if 'Roman' in f]
-        files_rr = [f for f in files_fits if not 'Roman' in f]
+    #     files_roman = [f for f in files_fits if 'Roman' in f]
+    #     files_rr = [f for f in files_fits if not 'Roman' in f]
     
-        n_rom = []  # list with the event number
-        for j in files_roman:
-            number = int(re.findall(r'\d+', j)[0])
-            n_rom.append(number)
+    #     n_rom = []  # list with the event number
+    #     for j in files_roman:
+    #         number = int(re.findall(r'\d+', j)[0])
+    #         n_rom.append(number)
     
-        n_rr = []  # # list with the event number
-        for j in files_rr:
-            number = int(re.findall(r'\d+', j)[0])
-            n_rr.append(number)
+    #     n_rr = []  # # list with the event number
+    #     for j in files_rr:
+    #         number = int(re.findall(r'\d+', j)[0])
+    #         n_rr.append(number)
     
-        # Convert lists to sets
-        set1 = set(n_rom)
-        set2 = set(n_rr)
-        # Find the common elements using intersection
-        common_elements = set1.intersection(set2)
-        # Convert the result back to a list (if needed)
-        common_elements_list = list(common_elements)
-        return common_elements_list
+    #     # Convert lists to sets
+    #     set1 = set(n_rom)
+    #     set2 = set(n_rr)
+    #     # Find the common elements using intersection
+    #     common_elements = set1.intersection(set2)
+    #     # Convert the result back to a list (if needed)
+    #     common_elements_list = list(common_elements)
+    #     return common_elements_list
     
     
-    def new_rows(camino, st, labels_params):
-        data_rr = np.load(camino,allow_pickle=True).item()
+    # def fit_data(self):
+    #     data_fit = np.load(self.path_fit_roman,allow_pickle=True).item()
     
-        fit_values = dict(zip(labels_params,
-                              data_rr['best_model'][0:len(labels_params)]))
-        # print(np.sqrt(np.diag(data_rr['covariance_matrix']))[0:8])
-        if any(np.diag(data_rr['covariance_matrix'])<0):
-            fit_error = np.zeros(len(labels_params))
+    #     fit_values = dict(zip(labels_params,
+    #                           data_rr['best_model'][0:len(labels_params)]))
+    #     # print(np.sqrt(np.diag(data_rr['covariance_matrix']))[0:8])
+    #     if any(np.diag(data_rr['covariance_matrix'])<0):
+    #         fit_error = np.zeros(len(labels_params))
+    #     else:
+    #         fit_error= np.sqrt(np.diag(data_rr['covariance_matrix']))[0:len(labels_params)]
+    
+    #     for j,key in enumerate(labels_params):
+    #         fit_values[key+'_err']=fit_error[j]
+    #     fit_values['Source'] = data_rr['true_params'].name+st*5000
+    
+    #     true_values = data_rr['true_params'][labels_params].to_dict()#.values[0:9])
+    #     true_values['Source']=data_rr['true_params'].name+st*5000
+    
+    #     new_row_true = pd.DataFrame([true_values])
+    #     new_row_fit = pd.DataFrame([fit_values])
+    #     return new_row_true, new_row_fit
+    def error_pyLIMA(self, data):
+        if any(np.diag(data['covariance_matrix'])<0):
+            fit_error = np.zeros(len(self.labels_params))
         else:
-            fit_error= np.sqrt(np.diag(data_rr['covariance_matrix']))[0:len(labels_params)]
-    
-        for j,key in enumerate(labels_params):
-            fit_values[key+'_err']=fit_error[j]
-        fit_values['Source'] = data_rr['true_params'].name+st*5000
-    
-        true_values = data_rr['true_params'][labels_params].to_dict()#.values[0:9])
-        true_values['Source']=data_rr['true_params'].name+st*5000
-    
-        new_row_true = pd.DataFrame([true_values])
-        new_row_fit = pd.DataFrame([fit_values])
-        return new_row_true, new_row_fit
+            fit_error= np.sqrt(np.diag(data['covariance_matrix']))[0:len(self.labels_params)]
+        return fit_error
+        # for j,key in enumerate(self.labels_params):
+        #     fit_values[key+'_err']=fit_error[j]
+        # fit_values['Source'] = data_rr['true_params'].name + st*5000
+
     
     def fit_true(self):#path, labels_params):
         cols_true = ['Source']+self.labels_params
         cols_fit=cols_true+[t+'_err' for t in self.labels_params]
         
-        true = pd.DataFrame(columns=cols_true)
-        fit_rr = pd.DataFrame(columns=cols_fit)
-        fit_roman = pd.DataFrame(columns=cols_fit)
-        fit_completed = []
-        err = []
-        # len([f for f in os.listdir(self.path_fit) if "set_sim" in f])
-        for st in tqdm(range(1,5)):
-            PATH = self.path_fit+f'set_fit{st}/'
-            nevent = self.event_fits(PATH)
-            list_files_rr = [f'Event_RR_{int(f)}_TRF.npy' for f in nevent]
-            list_files_roman = [f'Event_Roman_{int(f)}_TRF.npy' for f in nevent]
+        true = {}
+        fit_rr = {}
+        fit_roman = {}
+        
+        for key in cols_fit:
+            data_rr = np.load(self.path_fit_rr, allow_pickle=True).item()
+            data_roman = np.load(self.path_fit_roman, allow_pickle=True).item()
+            fit_error_rr = self.error_pyLIMA(data_rr)
+            fit_error_roman = self.error_pyLIMA(data_roman)
+        
+            true_values = data_rr['true_params'][labels_params].to_dict()#.values[0:9])
+            true_values['Source']=data_rr['true_params'].name+st*5000
+
+            
+            
+        
+        # nevent = self.event_fits(PATH)
+        # list_files_rr = [f'Event_RR_{int(f)}_TRF.npy' for f in nevent]
+        # list_files_roman = [f'Event_Roman_{int(f)}_TRF.npy' for f in nevent]
     
-            for i in range(len(nevent)):
-                path_rr = PATH+list_files_rr[i]
-                path_roman = PATH+list_files_roman[i]
-                try:
-                # if i==4:
-                    new_row_true, new_row_rr = self.new_rows(path_rr,st, self.labels_params)
-                    new_row_true2, new_row_roman = self.new_rows(path_roman,st, self.labels_params)
+        #     for i in range(len(nevent)):
+        #         path_rr = PATH+list_files_rr[i]
+        #         path_roman = PATH+list_files_roman[i]
+        #         try:
+        #         # if i==4:
+        #             new_row_true, new_row_rr = self.new_rows(path_rr,st, self.labels_params)
+        #             new_row_true2, new_row_roman = self.new_rows(path_roman,st, self.labels_params)
     
-                    # new_row_true = new_row_true.dropna(how='all', axis=1)  # Drop all-NA columns in new_row_true
-                    # new_row_true2 = new_row_true2.dropna(how='all', axis=1)  # Drop all-NA columns in new_row_true
+        #             # new_row_true = new_row_true.dropna(how='all', axis=1)  # Drop all-NA columns in new_row_true
+        #             # new_row_true2 = new_row_true2.dropna(how='all', axis=1)  # Drop all-NA columns in new_row_true
     
-                    true = pd.concat([true, new_row_true], ignore_index=True)
-                    fit_rr = pd.concat([fit_rr, new_row_rr], ignore_index=True)
-                    fit_roman = pd.concat([fit_roman, new_row_roman], ignore_index=True)
+        #             true = pd.concat([true, new_row_true], ignore_index=True)
+        #             fit_rr = pd.concat([fit_rr, new_row_rr], ignore_index=True)
+        #             fit_roman = pd.concat([fit_roman, new_row_roman], ignore_index=True)
     
-                    fit_completed.append(1)
+        #             fit_completed.append(1)
     
-                except Exception as e:
-                    print(f"Error with event {nevent[i]}: {e}")
-                    # err.append(1)
-                    # print(i)
-                    fit_completed.append(0)
+        #         except Exception as e:
+        #             print(f"Error with event {nevent[i]}: {e}")
+        #             # err.append(1)
+        #             # print(i)
+        #             fit_completed.append(0)
         # print(len(err))
         return true, fit_rr, fit_roman
     
@@ -187,7 +206,8 @@ class Analysis_Microlensing:
     
     def group_consecutive_numbers(numbers):
         '''
-        Defino comienzo y finalizacion de temporadas de observacion de Rubin en el campo de Roman
+        Defino comienzo y finalizacion de temporadas de observacion de
+        Rubin en el campo de Roman
         '''
         numbers.sort()
         groups = []
@@ -212,6 +232,7 @@ class Analysis_Microlensing:
     
     
     def chichi_to_fits_files(self,path,fit_rr, fit_roman):
+        
         id_to_chi2_rr = {}
         id_to_chi2_roman = {}
         id_to_dof_rr = {}
@@ -235,16 +256,15 @@ class Analysis_Microlensing:
         fit_rr['dof']= fit_rr['Source'].map(id_to_dof_rr)
         return fit_rr, fit_roman
     
+    
     def montecarlo_propagation_piE(best_model, covariance_matrix, indx_piE):
+        
         samples = np.random.multivariate_normal(best_model, covariance_matrix, 30000)
         piEN_dist = np.array(samples)[:,indx_piE[0]]
         piEE_dist = np.array(samples)[:,indx_piE[1]]
-        piE_dist = np.sqrt(piEN_dist**2+piEE_dist**2)
-        
+        piE_dist = np.sqrt(piEN_dist**2+piEE_dist**2)        
         return np.std(piE_dist)
-    
-    
-    
+        
     # def piE_cov_terms(path, fit_rr, fit_roman, labels_params):
     #     cov_piEE_piEN = {}
     #     cov_piEE_piEN_rom = {}
