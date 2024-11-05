@@ -37,122 +37,35 @@ class Analysis_Event:
             labels_params: list[str] = ['t0','u0','te','piEN','piEE']
         return labels_params
     
-    # def event_fits(self):
-    #     '''
-    #     return events in common with roman and rubin
-    #     we have events that fits only one of two for unknown reasons
-    #     '''
-    
-    #     files_fits = os.listdir(self.path_fit)
-    
-    #     files_roman = [f for f in files_fits if 'Roman' in f]
-    #     files_rr = [f for f in files_fits if not 'Roman' in f]
-    
-    #     n_rom = []  # list with the event number
-    #     for j in files_roman:
-    #         number = int(re.findall(r'\d+', j)[0])
-    #         n_rom.append(number)
-    
-    #     n_rr = []  # # list with the event number
-    #     for j in files_rr:
-    #         number = int(re.findall(r'\d+', j)[0])
-    #         n_rr.append(number)
-    
-    #     # Convert lists to sets
-    #     set1 = set(n_rom)
-    #     set2 = set(n_rr)
-    #     # Find the common elements using intersection
-    #     common_elements = set1.intersection(set2)
-    #     # Convert the result back to a list (if needed)
-    #     common_elements_list = list(common_elements)
-    #     return common_elements_list
-    
-    
-    # def fit_data(self):
-    #     data_fit = np.load(self.path_fit_roman,allow_pickle=True).item()
-    
-    #     fit_values = dict(zip(labels_params,
-    #                           data_rr['best_model'][0:len(labels_params)]))
-    #     # print(np.sqrt(np.diag(data_rr['covariance_matrix']))[0:8])
-    #     if any(np.diag(data_rr['covariance_matrix'])<0):
-    #         fit_error = np.zeros(len(labels_params))
-    #     else:
-    #         fit_error= np.sqrt(np.diag(data_rr['covariance_matrix']))[0:len(labels_params)]
-    
-    #     for j,key in enumerate(labels_params):
-    #         fit_values[key+'_err']=fit_error[j]
-    #     fit_values['Source'] = data_rr['true_params'].name+st*5000
-    
-    #     true_values = data_rr['true_params'][labels_params].to_dict()#.values[0:9])
-    #     true_values['Source']=data_rr['true_params'].name+st*5000
-    
-    #     new_row_true = pd.DataFrame([true_values])
-    #     new_row_fit = pd.DataFrame([fit_values])
-    #     return new_row_true, new_row_fit
     def error_pyLIMA(self, data):
         if any(np.diag(data['covariance_matrix'])<0):
-            fit_error = np.zeros(len(self.labels_params))
+            fit_error = np.zeros(len(self.labels_params()))
         else:
-            fit_error= np.sqrt(np.diag(data['covariance_matrix']))[0:len(self.labels_params)]
+            fit_error= np.sqrt(np.diag(data['covariance_matrix']))[0:len(self.labels_params())]
         return fit_error
-        # for j,key in enumerate(self.labels_params):
-        #     fit_values[key+'_err']=fit_error[j]
-        # fit_values['Source'] = data_rr['true_params'].name + st*5000
-
     
-    def fit_true(self):#path, labels_params):
-        cols_true = ['Source']+self.labels_params
-        cols_fit=cols_true+[t+'_err' for t in self.labels_params]
-        
-        true = {}
+    def fit_true(self):
+
         fit_rr = {}
         fit_roman = {}
         
-        for key in cols_fit:
-            data_rr = np.load(self.path_fit_rr, allow_pickle=True).item()
-            data_roman = np.load(self.path_fit_roman, allow_pickle=True).item()
-            fit_error_rr = self.error_pyLIMA(data_rr)
-            fit_error_roman = self.error_pyLIMA(data_roman)
-        
-            true_values = data_rr['true_params'][labels_params].to_dict()#.values[0:9])
-            true_values['Source']=data_rr['true_params'].name+st*5000
+        data_rr = np.load(self.path_fit_rr, allow_pickle=True).item()
+        data_roman = np.load(self.path_fit_roman, allow_pickle=True).item()
+        fit_error_rr = self.error_pyLIMA(data_rr)
+        fit_error_roman = self.error_pyLIMA(data_roman)
 
-            
-            
-        
-        # nevent = self.event_fits(PATH)
-        # list_files_rr = [f'Event_RR_{int(f)}_TRF.npy' for f in nevent]
-        # list_files_roman = [f'Event_Roman_{int(f)}_TRF.npy' for f in nevent]
-    
-        #     for i in range(len(nevent)):
-        #         path_rr = PATH+list_files_rr[i]
-        #         path_roman = PATH+list_files_roman[i]
-        #         try:
-        #         # if i==4:
-        #             new_row_true, new_row_rr = self.new_rows(path_rr,st, self.labels_params)
-        #             new_row_true2, new_row_roman = self.new_rows(path_roman,st, self.labels_params)
-    
-        #             # new_row_true = new_row_true.dropna(how='all', axis=1)  # Drop all-NA columns in new_row_true
-        #             # new_row_true2 = new_row_true2.dropna(how='all', axis=1)  # Drop all-NA columns in new_row_true
-    
-        #             true = pd.concat([true, new_row_true], ignore_index=True)
-        #             fit_rr = pd.concat([fit_rr, new_row_rr], ignore_index=True)
-        #             fit_roman = pd.concat([fit_roman, new_row_roman], ignore_index=True)
-    
-        #             fit_completed.append(1)
-    
-        #         except Exception as e:
-        #             print(f"Error with event {nevent[i]}: {e}")
-        #             # err.append(1)
-        #             # print(i)
-        #             fit_completed.append(0)
-        # print(len(err))
+        for i,key in enumerate(self.labels_params()):
+            fit_rr[key] = data_rr["best_model"][i]
+            fit_rr[key+"_err"] = fit_error_rr[i]
+            fit_roman[key] = data_roman["best_model"][i]
+            fit_roman[key+"_err"] = fit_error_roman[i]
+        true = data_rr["true_params"][self.labels_params()].to_dict()
         return true, fit_rr, fit_roman
     
-    
-    def read_data(self, path_model):
+
+    def read_data(self):
         # Open the HDF5 file and load data using specified names
-        with h5py.File(path_model, 'r') as file:
+        with h5py.File(self.path_model, 'r') as file:
             # Load array with string with info of dataset using its name
             info_dataset = file['Data'][:]
             info_dataset = [file['Data'][:][0].decode('UTF-8'), file['Data'][:][1].decode('UTF-8'),
@@ -169,40 +82,40 @@ class Analysis_Event:
             return info_dataset, pyLIMA_parameters, bands
     
     
-    def chichi(self, name_file):
-        '''
-        name_file(str):This function receives as input the name of the file
-        example: /home/user/model/set_sim1/Event_RR_42_trf.npy.
-        '''
-        # print(name_file[name_file.index('Event_')-2])
-        nset = int(name_file[name_file.index('Event_') - 2:name_file.index('Event_') - 1])
+    # def chichi(self):
+    #     '''
+    #     name_file(str):This function receives as input the name of the file
+    #     example: /home/user/model/set_sim1/Event_RR_42_trf.npy.
+    #     '''
+    #     # print(name_file[name_file.index('Event_')-2])
+    #     nset = int(name_file[name_file.index('Event_') - 2:name_file.index('Event_') - 1])
     
-        # print(nset)
-        name_set = 'set_sim' + str(nset)
-        directory_simset = name_file[0:name_file.index('set')] + name_set + '/'
-        # print()
-        nevent = re.sub(r'\D', '', name_file[name_file.index('Event_'):-1])
+    #     # print(nset)
+    #     name_set = 'set_sim' + str(nset)
+    #     directory_simset = name_file[0:name_file.index('set')] + name_set + '/'
+    #     # print()
+    #     nevent = re.sub(r'\D', '', name_file[name_file.index('Event_'):-1])
     
-        model_file = directory_simset + 'Event_' + str(nevent) + '.h5'
-        info_dataset, model_params, curves = self.read_data(name_file)
-        # curves,model_params = read_curves(model_file)
-        name_file_rr = name_file[0:name_file.index('set')] + f"/set_fit{nset}/Event_RR_{nevent}_TRF.npy"
-        name_file_roman = name_file[0:name_file.index('set')] + f"/set_fit{nset}/Event_Roman_{nevent}_TRF.npy"
-        data_rr = np.load(name_file_rr, allow_pickle=True)
-        data_roman = np.load(name_file_roman, allow_pickle=True)
-        # print(data_rr)
-        try:
-            chi_rr = data_rr.item()["chi2"]
-            chi_roman = data_roman.item()["chi2"]
+    #     model_file = directory_simset + 'Event_' + str(nevent) + '.h5'
+    #     info_dataset, model_params, curves = self.read_data(name_file)
+    #     # curves,model_params = read_curves(model_file)
+    #     name_file_rr = name_file[0:name_file.index('set')] + f"/set_fit{nset}/Event_RR_{nevent}_TRF.npy"
+    #     name_file_roman = name_file[0:name_file.index('set')] + f"/set_fit{nset}/Event_Roman_{nevent}_TRF.npy"
+    #     data_rr = np.load(name_file_rr, allow_pickle=True)
+    #     data_roman = np.load(name_file_roman, allow_pickle=True)
+    #     # print(data_rr)
+    #     try:
+    #         chi_rr = data_rr.item()["chi2"]
+    #         chi_roman = data_roman.item()["chi2"]
     
-            dof_rr = sum([len(curves[key]) for key in curves]) - len(
-                [len(curves[key]) for key in curves if not len(curves[key]) == 0]) * 2 - 9
-            dof_roman = len(curves['W149']) - 2 - 9
-            # print(model_params)
-            # print(chi_roman/dof)
-            return chi_rr, chi_roman, dof_rr, dof_roman
-        except:
-            return 0, 0,0,0
+    #         dof_rr = sum([len(curves[key]) for key in curves]) - len(
+    #             [len(curves[key]) for key in curves if not len(curves[key]) == 0]) * 2 - 9
+    #         dof_roman = len(curves['W149']) - 2 - 9
+    #         # print(model_params)
+    #         # print(chi_roman/dof)
+    #         return chi_rr, chi_roman, dof_rr, dof_roman
+    #     except:
+    #         return 0, 0,0,0
     
     def group_consecutive_numbers(numbers):
         '''
@@ -538,48 +451,58 @@ class Analysis_Event:
         return true
 
 
-#HERE IS THE APLICATION OF ALL THE FUNCTIONS
-from analysis import fit_true, chichi_to_fits_files, piE_cov_terms, categories_function
-from pathlib import Path
-import os
+# #HERE IS THE APLICATION OF ALL THE FUNCTIONS
+# from analysis import fit_true, chichi_to_fits_files, piE_cov_terms, categories_function
+# from pathlib import Path
+# import os
 
-labels_params: list[str] = ['t0','u0','te','rho',"s","q","alpha",'piEN','piEE']
-#labels_params: list[str] = ['t0','u0','te','rho','piEN','piEE']
-#labels_params: list[str] = ['t0','u0','te','piEN','piEE']
-script_dir = str(Path(__file__).parent)
-print(script_dir)
-
-
-path_ephemerides = script_dir+'/ajustes/Gaia.txt'
-path_storage = '/share/storage3/rubin/microlensing/romanrubin/'
-path_set = 'PB/'
-path = path_storage+path_set
-path_dataslice = script_dir+'/opsims/baseline/dataSlice.npy'
+# labels_params: list[str] = ['t0','u0','te','rho',"s","q","alpha",'piEN','piEE']
+# #labels_params: list[str] = ['t0','u0','te','rho','piEN','piEE']
+# #labels_params: list[str] = ['t0','u0','te','piEN','piEE']
+# script_dir = str(Path(__file__).parent)
+# print(script_dir)
 
 
-# def save_data(labels_params): # path in the CHE cluster
-
-if len(labels_params)==5:
-    save_results = script_dir+'/all_results/BH/'+path_set
-    os.makedirs(save_results, exist_ok=True)
-elif len(labels_params)==6:
-    save_results = script_dir+'/all_results/FFP/'+path_set
-    os.makedirs(save_results, exist_ok=True)
-elif len(labels_params)==9:
-    save_results = script_dir+'/all_results/PB/'+'PB_MCprop'#path_set
-    os.makedirs(save_results, exist_ok=True)
-
-# path_model = ['set_sim'+str(i)+'/' for i in range(1,9)]
-# path_fit = ['set_fit'+str(i)+'/' for i in range(1,9)]
-# path_set_sim = [path+'set_sim'+str(i)+'/' for i in range(1,9)]
-# path_set_fit = [path+'set_fit'+str(i)+'/' for i in range(1,9)]
+# path_ephemerides = script_dir+'/ajustes/Gaia.txt'
+# path_storage = '/share/storage3/rubin/microlensing/romanrubin/'
+# path_set = 'PB/'
+# path = path_storage+path_set
+# path_dataslice = script_dir+'/opsims/baseline/dataSlice.npy'
 
 
-true, fit_rr, fit_roman = fit_true(path, labels_params)
-fit_rr1, fit_roman1 = chichi_to_fits_files(path, fit_rr, fit_roman)
-fit_rr2, fit_roman2 = piE_cov_terms(path,fit_rr1,fit_roman1, labels_params)
-true1 = categories_function(true, path_dataslice)
+# # def save_data(labels_params): # path in the CHE cluster
 
-fit_rr2.to_csv(save_results+'fit_rr_ffp.csv', index=False)
-fit_roman2.to_csv(save_results+'fit_roman_ffp.csv', index=False)
-true1.to_csv(save_results+'true_ffp.csv', index=False)
+# if len(labels_params)==5:
+#     save_results = script_dir+'/all_results/BH/'+path_set
+#     os.makedirs(save_results, exist_ok=True)
+# elif len(labels_params)==6:
+#     save_results = script_dir+'/all_results/FFP/'+path_set
+#     os.makedirs(save_results, exist_ok=True)
+# elif len(labels_params)==9:
+#     save_results = script_dir+'/all_results/PB/'+'PB_MCprop'#path_set
+#     os.makedirs(save_results, exist_ok=True)
+
+# # path_model = ['set_sim'+str(i)+'/' for i in range(1,9)]
+# # path_fit = ['set_fit'+str(i)+'/' for i in range(1,9)]
+# # path_set_sim = [path+'set_sim'+str(i)+'/' for i in range(1,9)]
+# # path_set_fit = [path+'set_fit'+str(i)+'/' for i in range(1,9)]
+
+
+# true, fit_rr, fit_roman = fit_true(path, labels_params)
+# fit_rr1, fit_roman1 = chichi_to_fits_files(path, fit_rr, fit_roman)
+# fit_rr2, fit_roman2 = piE_cov_terms(path,fit_rr1,fit_roman1, labels_params)
+# true1 = categories_function(true, path_dataslice)
+
+# fit_rr2.to_csv(save_results+'fit_rr_ffp.csv', index=False)
+# fit_roman2.to_csv(save_results+'fit_roman_ffp.csv', index=False)
+# true1.to_csv(save_results+'true_ffp.csv', index=False)
+
+path_fit_rr = "/home/anibal/roman_rubin/test_sim_fit/Event_RR_18_TRF.npy"
+path_fit_roman = "/home/anibal/roman_rubin/test_sim_fit/Event_Roman_18_TRF.npy"
+path_model = "/home/anibal/roman_rubin/test_sim_fit/Event_18.h5"
+
+Event = Analysis_Event("USBL", path_model, path_fit_rr, path_fit_roman)
+true, fit_rr, fit_roman = Event.fit_true()
+
+print(fit_rr)
+print(Event.read_data())
