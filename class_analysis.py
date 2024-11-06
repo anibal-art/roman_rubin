@@ -194,7 +194,6 @@ class Analysis_Event:
     #         covariance_matrix = data.item()['covariance_matrix']
     #         cov_piEE_piEN[nsource] = covariance_matrix[indx_piE[0], indx_piE[1]]
     
-            
     #         best_model_rom = data_rom.item()['best_model']
     #         covariance_matrix_rom = data_rom.item()['covariance_matrix']
     #         cov_piEE_piEN_rom[nsource] = covariance_matrix_rom[indx_piE[0], indx_piE[1]]
@@ -254,10 +253,10 @@ class Analysis_Event:
             MC_rho = None
         return MC_tE, MC_rho, MC_piE
     
+
     
     
-    
-    def piE_propagation(self):
+    def MC_propagation(self):
         """
         Parameters
         ----------
@@ -285,73 +284,50 @@ class Analysis_Event:
         piE_MC_rr = {}
         piE_MC_roman = {}
     
-    
-        if len(self.labels_params)==len(['t0','u0','te','rho',"s","q","alpha",'piEN','piEE']):
-            indx_piE = [7, 8]
-            indx_tE_rho = [2,3]
-        elif len(self.labels_params)==len(['t0','u0','te','rho','piEN','piEE']):
-            indx_piE = [4, 5]
-            indx_tE_rho = [2,3]
-        elif len(self.labels_params)==len(['t0','u0','te','piEN','piEE']):
-            indx_piE = [3, 4]
-            indx_tE_rho = [2,3]
+        self.labels_params().index('piEE')
+        self.labels_params().index('piEN')
+        self.labels_params().index('te')
+        try:
+            self.labels_params().index('rho')
+        except:
+            pass
 
         data_rr, data_roman = self.data_fit()
         
-        MC_tE, MC_rho, MC_piE = self.MC_tE_rho_piE(data_rr["best_model"],
-                                              data_rr["covariance_matrix"],
-                                              indx_tE_rho, indx_piE)
-        # thetaE_tE = MC_tE*mu_rel
-        # thetaE_rho = thetas/MC_rho
-        # mass_rr_tE = thetaE_tE/(k*MC_piE)
-        # mass_rr_rho = thetaE_rho/(k*MC_piE)
+        samples_rr = np.random.multivariate_normal(data_rr["best_model"],
+                                                   data_rr["covariance_matrix"],
+                                                   30000)
+        
+        samples_roman = np.random.multivariate_normal(data_roman["best_model"],
+                                                   data_roman["covariance_matrix"],
+                                                   30000)
+        
+        piEN_dist_rr = samples_rr[:, self.labels_params().index('piEN')]
+        
+        piEE_dist_rr = samples_rr[:, self.labels_params().index('piEE')]
+        
+        piEN_dist_roman = samples_roman[:, self.labels_params().index('piEN')]
+        
+        piEE_dist_roman = samples_roman[:, self.labels_params().index('piEE')]
+        
+        MC_piE_rr = np.sqrt(piEN_dist_rr ** 2 + piEE_dist_rr ** 2)
+        
+        MC_piE_roman = np.sqrt(piEE_dist_roman ** 2 + piEN_dist_roman ** 2)
 
 
-        MC_tE_rom, MC_rho_rom, MC_piE_rom = self.MC_tE_rho_piE(data_roman["best_model"],
-                                              data_roman["covariance_matrix"],
-                                              indx_tE_rho, indx_piE)
-        # thetaE_tE_rom = MC_tE_rom*mu_rel
-        # thetaE_rho_rom = thetas/MC_rho_rom
-        # mass_rom_tE = thetaE_tE_rom/(k*MC_piE_rom)
-        # mass_rom_rho = thetaE_rho_rom/(k*MC_piE_rom)
-
-        # mass_MC_rho_rr[nsource] = np.std(mass_rr_rho)
-        # mass_MC_rho_rom[nsource] = np.std(mass_rom_rho)
-
-        # mass_MC_te_rr[nsource] = np.std(mass_rr_tE)
-        # mass_MC_te_rom[nsource] = np.std(mass_rom_tE)
-
-        piE_MC_rr= np.std(MC_piE)
-        piE_MC_roman = np.std(MC_piE_rom)
-
-    
-        #mapeo a los df fit_rr y fit_roman
-        # fit_rr["cov_piEE_piEN"] = fit_rr['Source'].map(cov_piEE_piEN)
-        # fit_roman["cov_piEE_piEN"] = fit_rr['Source'].map(cov_piEE_piEN_rom)
-        # fit_rr['piE_err_MC'] = fit_rr['Source'].map(piE_MC_rr)
-        # fit_roman['piE_err_MC'] = fit_roman['Source'].map(piE_MC_roman)
-    
-        # fit_rr['mass_MC_te'] = fit_rr['Source'].map(mass_MC_te_rr)
-        # fit_roman['mass_MC_te'] = fit_roman['Source'].map(mass_MC_te_rom)
-    
-        # fit_rr['mass_MC_rho'] = fit_rr['Source'].map(mass_MC_rho_rr)
-        # fit_roman['mass_MC_rho'] = fit_roman['Source'].map(mass_MC_rho_rom)
-    
         #opero solo con los df
-        fit_rr['piE'] = np.sqrt(fit_rr['piEN'] ** 2 + fit_rr['piEE'] ** 2)
-        fit_rr['piE_err'] = (1 / fit_rr['piE']) * np.sqrt((fit_rr['piEN_err'] * fit_rr['piEN']) ** 2 + (
-                    fit_rr['piEE_err'] * fit_rr['piEE']) ** 2 +2*fit_rr['piEE']*fit_rr['piEN']*fit_rr['cov_piEE_piEN'])
+        # fit_rr['piE'] = np.sqrt(fit_rr['piEN'] ** 2 + fit_rr['piEE'] ** 2)
+        # fit_rr['piE_err'] = (1 / fit_rr['piE']) * np.sqrt((fit_rr['piEN_err'] * fit_rr['piEN']) ** 2 + (
+        #             fit_rr['piEE_err'] * fit_rr['piEE']) ** 2 +2*fit_rr['piEE']*fit_rr['piEN']*fit_rr['cov_piEE_piEN'])
         
-        fit_roman['piE'] = np.sqrt(fit_roman['piEN'] ** 2 + fit_roman['piEE'] ** 2)
-        fit_roman['piE_err'] = (1 / fit_roman['piE']) * np.sqrt((fit_roman['piEN_err'] * fit_roman['piEN']) ** 2 + (
-                    fit_roman['piEE_err'] * fit_roman[
-                'piEE']) ** 2 +2*fit_roman['piEE']*fit_roman['piEN']*fit_roman['cov_piEE_piEN'])
+        # fit_roman['piE'] = np.sqrt(fit_roman['piEN'] ** 2 + fit_roman['piEE'] ** 2)
+        # fit_roman['piE_err'] = (1 / fit_roman['piE']) * np.sqrt((fit_roman['piEN_err'] * fit_roman['piEN']) ** 2 + (
+        #             fit_roman['piEE_err'] * fit_roman[
+        #         'piEE']) ** 2 +2*fit_roman['piEE']*fit_roman['piEN']*fit_roman['cov_piEE_piEN'])
         
     
-        return fit_rr, fit_roman
+        return np.std(MC_piE_rr), np.std(MC_piE_roman)
     
-    
-    # keys = labels_params
     
     def categories_function(true,path_dataslice):
         nominal_seasons = [
@@ -406,52 +382,6 @@ class Analysis_Event:
         return true
 
 
-# #HERE IS THE APLICATION OF ALL THE FUNCTIONS
-# from analysis import fit_true, chichi_to_fits_files, piE_cov_terms, categories_function
-# from pathlib import Path
-# import os
-
-# labels_params: list[str] = ['t0','u0','te','rho',"s","q","alpha",'piEN','piEE']
-# #labels_params: list[str] = ['t0','u0','te','rho','piEN','piEE']
-# #labels_params: list[str] = ['t0','u0','te','piEN','piEE']
-# script_dir = str(Path(__file__).parent)
-# print(script_dir)
-
-
-# path_ephemerides = script_dir+'/ajustes/Gaia.txt'
-# path_storage = '/share/storage3/rubin/microlensing/romanrubin/'
-# path_set = 'PB/'
-# path = path_storage+path_set
-# path_dataslice = script_dir+'/opsims/baseline/dataSlice.npy'
-
-
-# # def save_data(labels_params): # path in the CHE cluster
-
-# if len(labels_params)==5:
-#     save_results = script_dir+'/all_results/BH/'+path_set
-#     os.makedirs(save_results, exist_ok=True)
-# elif len(labels_params)==6:
-#     save_results = script_dir+'/all_results/FFP/'+path_set
-#     os.makedirs(save_results, exist_ok=True)
-# elif len(labels_params)==9:
-#     save_results = script_dir+'/all_results/PB/'+'PB_MCprop'#path_set
-#     os.makedirs(save_results, exist_ok=True)
-
-# # path_model = ['set_sim'+str(i)+'/' for i in range(1,9)]
-# # path_fit = ['set_fit'+str(i)+'/' for i in range(1,9)]
-# # path_set_sim = [path+'set_sim'+str(i)+'/' for i in range(1,9)]
-# # path_set_fit = [path+'set_fit'+str(i)+'/' for i in range(1,9)]
-
-
-# true, fit_rr, fit_roman = fit_true(path, labels_params)
-# fit_rr1, fit_roman1 = chichi_to_fits_files(path, fit_rr, fit_roman)
-# fit_rr2, fit_roman2 = piE_cov_terms(path,fit_rr1,fit_roman1, labels_params)
-# true1 = categories_function(true, path_dataslice)
-
-# fit_rr2.to_csv(save_results+'fit_rr_ffp.csv', index=False)
-# fit_roman2.to_csv(save_results+'fit_roman_ffp.csv', index=False)
-# true1.to_csv(save_results+'true_ffp.csv', index=False)
-
 path_fit_rr = "/home/anibal/roman_rubin/test_sim_fit/Event_RR_18_TRF.npy"
 path_fit_roman = "/home/anibal/roman_rubin/test_sim_fit/Event_Roman_18_TRF.npy"
 path_model = "/home/anibal/roman_rubin/test_sim_fit/Event_18.h5"
@@ -462,3 +392,4 @@ true, fit_rr, fit_roman = Event.fit_true()
 print(fit_rr)
 print(Event.read_data())
 print(Event.chichi())
+print(Event.MC_propagation())
