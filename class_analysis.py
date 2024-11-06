@@ -1,11 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Created on Tue Nov  5 12:32:05 2024
-
-@author: anibal
-"""
-
 import os, sys
 import re
 from typing import List
@@ -22,11 +14,14 @@ from astropy import units as u
 class Analysis_Event:
     description = "This is a simple class example."
     
-    def __init__(self, model, path_model, path_fit_rr, path_fit_roman):
+    def __init__(self, model, path_model, path_fit_rr, path_fit_roman, 
+                 path_dataslice, trilegal_params):
         self.model = model
         self.path_model = path_model
         self.path_fit_rr   = path_fit_rr
         self.path_fit_roman   = path_fit_roman
+        self.path_dataslice = path_dataslice
+        self.trilegal_params = trilegal_params
         
     def labels_params(self):
         if self.model == "USBL":
@@ -107,7 +102,7 @@ class Analysis_Event:
         return chi_rr, chi_roman, dof_rr, dof_roman
 
 
-    def group_consecutive_numbers(numbers):
+    def group_consecutive_numbers(self,numbers):
         '''
         Defino comienzo y finalizacion de temporadas de observacion de
         Rubin en el campo de Roman
@@ -127,98 +122,25 @@ class Analysis_Event:
             groups.append(current_group)
     
         return groups
-    
-    def intervals_overlap(interval1, interval2):
+
+
+    def intervals_overlap(self,interval1, interval2):
         start1, end1 = interval1
         start2, end2 = interval2
         return (start1 <= end2 and end1 >= start2) or (start2 <= end1 and end2 >= start1)
-    
-    
-    # def chichi_to_fits_files(self,path,fit_rr, fit_roman):
-        
-    #     id_to_chi2_rr = {}
-    #     id_to_chi2_roman = {}
-    #     id_to_dof_rr = {}
-    #     id_to_dof_roman = {}
-    #     sets = [int(re.search(r'\d+', f).group()) for f in os.listdir(path) if 'set_sim' in f]
-        
-    #     for i in tqdm(sets):
-    #         common_elements_list = self.event_fits(path+f"set_fit{i}/")
-    #         if not len(common_elements_list)==0:
-    #             for j in range(len(common_elements_list)):
-    #                 name_file = f"Event_{common_elements_list[j]}.h5"
-    #                 chi2rr, chi2roman,dof_rr,dof_roman = self.chichi(path+f"set_sim{i}/"+name_file)
-    #                 # print(chi2rr, chi2roman)
-    #                 id_to_chi2_rr[int(common_elements_list[j]+i*5000)] =chi2rr
-    #                 id_to_chi2_roman[int(common_elements_list[j]+i*5000)] =chi2roman
-    #                 id_to_dof_rr[int(common_elements_list[j]+i*5000)] = dof_rr
-    #                 id_to_dof_roman[int(common_elements_list[j]+i*5000)] = dof_roman
-    #     fit_rr['chi2'] = fit_rr['Source'].map(id_to_chi2_rr)
-    #     fit_roman['chi2'] = fit_roman['Source'].map(id_to_chi2_roman)
-    #     fit_roman['dof']= fit_roman['Source'].map(id_to_dof_roman)
-    #     fit_rr['dof']= fit_rr['Source'].map(id_to_dof_rr)
-    #     return fit_rr, fit_roman
-    
-    
+
+ 
     def montecarlo_propagation_piE(best_model, covariance_matrix, indx_piE):
         
-        samples = np.random.multivariate_normal(best_model, covariance_matrix, 30000)
+        samples = np.random.multivariate_normal(best_model,
+                                                covariance_matrix,
+                                                30000)
+        
         piEN_dist = np.array(samples)[:,indx_piE[0]]
         piEE_dist = np.array(samples)[:,indx_piE[1]]
         piE_dist = np.sqrt(piEN_dist**2+piEE_dist**2)        
         return np.std(piE_dist)
-        
-    # def piE_cov_terms(path, fit_rr, fit_roman, labels_params):
-    #     cov_piEE_piEN = {}
-    #     cov_piEE_piEN_rom = {}
-        
-    #     piE_MC_rr = {}
-    #     piE_MC_roman = {}
-        
-    #     if len(labels_params)==len(['t0','u0','te','rho',"s","q","alpha",'piEN','piEE']):
-    #         indx_piE = [7,8]
-    #     elif len(labels_params)==len(['t0','u0','te','rho','piEN','piEE']):
-    #         indx_piE = [4,5]
-    #     elif len(labels_params)==len(['t0','u0','te','piEN','piEE']):
-    #         indx_piE = [3,4]
-            
-            
-    #     for i in tqdm(range(len(fit_rr))):
-    #         nsource = fit_rr["Source"].iloc[i]
-    #         nset = int(nsource / 5000)
-    #         nevent = nsource - nset * 5000
-    #         data = np.load(path + f"set_fit{nset}/Event_RR_{nevent}_TRF.npy", allow_pickle=True)
-    #         data_rom = np.load(path + f"set_fit{nset}/Event_Roman_{nevent}_TRF.npy", allow_pickle=True)
-            
-    #         best_model = data.item()['best_model']
-    #         covariance_matrix = data.item()['covariance_matrix']
-    #         cov_piEE_piEN[nsource] = covariance_matrix[indx_piE[0], indx_piE[1]]
-    
-    #         best_model_rom = data_rom.item()['best_model']
-    #         covariance_matrix_rom = data_rom.item()['covariance_matrix']
-    #         cov_piEE_piEN_rom[nsource] = covariance_matrix_rom[indx_piE[0], indx_piE[1]]
-    
-    #         piE_MC_rr[nsource] = montecarlo_propagation_piE(best_model, covariance_matrix, indx_piE)
-    #         piE_MC_roman[nsource] = montecarlo_propagation_piE(best_model_rom, covariance_matrix_rom, indx_piE)
-            
-    #     fit_rr["cov_piEE_piEN"] = fit_rr['Source'].map(cov_piEE_piEN)
-    #     fit_roman["cov_piEE_piEN"] = fit_rr['Source'].map(cov_piEE_piEN_rom)
-    
-    #     fit_rr['piE'] = np.sqrt(fit_rr['piEN'] ** 2 + fit_rr['piEE'] ** 2)
-    #     fit_rr['piE_err'] = (1 / fit_rr['piE']) * np.sqrt((fit_rr['piEN_err'] * fit_rr['piEN']) ** 2 + (
-    #                 fit_rr['piEE_err'] * fit_rr['piEE']) ** 2 +2*fit_rr['piEE']*fit_rr['piEN']*fit_rr['cov_piEE_piEN'])
-    #     fit_roman['piE'] = np.sqrt(fit_roman['piEN'] ** 2 + fit_roman['piEE'] ** 2)
-    #     fit_roman['piE_err'] = (1 / fit_roman['piE']) * np.sqrt((fit_roman['piEN_err'] * fit_roman['piEN']) ** 2 + (
-    #                 fit_roman['piEE_err'] * fit_roman[
-    #             'piEE']) ** 2 +2*fit_roman['piEE']*fit_roman['piEN']*fit_roman['cov_piEE_piEN'])
-    #     #true['piE'] = np.sqrt(true['piEN'] ** 2 + true['piEE'] ** 2)
-        
-    #     fit_rr['piE_err_MC'] = fit_rr['Source'].map(piE_MC_rr)
-    #     fit_roman['piE_err_MC'] = fit_roman['Source'].map(piE_MC_roman)
-        
-    #     return fit_rr, fit_roman
-    
-    
+
     def MC_tE_rho_piE(best_model, covariance_matrix, indx_tE_rho, indx_piE):
         """
         Parameters
@@ -253,83 +175,104 @@ class Analysis_Event:
             MC_rho = None
         return MC_tE, MC_rho, MC_piE
     
-
     
-    
-    def MC_propagation(self):
-        """
-        Parameters
-        ----------
-        path : str
-            path to the directory where the fit and sims are saved.
-        fit_rr : dataframe
-            Pandas dataframe with the results of the fitting process 
-        fit_roman : dataframe
-            Pandas dataframe with the results of the fitting process
-        Returns
-        -------
-        fit_rr : dataframe
-            Add a column with the mass_true.
-            Add a column with the mass obtained from MonteCarlo propagation.
-            Add a column with the mass obtained from propagation formulae.
-        fit_roman : dataframe
-            Add a column with the mass_true.
-            Add a column with the mass obtained from MonteCarlo propagation.
-            Add a column with the mass obtained from propagation formulae.
-        """
- 
-        cov_piEE_piEN = {}
-        cov_piEE_piEN_rom = {}
-    
-        piE_MC_rr = {}
-        piE_MC_roman = {}
-    
-        self.labels_params().index('piEE')
-        self.labels_params().index('piEN')
-        self.labels_params().index('te')
-        try:
-            self.labels_params().index('rho')
-        except:
-            pass
-
+    def samples(self):
         data_rr, data_roman = self.data_fit()
-        
+
         samples_rr = np.random.multivariate_normal(data_rr["best_model"],
                                                    data_rr["covariance_matrix"],
                                                    30000)
-        
+
         samples_roman = np.random.multivariate_normal(data_roman["best_model"],
                                                    data_roman["covariance_matrix"],
                                                    30000)
+        return samples_rr, samples_roman
         
+    def MC_propagation_piE(self):
+        """
+        """
+        
+        samples_rr, samples_roman = self.samples()
+
+
         piEN_dist_rr = samples_rr[:, self.labels_params().index('piEN')]
-        
         piEE_dist_rr = samples_rr[:, self.labels_params().index('piEE')]
-        
         piEN_dist_roman = samples_roman[:, self.labels_params().index('piEN')]
-        
         piEE_dist_roman = samples_roman[:, self.labels_params().index('piEE')]
         
         MC_piE_rr = np.sqrt(piEN_dist_rr ** 2 + piEE_dist_rr ** 2)
-        
         MC_piE_roman = np.sqrt(piEE_dist_roman ** 2 + piEN_dist_roman ** 2)
 
-
-        #opero solo con los df
-        # fit_rr['piE'] = np.sqrt(fit_rr['piEN'] ** 2 + fit_rr['piEE'] ** 2)
-        # fit_rr['piE_err'] = (1 / fit_rr['piE']) * np.sqrt((fit_rr['piEN_err'] * fit_rr['piEN']) ** 2 + (
-        #             fit_rr['piEE_err'] * fit_rr['piEE']) ** 2 +2*fit_rr['piEE']*fit_rr['piEN']*fit_rr['cov_piEE_piEN'])
-        
-        # fit_roman['piE'] = np.sqrt(fit_roman['piEN'] ** 2 + fit_roman['piEE'] ** 2)
-        # fit_roman['piE_err'] = (1 / fit_roman['piE']) * np.sqrt((fit_roman['piEN_err'] * fit_roman['piEN']) ** 2 + (
-        #             fit_roman['piEE_err'] * fit_roman[
-        #         'piEE']) ** 2 +2*fit_roman['piEE']*fit_roman['piEN']*fit_roman['cov_piEE_piEN'])
-        
-    
         return np.std(MC_piE_rr), np.std(MC_piE_roman)
+
+    def mass_MC(self):
+        
+        samples_rr, samples_roman = self.samples()
+        te_dist_rr = samples_rr[:, self.labels_params().index('te')]
+        te_dist_roman = samples_roman[:, self.labels_params().index('te')]
+
+        if "rho" in self.labels_params():
+            rho_dist_roman = samples_roman[:, self.labels_params().index('rho')]
+            rho_dist_rr = samples_rr[:, self.labels_params().index('rho')]        
+            rad_to_mas = 206264806.24709633
+            theta_s = np.arctan(self.trilegal_params["radius"]/self.trilegal_params["D_S"])*rad_to_mas            
+            thE_rho_rr = theta_s/rho_dist_rr 
+            thE_rho_roman = theta_s/rho_dist_roman
+            
+                
+        thE_te_rr = self.trilegal_params["mu_rel"]*te_dist_rr 
+        thE_te_roman = self.trilegal_params["mu_rel"]*te_dist_roman
+        k=1
+        err_mass_rr = np.std(thE_te_rr/(k*self.piE()[0]))
+        
+        
+        
+        return thE_te_rr, thE_te_roman
+
+        
+
+    def piE_propagation(self, piEE, piEN, err_piEE, err_piEN, cov_piEE_piEN):
+
+        piE = np.sqrt(piEE ** 2 + piEN ** 2)
+       
+        err_piE = (1 / piE) * np.sqrt((err_piEN * piEN) ** 2 + (
+                    err_piEE * piEE) ** 2 +2*piEE * piEN*cov_piEE_piEN)
+        
+        return piE, err_piE
     
     
-    def categories_function(true,path_dataslice):
+    def piE(self):
+        
+        data_rr, data_roman = self.data_fit()
+        
+        piEN_rr = data_rr["best_model"][self.labels_params().index("piEN")]
+        piEE_rr = data_rr["best_model"][self.labels_params().index("piEE")]
+        err_piEN_rr = np.sqrt(np.diag(data_rr["covariance_matrix"]))[self.labels_params().index('piEN')]
+        err_piEE_rr = np.sqrt(np.diag(data_rr["covariance_matrix"]))[self.labels_params().index('piEE')]
+        cov_piEE_piEN_rr = data_rr["covariance_matrix"][self.labels_params().index('piEE'),
+                                                        self.labels_params().index('piEN')] 
+        
+        
+        piEN_roman = data_rr["best_model"][self.labels_params().index("piEN")]
+        piEE_roman = data_rr["best_model"][self.labels_params().index("piEE")]
+        err_piEN_roman = np.sqrt(np.diag(data_rr["covariance_matrix"]))[self.labels_params().index('piEN')]
+        err_piEE_roman = np.sqrt(np.diag(data_rr["covariance_matrix"]))[self.labels_params().index('piEE')]
+        cov_piEE_piEN_roman = data_rr["covariance_matrix"][self.labels_params().index('piEE'),
+                                                        self.labels_params().index('piEN')]        
+
+        piE_rr, err_piE_rr = self.piE_propagation(piEE_rr, piEN_rr, 
+                                                  err_piEE_rr, err_piEN_rr, 
+                                                  cov_piEE_piEN_rr)
+        piE_roman, err_piE_roman = self.piE_propagation(piEE_roman, 
+                                                        piEN_roman, 
+                                                        err_piEE_roman, 
+                                                        err_piEN_roman,
+                                                        cov_piEE_piEN_roman)
+        
+        return piE_rr, err_piE_rr, piE_roman, err_piE_roman
+    
+    def categories_function(self):
+        
         nominal_seasons = [
             {'start': '2027-02-11T00:00:00', 'end': '2027-04-24T00:00:00'},
             {'start': '2027-08-16T00:00:00', 'end': '2027-10-27T00:00:00'},
@@ -339,57 +282,66 @@ class Analysis_Event:
             {'start': '2031-02-11T00:00:00', 'end': '2031-04-24T00:00:00'},
         ]
     
-        dataSlice = np.load(path_dataslice, allow_pickle=True)
-        # dataSlice['observationStartMJD']
+        dataSlice = np.load(self.path_dataslice, allow_pickle=True)
         consecutive_numbers = dataSlice['observationStartMJD']
-        result = group_consecutive_numbers(consecutive_numbers)
+        result = self.group_consecutive_numbers(consecutive_numbers)
         rubin_seasons = []
         roman_seasons = []
         for group in result:
             rubin_seasons.append((min(group) + 2400000.5, max(group) + 2400000.5))
         for season in nominal_seasons:
             roman_seasons.append((Time(season['start'], format='isot').jd, Time(season['end'], format='isot').jd))
-    
-        categories = {}
-        for i in range(len(true)):
-            Source = true['Source'].iloc[i]
-            t0 = true['t0'].iloc[i]
-            tE = true['te'].iloc[i]
-            interval1 = (t0 - tE, t0 + tE)
-            overlap_rubin = False
-            for j in range(len(rubin_seasons)):
-                interval2 = rubin_seasons[j]
-                if intervals_overlap(interval1, rubin_seasons[j]):
-                    overlap_rubin = True
-                    break
-            overlap_roman = False
-            for k in range(len(roman_seasons)):
-                interval2 = roman_seasons[k]
-                if intervals_overlap(interval1, roman_seasons[k]):
-                    overlap_roman = True
-                    break
-    
-            if (overlap_rubin == True) and (overlap_roman == True):
-                categories[Source]='A'
-            if (overlap_rubin == True) and (not overlap_roman == True):
-                categories[Source]='B'
-            if (not overlap_rubin == True) and (not overlap_roman == True):
-                categories[Source]='C'
-            if (not overlap_rubin == True) and (overlap_roman == True):
-                categories[Source]='D'
-    
-        true['categories'] = true['Source'].map(categories)
-        return true
+
+        t0 = self.fit_true()[0]["t0"]
+        tE = self.fit_true()[0]["te"]
+        interval1 = (t0 - tE, t0 + tE)
+        overlap_rubin = False
+
+        for j in range(len(rubin_seasons)):
+            # interval2 = rubin_seasons[j]
+            if self.intervals_overlap(interval1, rubin_seasons[j]):
+                overlap_rubin = True
+                break
+        overlap_roman = False
+        for k in range(len(roman_seasons)):
+            # interval2 = roman_seasons[k]
+            if self.intervals_overlap(interval1, roman_seasons[k]):
+                overlap_roman = True
+                break
+
+        if (overlap_rubin == True) and (overlap_roman == True):
+            category='A'
+        if (overlap_rubin == True) and (not overlap_roman == True):
+            category='B'
+        if (not overlap_rubin == True) and (not overlap_roman == True):
+            category='C'
+        if (not overlap_rubin == True) and (overlap_roman == True):
+            category='D'
+        return category
+
+
+
+from pathlib import Path
 
 
 path_fit_rr = "/home/anibal/roman_rubin/test_sim_fit/Event_RR_18_TRF.npy"
 path_fit_roman = "/home/anibal/roman_rubin/test_sim_fit/Event_Roman_18_TRF.npy"
 path_model = "/home/anibal/roman_rubin/test_sim_fit/Event_18.h5"
+script_dir = str(Path(__file__).parent)
+path_TRILEGAL = str(Path(__file__).parent)+f'/TRILEGAL/PB_planet_split_{1}.csv'
+trilegal_params = pd.read_csv(path_TRILEGAL).iloc[0]
 
-Event = Analysis_Event("USBL", path_model, path_fit_rr, path_fit_roman)
+path_dataslice = script_dir+'/opsims/baseline/dataSlice.npy'
+
+Event = Analysis_Event("USBL", path_model, path_fit_rr, path_fit_roman,
+                       path_dataslice, trilegal_params)
 true, fit_rr, fit_roman = Event.fit_true()
 
-print(fit_rr)
-print(Event.read_data())
-print(Event.chichi())
-print(Event.MC_propagation())
+
+# print(fit_rr)
+# print(Event.read_data())
+# print(Event.chichi())
+# print(Event.MC_propagation())
+# print(Event.piE())
+# print(Event.categories_function())
+print(Event.mass_MC())
