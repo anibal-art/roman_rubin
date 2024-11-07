@@ -223,12 +223,12 @@ class Analysis_Event:
         thE_te_rr = self.trilegal_params["mu_rel"]*te_dist_rr 
         thE_te_roman = self.trilegal_params["mu_rel"]*te_dist_roman
         
-        k=4*const.G/const.c
+        k=(4*const.G/const.c).value
+        
         err_mass_rr = np.std(thE_te_rr/(k*self.piE()[0]))
+        err_mass_roman = np.std(thE_te_roman/(k*self.piE()[0]))
         
-        
-        
-        return np.sqrt(thE_te_rr), np.sqrt(thE_te_roman)
+        return err_mass_rr, err_mass_roman
 
         
 
@@ -320,29 +320,3 @@ class Analysis_Event:
             category='D'
         return category
 
-
-
-from pathlib import Path
-
-
-path_fit_rr = "/home/anibal/roman_rubin/test_sim_fit/Event_RR_18_TRF.npy"
-path_fit_roman = "/home/anibal/roman_rubin/test_sim_fit/Event_Roman_18_TRF.npy"
-path_model = "/home/anibal/roman_rubin/test_sim_fit/Event_18.h5"
-script_dir = str(Path(__file__).parent)
-path_TRILEGAL = str(Path(__file__).parent)+f'/TRILEGAL/PB_planet_split_{1}.csv'
-trilegal_params = pd.read_csv(path_TRILEGAL).iloc[0]
-
-path_dataslice = script_dir+'/opsims/baseline/dataSlice.npy'
-
-Event = Analysis_Event("USBL", path_model, path_fit_rr, path_fit_roman,
-                       path_dataslice, trilegal_params)
-true, fit_rr, fit_roman = Event.fit_true()
-
-
-# print(fit_rr)
-# print(Event.read_data())
-# print(Event.chichi())
-# print(Event.MC_propagation())
-# print(Event.piE())
-# print(Event.categories_function())
-print(Event.mass_MC())

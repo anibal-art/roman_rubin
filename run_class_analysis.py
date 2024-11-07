@@ -1,35 +1,28 @@
-from class_analysis import MicrolensingAnalysis
 from pathlib import Path
+from class_analysis import Analysis_Event
+import pandas as pd 
 import os
 
-# Define labels for parameters
-labels_params = ['t0', 'u0', 'te', 'rho', 'piEN', 'piEE']
 
-# Determine paths
 script_dir = str(Path(__file__).parent)
-path_ephemerides = script_dir + '/ajustes/Gaia.txt'
-path_storage = '/share/storage3/rubin/microlensing/romanrubin/'
-path_set = 'test/'
-path = path_storage + path_set
-path_dataslice = script_dir + '/opsims/baseline/dataSlice.npy'
+path_TRILEGAL = str(Path(__file__).parent)+f'/TRILEGAL/PB_planet_split_{1}.csv'
+path_fit_rr = "/home/anibal/roman_rubin/test_sim_fit/Event_RR_18_TRF.npy"
+path_fit_roman = "/home/anibal/roman_rubin/test_sim_fit/Event_Roman_18_TRF.npy"
+path_model = "/home/anibal/roman_rubin/test_sim_fit/Event_18.h5"
 
-# Determine save_results path based on length of labels_params
-if len(labels_params) == 5:
-    save_results = script_dir + '/all_results/BH/' + path_set
-elif len(labels_params) == 6:
-    save_results = script_dir + '/all_results/FFP/' + path_set
-elif len(labels_params) == 9:
-    save_results = script_dir + '/all_results/PB/' + path_set
+trilegal_params = pd.read_csv(path_TRILEGAL).iloc[0]
 
-os.makedirs(save_results, exist_ok=True)
+path_dataslice = script_dir+'/opsims/baseline/dataSlice.npy'
 
-# Instantiate the class with parameters
-analysis = MicrolensingAnalysis(
-    path=path,
-    labels_params=labels_params,
-    save_results=save_results,
-    path_dataslice=path_dataslice
-)
+Event = Analysis_Event("USBL", path_model, path_fit_rr, path_fit_roman,
+                       path_dataslice, trilegal_params)
+true, fit_rr, fit_roman = Event.fit_true()
 
-# Run the analysis
-analysis.run_analysis()
+# print(fit_rr)
+# print(Event.read_data())
+# print(Event.chichi())
+# print(Event.MC_propagation_piE())
+# print(Event.piE())
+# print(Event.categories_function())
+print(Event.mass_MC())
+
