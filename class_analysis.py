@@ -228,7 +228,7 @@ class Analysis_Event:
         
         
         
-        return thE_te_rr, thE_te_roman
+        return np.sqrt(thE_te_rr), np.sqrt(thE_te_roman)
 
         
 
