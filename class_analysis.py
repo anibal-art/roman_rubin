@@ -222,7 +222,8 @@ class Analysis_Event:
                 
         thE_te_rr = self.trilegal_params["mu_rel"]*te_dist_rr 
         thE_te_roman = self.trilegal_params["mu_rel"]*te_dist_roman
-        k=1
+        
+        k=4*const.G/const.c
         err_mass_rr = np.std(thE_te_rr/(k*self.piE()[0]))
         
         
