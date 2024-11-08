@@ -8,7 +8,7 @@ from astropy import units as u
 
 
 class Analysis_Event:
-    description = "This is a simple class example."
+    description = "This is a class to analize one event."
     
     def __init__(self, model, path_model, path_fit_rr, path_fit_roman, 
                  path_dataslice, trilegal_params):
@@ -173,12 +173,13 @@ class Analysis_Event:
     
     
     def samples(self):
+        
         data_rr, data_roman = self.data_fit()
 
         samples_rr = np.random.multivariate_normal(data_rr["best_model"],
                                                    data_rr["covariance_matrix"],
                                                    30000)
-
+        
         samples_roman = np.random.multivariate_normal(data_roman["best_model"],
                                                    data_roman["covariance_matrix"],
                                                    30000)
@@ -235,10 +236,10 @@ class Analysis_Event:
         err_mass_rr2 = self.mass( thE_rho_rr, piEN_dist_rr, piEE_dist_rr)
         err_mass_roman2 = self.mass(thE_rho_roman, piEN_dist_roman, piEE_dist_roman)
         
-        return {'sigma_m_rho_rr':np.std(err_mass_rr1), 
-                'sigma_m_rho_roman':np.std(err_mass_roman1),
-                'sigma_m_te_rr':np.std(err_mass_rr2),
-                'sigma_m_te_roman':np.std(err_mass_roman2)}
+        return {'sigma_m_thetaS_rr':np.std(err_mass_rr1), 
+                'sigma_m_thetaS_roman':np.std(err_mass_roman1),
+                'sigma_m_mu_rr':np.std(err_mass_rr2),
+                'sigma_m_mu_roman':np.std(err_mass_roman2)}
 
         
 
