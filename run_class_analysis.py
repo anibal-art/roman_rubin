@@ -5,17 +5,22 @@ import os
 
 
 script_dir = str(Path(__file__).parent)
-path_TRILEGAL = str(Path(__file__).parent)+f'/TRILEGAL/PB_planet_split_{1}.csv'
-path_fit_rr = "/home/anibal/roman_rubin/test_sim_fit/Event_RR_18_TRF.npy"
-path_fit_roman = "/home/anibal/roman_rubin/test_sim_fit/Event_Roman_18_TRF.npy"
-path_model = "/home/anibal/roman_rubin/test_sim_fit/Event_18.h5"
 
-trilegal_params = pd.read_csv(path_TRILEGAL).iloc[0]
 
+
+# for SET in sets:
+nset=1
+nevent=18
+path_TRILEGAL = str(Path(__file__).parent)+f'/TRILEGAL/PB_planet_split_{nset}.csv'
+path_fit_rr = str(Path(__file__).parent)+"/test_sim_fit"+f"/Event_RR_{nevent}_TRF.npy"
+path_fit_roman = str(Path(__file__).parent)+"/test_sim_fit"+f"/Event_Roman_{nevent}_TRF.npy"
+path_model = str(Path(__file__).parent)+"/test_sim_fit"+f"/Event_{nevent}.h5"
+trilegal_params = pd.read_csv(path_TRILEGAL).iloc[18]
 path_dataslice = script_dir+'/opsims/baseline/dataSlice.npy'
 
 Event = Analysis_Event("USBL", path_model, path_fit_rr, path_fit_roman,
                        path_dataslice, trilegal_params)
+
 true, fit_rr, fit_roman = Event.fit_true()
 
 # print(fit_rr)
@@ -24,5 +29,24 @@ true, fit_rr, fit_roman = Event.fit_true()
 # print(Event.MC_propagation_piE())
 # print(Event.piE())
 # print(Event.categories_function())
-print(Event.mass_MC())
+# print(Event.mass_MC())
+# print(Event.labels_params())
 
+cols_true = ['Source', 'Set'] + Event.labels_params() + ['Category']
+true_df = pd.DataFrame(columns=cols_true)
+
+new_row = {}
+new_row['Source']=nevent
+new_row['Set']=nevent
+for key in Event.labels_params():
+    new_row[key]=true[key]
+
+new_row['Category'] = Event.categories_function()
+true_df = pd.concat([true_df, pd.DataFrame([new_row])], ignore_index=True)
+
+cols_fit = ['Source', 'Set'] + Event.labels_params() + \
+[f+'_err' for f in Event.labels_params()]+\
+['piE', 'piE_err', 'piE_err_MC']+\
+['mass','mass_err', 'mass_err_MC_rho','mass_err_MC_te', 'chichi']
+print(cols_fit)
+fit_rr_df = pd.DataFrame(columns=cols_fit)
