@@ -1,15 +1,11 @@
-import os, sys
-import re
-from typing import List
-from astropy.time import Time
 import h5py
-from astropy.table import QTable
-from tqdm.auto import tqdm
-import pandas as pd
+import math
 import numpy as np
-import warnings
+from astropy.time import Time
+from astropy.table import QTable
 from astropy import constants as const
 from astropy import units as u
+
 
 class Analysis_Event:
     description = "This is a simple class example."
@@ -190,13 +186,13 @@ class Analysis_Event:
         
     def MC_propagation_piE(self):
         """
-        """
         
+        """
         samples_rr, samples_roman = self.samples()
-
-
+        
         piEN_dist_rr = samples_rr[:, self.labels_params().index('piEN')]
         piEE_dist_rr = samples_rr[:, self.labels_params().index('piEE')]
+        
         piEN_dist_roman = samples_roman[:, self.labels_params().index('piEN')]
         piEE_dist_roman = samples_roman[:, self.labels_params().index('piEE')]
         
@@ -204,31 +200,45 @@ class Analysis_Event:
         MC_piE_roman = np.sqrt(piEE_dist_roman ** 2 + piEN_dist_roman ** 2)
 
         return np.std(MC_piE_rr), np.std(MC_piE_roman)
+    
+    def mass(self, thetaE, piEN, piEE):
+        aconv = (180 * 60 * 60 * 1000) / math.pi
+        k= 4 * const.G / (const.c ** 2)
+        mest = ((thetaE/aconv**2)*u.kpc/(k*np.sqrt(piEN**2+piEE**2))).decompose().to('M_sun')
+        return mest
 
     def mass_MC(self):
         
         samples_rr, samples_roman = self.samples()
+        
+        piEE_dist_rr = samples_rr[:, self.labels_params().index('piEE')]
+        piEN_dist_rr = samples_rr[:, self.labels_params().index('piEN')]
         te_dist_rr = samples_rr[:, self.labels_params().index('te')]
+
+        piEE_dist_roman = samples_roman[:, self.labels_params().index('piEE')]
+        piEN_dist_roman = samples_roman[:, self.labels_params().index('piEN')]
         te_dist_roman = samples_roman[:, self.labels_params().index('te')]
+
 
         if "rho" in self.labels_params():
             rho_dist_roman = samples_roman[:, self.labels_params().index('rho')]
             rho_dist_rr = samples_rr[:, self.labels_params().index('rho')]        
-            rad_to_mas = 206264806.24709633
-            theta_s = np.arctan(self.trilegal_params["radius"]/self.trilegal_params["D_S"])*rad_to_mas            
+            theta_s = np.arctan((self.trilegal_params["radius"]*u.R_sun/(self.trilegal_params["D_S"]*u.pc))).to('mas').value      
             thE_rho_rr = theta_s/rho_dist_rr 
             thE_rho_roman = theta_s/rho_dist_roman
             
-                
-        thE_te_rr = self.trilegal_params["mu_rel"]*te_dist_rr 
-        thE_te_roman = self.trilegal_params["mu_rel"]*te_dist_roman
+        yr2day = 365.25        
+        thE_te_rr = self.trilegal_params["mu_rel"]*te_dist_rr/yr2day 
+        thE_te_roman = self.trilegal_params["mu_rel"]*te_dist_roman/yr2day 
+        err_mass_rr1 = self.mass( thE_te_rr, piEN_dist_rr, piEE_dist_rr)
+        err_mass_roman1 = self.mass(thE_te_roman, piEN_dist_roman, piEE_dist_roman)
+        err_mass_rr2 = self.mass( thE_rho_rr, piEN_dist_rr, piEE_dist_rr)
+        err_mass_roman2 = self.mass(thE_rho_roman, piEN_dist_roman, piEE_dist_roman)
         
-        k=(4*const.G/const.c).value
-        
-        err_mass_rr = np.std(thE_te_rr/(k*self.piE()[0]))
-        err_mass_roman = np.std(thE_te_roman/(k*self.piE()[0]))
-        
-        return err_mass_rr, err_mass_roman
+        return {'sigma_m_rho_rr':np.std(err_mass_rr1), 
+                'sigma_m_rho_roman':np.std(err_mass_roman1),
+                'sigma_m_te_rr':np.std(err_mass_rr2),
+                'sigma_m_te_roman':np.std(err_mass_roman2)}
 
         
 
@@ -291,21 +301,21 @@ class Analysis_Event:
         for group in result:
             rubin_seasons.append((min(group) + 2400000.5, max(group) + 2400000.5))
         for season in nominal_seasons:
-            roman_seasons.append((Time(season['start'], format='isot').jd, Time(season['end'], format='isot').jd))
+            roman_seasons.append((Time(season['start'], format='isot').jd, 
+                                  Time(season['end'], format='isot').jd))
 
         t0 = self.fit_true()[0]["t0"]
         tE = self.fit_true()[0]["te"]
         interval1 = (t0 - tE, t0 + tE)
+
         overlap_rubin = False
 
         for j in range(len(rubin_seasons)):
-            # interval2 = rubin_seasons[j]
             if self.intervals_overlap(interval1, rubin_seasons[j]):
                 overlap_rubin = True
                 break
         overlap_roman = False
         for k in range(len(roman_seasons)):
-            # interval2 = roman_seasons[k]
             if self.intervals_overlap(interval1, roman_seasons[k]):
                 overlap_roman = True
                 break
@@ -315,8 +325,8 @@ class Analysis_Event:
         if (overlap_rubin == True) and (not overlap_roman == True):
             category='B'
         if (not overlap_rubin == True) and (not overlap_roman == True):
-            category='C'
-        if (not overlap_rubin == True) and (overlap_roman == True):
             category='D'
+        if (not overlap_rubin == True) and (overlap_roman == True):
+            category='C'
         return category
 
