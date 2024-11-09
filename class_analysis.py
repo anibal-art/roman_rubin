@@ -18,7 +18,7 @@ class Analysis_Event:
         self.path_fit_roman   = path_fit_roman
         self.path_dataslice = path_dataslice
         self.trilegal_params = trilegal_params
-        
+
     def labels_params(self):
         if self.model == "USBL":
             labels_params: list[str] = ['t0','u0','te','rho',"s","q","alpha",'piEN','piEE']
@@ -47,23 +47,33 @@ class Analysis_Event:
         data_rr = self.data_fit_rr()
         data_roman = self.data_fit_roman()
         return data_rr, data_roman
-
-    def fit_values(self):
-        
+    
+    def fit_values_rr(self):
         fit_rr = {}
-        fit_roman = {}
-        
-        data_rr, data_roman = self.data_fit()
-        
+        data_rr = self.data_fit_rr()    
         fit_error_rr = self.error_pyLIMA(data_rr)
-        fit_error_roman = self.error_pyLIMA(data_roman)
 
         for i,key in enumerate(self.labels_params()):
             fit_rr[key] = data_rr["best_model"][i]
             fit_rr[key+"_err"] = fit_error_rr[i]
+        
+        return fit_rr
+    
+    def fit_values_roman(self):
+        fit_roman = {}
+        data_roman = self.data_fit_roman()
+        fit_error_roman = self.error_pyLIMA(data_roman)
+
+        for i,key in enumerate(self.labels_params()):
             fit_roman[key] = data_roman["best_model"][i]
             fit_roman[key+"_err"] = fit_error_roman[i]
         
+        return fit_roman
+        
+
+    def fit_values(self):
+        fit_rr = self.fit_values_rr()
+        fit_roman = self.fit_values_roman()
         return fit_rr, fit_roman
         
     
@@ -75,21 +85,6 @@ class Analysis_Event:
     def fit_true(self):
         fit_rr, fit_roman =self.fit_values()
         true = self.true_values()
-
-        # fit_rr = {}
-        # fit_roman = {}
-        
-        # data_rr, data_roman = self.data_fit()
-        
-        # fit_error_rr = self.error_pyLIMA(data_rr)
-        # fit_error_roman = self.error_pyLIMA(data_roman)
-
-        # for i,key in enumerate(self.labels_params()):
-        #     fit_rr[key] = data_rr["best_model"][i]
-        #     fit_rr[key+"_err"] = fit_error_rr[i]
-        #     fit_roman[key] = data_roman["best_model"][i]
-        #     fit_roman[key+"_err"] = fit_error_roman[i]
-        # true = data_rr["true_params"][self.labels_params()].to_dict()
         return true, fit_rr, fit_roman
     
 
@@ -242,13 +237,20 @@ class Analysis_Event:
         mest = ((thetaE/aconv**2)*u.kpc/(k*np.sqrt(piEN**2+piEE**2))).decompose().to('M_sun')
         return mest
     
-    def fit_mass(self):
-        fit_rr_values = self.data_fit_rr()
-        thetaE_rr = fit_rr_values['te']
-        
-        thetaE_rr, piEN_rr, piEE_rr
-        self.mass(thetaE_rr, piEN_rr, piEE_rr)
-        return mass_rr, mass_roman
+    def fit_mass_rr(self):
+        yr2day = 365.25
+        fit_rr = self.fit_values_rr()
+        thetaE = fit_rr['te']*self.trilegal_params["mu_rel"]/yr2day   
+        mass_rr = self.mass(thetaE, fit_rr["piEN"], fit_rr["piEE"])
+        return mass_rr
+    
+    
+    def fit_mass_roman(self):
+        yr2day = 365.25
+        fit_roman = self.fit_values_roman()
+        thetaE = fit_roman['te']*self.trilegal_params["mu_rel"]/yr2day   
+        mass_roman = self.mass(thetaE, fit_roman["piEN"], fit_roman["piEE"])
+        return mass_roman
     
 
     def mass_MC(self):
