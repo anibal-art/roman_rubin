@@ -25,11 +25,6 @@ true, fit_rr, fit_roman = Event.fit_true()
 piE_rr, err_piE_rr, piE_roman, err_piE_roman = Event.piE()
 chi_rr, chi_roman, dof_rr, dof_roman = Event.chichi()
 
-# {'sigma_m_thetaS_rr':np.std(err_mass_rr1), 
-#         'sigma_m_thetaS_roman':np.std(err_mass_roman1),
-#         'sigma_m_mu_rr':np.std(err_mass_rr2),
-#         'sigma_m_mu_roman':np.std(err_mass_roman2)}
-
 dict_mass = Event.mass_MC()
 #%%
 
@@ -61,8 +56,6 @@ cols_fit = ['Source', 'Set'] + Event.labels_params() + \
 [f+'_err' for f in Event.labels_params()]+\
 ['piE', 'piE_err', 'piE_err_MC']+\
 ['mass','mass_err', 'mass_err_MC_rho','mass_err_MC_te', 'chichi', 'dof']
-# print(cols_fit)
-
 
 fit_rr_df = pd.DataFrame(columns=cols_fit)
 
@@ -85,11 +78,11 @@ new_row['mass_thetaS'] = dict_mass['sigma_m_thetaS_rr']
 
 # new_row['err_mass_thetaE_NotMC'] = dict_mass['sigma_m_rho_rr'] 
 # new_row['mass_err_thetaE'] = dict_mass['sigma_m_rho_rr']
-new_row['mass_err_mu'] = dict_mass['sigma_m_mu_roman']
-new_row['mass_err_thetaS'] = dict_mass['sigma_m_thetaS_roman']
-
-
+new_row['mass_err_mu'] = dict_mass['sigma_m_mu_rr']
+new_row['mass_err_thetaS'] = dict_mass['sigma_m_thetaS_rr']
     
+fit_rr_df = pd.concat([fit_rr_df, pd.DataFrame([new_row])], ignore_index=True)
+
 #%%
 fit_roman_df = pd.DataFrame(columns=cols_fit)
 
@@ -99,6 +92,22 @@ new_row['Set']=nevent
 for key in Event.labels_params():
     new_row[key]=fit_rr[key]
 
-new_row['piE'] = Event.piE()
-new_row['piE_err'] = Event.piE()
+
+new_row['piE'] = piE_roman
+new_row['piE_err'] = err_piE_roman
+new_row['piE_err_MC'] = err_piE_roman
+new_row['chichi'] = chi_roman
+new_row['dof'] = dof_roman
+
+# new_row['mass_thetaE'] = dict_mass['sigma_m_rho_rr']
+new_row['mass_mu'] = dict_mass['sigma_m_mu_roman']
+new_row['mass_thetaS'] = dict_mass['sigma_m_thetaS_roman']
+
+# new_row['err_mass_thetaE_NotMC'] = dict_mass['sigma_m_rho_rr'] 
+# new_row['mass_err_thetaE'] = dict_mass['sigma_m_rho_rr']
+new_row['mass_err_mu'] = dict_mass['sigma_m_mu_roman']
+new_row['mass_err_thetaS'] = dict_mass['sigma_m_thetaS_roman']
+
+fit_roman_df = pd.concat([fit_roman_df, pd.DataFrame([new_row])], ignore_index=True)
+
     

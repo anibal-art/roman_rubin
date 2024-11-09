@@ -35,13 +35,21 @@ class Analysis_Event:
             fit_error= np.sqrt(np.diag(data['covariance_matrix']))[0:len(self.labels_params())]
         return fit_error
     
-    def data_fit(self):
+    def data_fit_rr(self):
         data_rr = np.load(self.path_fit_rr, allow_pickle=True).item()
-        data_roman = np.load(self.path_fit_roman, allow_pickle=True).item()
-        return data_rr, data_roman
+        return data_rr
     
-    def fit_true(self):
+    def data_fit_roman(self):
+        data_roman = np.load(self.path_fit_roman, allow_pickle=True).item()
+        return data_roman
+    
+    def data_fit(self):
+        data_rr = self.data_fit_rr()
+        data_roman = self.data_fit_roman()
+        return data_rr, data_roman
 
+    def fit_values(self):
+        
         fit_rr = {}
         fit_roman = {}
         
@@ -55,7 +63,33 @@ class Analysis_Event:
             fit_rr[key+"_err"] = fit_error_rr[i]
             fit_roman[key] = data_roman["best_model"][i]
             fit_roman[key+"_err"] = fit_error_roman[i]
+        
+        return fit_rr, fit_roman
+        
+    
+    def true_values(self):
+        data_rr, data_roman = self.data_fit()
         true = data_rr["true_params"][self.labels_params()].to_dict()
+        return true
+        
+    def fit_true(self):
+        fit_rr, fit_roman =self.fit_values()
+        true = self.true_values()
+
+        # fit_rr = {}
+        # fit_roman = {}
+        
+        # data_rr, data_roman = self.data_fit()
+        
+        # fit_error_rr = self.error_pyLIMA(data_rr)
+        # fit_error_roman = self.error_pyLIMA(data_roman)
+
+        # for i,key in enumerate(self.labels_params()):
+        #     fit_rr[key] = data_rr["best_model"][i]
+        #     fit_rr[key+"_err"] = fit_error_rr[i]
+        #     fit_roman[key] = data_roman["best_model"][i]
+        #     fit_roman[key+"_err"] = fit_error_roman[i]
+        # true = data_rr["true_params"][self.labels_params()].to_dict()
         return true, fit_rr, fit_roman
     
 
@@ -207,6 +241,15 @@ class Analysis_Event:
         k= 4 * const.G / (const.c ** 2)
         mest = ((thetaE/aconv**2)*u.kpc/(k*np.sqrt(piEN**2+piEE**2))).decompose().to('M_sun')
         return mest
+    
+    def fit_mass(self):
+        fit_rr_values = self.data_fit_rr()
+        thetaE_rr = fit_rr_values['te']
+        
+        thetaE_rr, piEN_rr, piEE_rr
+        self.mass(thetaE_rr, piEN_rr, piEE_rr)
+        return mass_rr, mass_roman
+    
 
     def mass_MC(self):
         
@@ -330,4 +373,3 @@ class Analysis_Event:
         if (not overlap_rubin == True) and (overlap_roman == True):
             category='C'
         return category
-
