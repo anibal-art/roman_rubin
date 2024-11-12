@@ -249,7 +249,7 @@ class Analysis_Event:
         
         yr2day = 365.25
         fit_rr = self.fit_values_rr()
-        thetaE = *self.trilegal_params["te"]*self.trilegal_params["mu_rel"]/yr2day
+        thetaE = self.trilegal_params["te"]*self.trilegal_params["mu_rel"]/yr2day
         mass_rr = self.mass(thetaE, fit_rr["piEN"], fit_rr["piEE"])
         return mass_rr
     
@@ -347,17 +347,94 @@ class Analysis_Event:
                 'sigma_m_thetaE_roman':np.std(err_mass_roman3)
                 }
     
-    # def formula_mass_uncertainty(self):
-    #     '''
-    #     Expression of change of variables in covariance at first order
-    #     '''
-    #     return 2+2
+    def formula_mass_uncertainty(self, piEE_fit, piEN_fit, sigma_piee, sigma_pien,cov_piEE_piEN,thetaE):
+        aconv = (180 * 60 * 60 * 1000) / math.pi
+        c = const.c
+        G = const.G
+        k = 4 * G / (c ** 2)
+        yr2day = 365.25  
+        piE_fit  = np.sqrt(piEE_fit**2 +piEN_fit**2)*(1 / u.kpc)
+        # Calculate the fitted mass
+        M_fit = ((thetaE / aconv**2) / (k * piE_fit)).decompose().to('M_sun')
+        # Derivatives for error propagation
+        dm_dpiee = ((thetaE * (-piEE_fit) / aconv**2) / (k * piE_fit**3)).decompose()
+        dm_dpien = ((thetaE * (-piEN_fit) / aconv**2) / (k * piE_fit**3)).decompose()
+        dm_dthetaE = ((1  / aconv**2) / (k * piE_fit)).decompose()
+        # Quadratic terms for the error
+        cuad_terms =  (dm_dpiee * sigma_piee)**2 + (dm_dpien * sigma_pien)**2 + (dm_dthetaE * 0.1 * thetaE)**2
+        # Covariance terms for the error
+        cov_terms = 2*dm_dpiee * dm_dpien * cov_piEE_piEN * (1 / u.kpc)**2
+        sigma_m = cuad_terms + cov_terms
+        return np.sqrt(sigma_m).to('M_sun').value
+        
     
-    # def sigma_m_notMC(self):
+    def formula_mass_uncertainty_rr(self):
+        '''
+        Expression of change of variables in covariance at first order
+        '''
+        aconv = (180 * 60 * 60 * 1000) / math.pi
+        c = const.c
+        G = const.G
+        k = 4 * G / (c ** 2)
+        yr2day = 365.25
+        piEE_fit = self.fit_values_rr()['piEE'] * (1 / u.kpc)
+        piEN_fit = self.fit_values_rr()['piEN'] * (1 / u.kpc)
+        piE_fit  = np.sqrt(piEE_fit**2 +piEN_fit**2)
+
+        sigma_piee = self.fit_values_rr()['piEE_err'] * (1 / u.kpc)
+        sigma_pien = self.fit_values_rr()['piEN_err'] * (1 / u.kpc)
         
-    #     return {'sigma_m_thetaE_notMC_rr': ,
-    #             'sigma_m_thetaE_notMC_roman':}
+        thetaE = self.trilegal_params["mu_rel"]* self.trilegal_params["te"]/yr2day 
+        # Covariance terms for the error
+        data_rr, data_roman = self.data_fit()
+        cov_piEE_piEN = data_rr["covariance_matrix"][self.labels_params().index('piEN'),self.labels_params().index('piEE')]
+
+        # # Derivatives for error propagation
+        dm_dpiee = ((thetaE * (-piEE_fit) / aconv**2) / (k * piE_fit**3)).decompose()
+        dm_dpien = ((thetaE * (-piEN_fit) / aconv**2) / (k * piE_fit**3)).decompose()
+        dm_dthetaE = ((1  / aconv**2) / (k * piE_fit)).decompose()
         
+        cuad_terms =  (dm_dpiee * sigma_piee)**2 + (dm_dpien * sigma_pien)**2 + (dm_dthetaE * 0.1 * thetaE)**2
+        cov_terms = 2*dm_dpiee * dm_dpien * cov_piEE_piEN * (1 / u.kpc)**2
+        sigma_m = cuad_terms + cov_terms
+        
+    
+        return np.sqrt(sigma_m).to('M_sun').value
+
+    
+    def formula_mass_uncertainty_roman(self):
+        '''
+        Expression of change of variables in covariance at first order
+        '''
+        aconv = (180 * 60 * 60 * 1000) / math.pi
+        c = const.c
+        G = const.G
+        k = 4 * G / (c ** 2)
+        yr2day = 365.25  
+        
+        piEE_fit = self.fit_values_roman()['piEE'] * (1 / u.kpc)
+        piEN_fit = self.fit_values_roman()['piEN'] * (1 / u.kpc)
+        piE_fit  = np.sqrt(piEE_fit**2 +piEN_fit**2)
+
+        sigma_piee = self.fit_values_roman()['piEE_err'] * (1 / u.kpc)
+        sigma_pien = self.fit_values_roman()['piEN_err'] * (1 / u.kpc)
+        
+        thetaE = self.trilegal_params["mu_rel"]* self.trilegal_params["te"]/yr2day 
+        # Calculate the fitted mass
+        M_fit = ((thetaE / aconv**2) / (k * piE_fit)).decompose().to('M_sun')
+        # Derivatives for error propagation
+        dm_dpiee = ((thetaE * (-piEE_fit) / aconv**2) / (k * piE_fit**3)).decompose()
+        dm_dpien = ((thetaE * (-piEN_fit) / aconv**2) / (k * piE_fit**3)).decompose()
+        dm_dthetaE = ((1  / aconv**2) / (k * piE_fit)).decompose()
+        # Quadratic terms for the error
+        cuad_terms =  (dm_dpiee * sigma_piee)**2 + (dm_dpien * sigma_pien)**2 + (dm_dthetaE * 0.1 * thetaE)**2
+        # Covariance terms for the error
+        data_rr, data_roman = self.data_fit()
+        cov_piEE_piEN = data_rr["covariance_matrix"][self.labels_params().index('piEN'),self.labels_params().index('piEE')]
+        cov_terms = 2*dm_dpiee * dm_dpien * cov_piEE_piEN * (1 / u.kpc)**2
+        sigma_m = cuad_terms + cov_terms
+        return np.sqrt(sigma_m).to('M_sun').value            
+
 
     def piE_propagation(self, piEE, piEN, err_piEE, err_piEN, cov_piEE_piEN):
 
