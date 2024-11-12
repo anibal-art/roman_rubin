@@ -237,18 +237,69 @@ class Analysis_Event:
         mest = ((thetaE/aconv**2)*u.kpc/(k*np.sqrt(piEN**2+piEE**2))).decompose().to('M_sun')
         return mest
     
-    def fit_mass_rr(self):
+    
+    def fit_mass_rr1(self):
+        '''
+        Returns the mass as theta_E known
+        -------
+        mass_rr : float
+            DESCRIPTION.
+
+        '''
+        
         yr2day = 365.25
         fit_rr = self.fit_values_rr()
-        thetaE = fit_rr['te']*self.trilegal_params["mu_rel"]/yr2day   
+        thetaE = *self.trilegal_params["te"]*self.trilegal_params["mu_rel"]/yr2day
         mass_rr = self.mass(thetaE, fit_rr["piEN"], fit_rr["piEE"])
         return mass_rr
     
+    def fit_mass_rr2(self):
+        '''
+        Returns the mass with theta_E estimated with known mu_rel
+        -------
+        mass_rr : float
+            DESCRIPTION.
+
+        '''
+        yr2day = 365.25
+        fit_rr = self.fit_values_rr()
+        thetaE = fit_rr['te']*self.trilegal_params["mu_rel"]/yr2day
+        mass_rr = self.mass(thetaE, fit_rr["piEN"], fit_rr["piEE"])
+        return mass_rr
+
+    def fit_mass_rr3(self):
+        '''
+        Returns the mass with theta_E estimated with theta_star known
+        -------
+        mass_rr : float
+            DESCRIPTION.
+
+        '''
+        fit_rr = self.fit_values_rr()
+        theta_s = np.arctan((self.trilegal_params["radius"]*u.R_sun/(self.trilegal_params["D_S"]*u.pc))).to('mas').value      
+        thetaE = theta_s/fit_rr['rho']
+        mass_rr = self.mass(thetaE, fit_rr["piEN"], fit_rr["piEE"])
+        return mass_rr
+
     
-    def fit_mass_roman(self):
+    def fit_mass_roman1(self):
+        yr2day = 365.25
+        fit_roman = self.fit_values_roman()
+        thetaE = self.trilegal_params["te"]*self.trilegal_params["mu_rel"]/yr2day   
+        mass_roman = self.mass(thetaE, fit_roman["piEN"], fit_roman["piEE"])
+        return mass_roman
+    
+    def fit_mass_roman2(self):
         yr2day = 365.25
         fit_roman = self.fit_values_roman()
         thetaE = fit_roman['te']*self.trilegal_params["mu_rel"]/yr2day   
+        mass_roman = self.mass(thetaE, fit_roman["piEN"], fit_roman["piEE"])
+        return mass_roman
+    
+    def fit_mass_roman3(self):
+        fit_roman = self.fit_values_roman()
+        theta_s = np.arctan((self.trilegal_params["radius"]*u.R_sun/(self.trilegal_params["D_S"]*u.pc))).to('mas').value
+        thetaE = theta_s/fit_roman['rho']   
         mass_roman = self.mass(thetaE, fit_roman["piEN"], fit_roman["piEE"])
         return mass_roman
     
@@ -274,18 +325,38 @@ class Analysis_Event:
             thE_rho_roman = theta_s/rho_dist_roman
             
         yr2day = 365.25        
+        
+        thE = self.trilegal_params["mu_rel"]* self.trilegal_params["te"]/yr2day 
         thE_te_rr = self.trilegal_params["mu_rel"]*te_dist_rr/yr2day 
         thE_te_roman = self.trilegal_params["mu_rel"]*te_dist_roman/yr2day 
+        
         err_mass_rr1 = self.mass( thE_te_rr, piEN_dist_rr, piEE_dist_rr)
         err_mass_roman1 = self.mass(thE_te_roman, piEN_dist_roman, piEE_dist_roman)
+        
         err_mass_rr2 = self.mass( thE_rho_rr, piEN_dist_rr, piEE_dist_rr)
         err_mass_roman2 = self.mass(thE_rho_roman, piEN_dist_roman, piEE_dist_roman)
+        
+        err_mass_rr3 = self.mass( thE, piEN_dist_rr, piEE_dist_rr)
+        err_mass_roman3 = self.mass(thE, piEN_dist_roman, piEE_dist_roman)
         
         return {'sigma_m_thetaS_rr':np.std(err_mass_rr1), 
                 'sigma_m_thetaS_roman':np.std(err_mass_roman1),
                 'sigma_m_mu_rr':np.std(err_mass_rr2),
-                'sigma_m_mu_roman':np.std(err_mass_roman2)}
-
+                'sigma_m_mu_roman':np.std(err_mass_roman2),
+                'sigma_m_thetaE_rr':np.std(err_mass_rr3),
+                'sigma_m_thetaE_roman':np.std(err_mass_roman3)
+                }
+    
+    # def formula_mass_uncertainty(self):
+    #     '''
+    #     Expression of change of variables in covariance at first order
+    #     '''
+    #     return 2+2
+    
+    # def sigma_m_notMC(self):
+        
+    #     return {'sigma_m_thetaE_notMC_rr': ,
+    #             'sigma_m_thetaE_notMC_roman':}
         
 
     def piE_propagation(self, piEE, piEN, err_piEE, err_piEN, cov_piEE_piEN):
