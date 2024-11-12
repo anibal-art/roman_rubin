@@ -3,10 +3,7 @@ from class_analysis import Analysis_Event
 import pandas as pd 
 import os
 
-
 script_dir = str(Path(__file__).parent)
-
-
 
 # for SET in sets:
 nset=1
@@ -81,12 +78,6 @@ new_row['mass_err_thetaE'] = dict_mass['sigma_m_thetaE_rr']
 new_row['mass_err_mu'] = dict_mass['sigma_m_mu_rr']
 new_row['mass_err_thetaS'] = dict_mass['sigma_m_thetaS_rr']
 
-
-new_row['mass_thetaS'] = dict_mass['sigma_m_thetaS_rr']
-new_row['mass_mu'] = dict_mass['sigma_m_mu_rr']
-new_row['mass_thetaE'] = dict_mass['sigma_m_thetaE_rr']
-
-
 fit_rr_df = pd.concat([fit_rr_df, pd.DataFrame([new_row])], ignore_index=True)
 
 #%%
@@ -115,5 +106,3 @@ new_row['mass_err_mu'] = dict_mass['sigma_m_mu_roman']
 new_row['mass_err_thetaS'] = dict_mass['sigma_m_thetaS_roman']
 
 fit_roman_df = pd.concat([fit_roman_df, pd.DataFrame([new_row])], ignore_index=True)
-
-    
