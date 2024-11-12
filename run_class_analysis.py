@@ -49,6 +49,9 @@ script_dir = str(Path(__file__).parent)
 path_dataslice = script_dir+'/opsims/baseline/dataSlice.npy'
 model = "USBL"
 
+save_results = script_dir + "/test_USBL/"
+os.makedirs(save_results, exist_ok=True)
+
 path_run = '/share/storage3/rubin/microlensing/romanrubin/PB'
 cols_true = ['Source', 'Set'] + labels_params(model) + ['Category']
 true_df = pd.DataFrame(columns=cols_true)
@@ -156,3 +159,9 @@ for SET in tqdm(range(1,5)):
         new_row['mass_err_thetaS'] = dict_mass['sigma_m_thetaS_roman']
         
         fit_roman_df = pd.concat([fit_roman_df, pd.DataFrame([new_row])], ignore_index=True)
+
+
+
+true_df.to_csv(save_results+'true.csv', index=False)
+fit_roman_df.to_csv(save_results+'fit_roman.csv', index=False)
+fit_rr_df.to_csv(save_results+'fit_rr.csv', index=False)
