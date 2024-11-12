@@ -3,6 +3,8 @@ from class_analysis import Analysis_Event
 import pandas as pd 
 import os, re
 from tqdm.auto import tqdm
+import warnings
+warnings.filterwarnings("ignore")
 
 
 def labels_params(model):
@@ -68,7 +70,7 @@ fit_roman_df = pd.DataFrame(columns=cols_fit)
 for SET in tqdm(range(1,5)):
     nset=SET
     available_events = event_fits(path_run+f"/set_fit{nset}")
-    for nevent in available_events:
+    for nevent in tqdm(available_events):
         # nevent=18
 
 # 
