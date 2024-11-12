@@ -72,11 +72,11 @@ new_row['piE_err_MC'] = err_piE_rr
 new_row['chichi'] = chi_rr
 new_row['dof'] = dof_rr
 
-# new_row['mass_thetaE'] = dict_mass['sigma_m_rho_rr']
-new_row['mass_mu'] = dict_mass['sigma_m_mu_rr']
-new_row['mass_thetaS'] = dict_mass['sigma_m_thetaS_rr']
+new_row['mass_thetaE'] = Event.fit_mass_rr1()
+new_row['mass_mu'] = Event.fit_mass_rr2()
+new_row['mass_thetaS'] = Event.fit_mass_rr3()
 
-new_row['err_mass_thetaE_NotMC'] = dict_mass['sigma_m_thetaE_notMC_rr'] 
+new_row['err_mass_thetaE_NotMC'] = Event.formula_mass_uncertainty_rr()
 new_row['mass_err_thetaE'] = dict_mass['sigma_m_thetaE_rr']
 new_row['mass_err_mu'] = dict_mass['sigma_m_mu_rr']
 new_row['mass_err_thetaS'] = dict_mass['sigma_m_thetaS_rr']
@@ -105,11 +105,11 @@ new_row['piE_err_MC'] = err_piE_roman
 new_row['chichi'] = chi_roman
 new_row['dof'] = dof_roman
 
-new_row['mass_thetaE'] = dict_mass['sigma_m_thetaE_rr']
-new_row['mass_mu'] = dict_mass['sigma_m_mu_roman']
-new_row['mass_thetaS'] = dict_mass['sigma_m_thetaS_roman']
+new_row['mass_thetaE'] = Event.fit_mass_roman1()
+new_row['mass_mu'] = Event.fit_mass_roman2()
+new_row['mass_thetaS'] = Event.fit_mass_roman3()
 
-new_row['err_mass_thetaE_NotMC'] = dict_mass['sigma_m_thetaE_notMC_roman'] 
+new_row['err_mass_thetaE_NotMC'] = Event.formula_mass_uncertainty_roman()
 new_row['mass_err_thetaE'] = dict_mass['sigma_m_thetaE_roman']
 new_row['mass_err_mu'] = dict_mass['sigma_m_mu_roman']
 new_row['mass_err_thetaS'] = dict_mass['sigma_m_thetaS_roman']
