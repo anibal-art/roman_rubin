@@ -111,12 +111,14 @@ for SET in tqdm(range(1,5)):
         true_df = pd.concat([true_df, pd.DataFrame([new_row])], ignore_index=True)
         
         
+        # df de Roman+Rubin
         
         new_row = {}
         new_row['Source']=nevent
         new_row['Set']=nevent
         for key in Event.labels_params():
             new_row[key]=fit_rr[key]
+            new_row[key+'_err']=fit_rr[key+'_err']
         
         
         new_row['piE'] = piE_rr
@@ -137,12 +139,14 @@ for SET in tqdm(range(1,5)):
         fit_rr_df = pd.concat([fit_rr_df, pd.DataFrame([new_row])], ignore_index=True)
         
         
+        # df de Roman 
         
         new_row = {}
         new_row['Source']=nevent
         new_row['Set']=nevent
         for key in Event.labels_params():
-            new_row[key]=fit_rr[key]
+            new_row[key]=fit_roman[key]
+            new_row[key+'_err']=fit_roman[key+'_err']
         
         
         new_row['piE'] = piE_roman
