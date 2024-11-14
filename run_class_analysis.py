@@ -10,12 +10,12 @@ warnings.filterwarnings("ignore")
 
 script_dir = str(Path(__file__).parent)
 path_dataslice = script_dir+'/opsims/baseline/dataSlice.npy'
-model = "PSPL"
+model = "FSPL"
 
-save_results = script_dir + "/test_PSPL/"
+save_results = script_dir + "/test_FFP/"
 os.makedirs(save_results, exist_ok=True)
 
-path_run = '/share/storage3/rubin/microlensing/romanrubin/BH'
+path_run = '/share/storage3/rubin/microlensing/romanrubin/test'
 cols_true = ['Source', 'Set'] + labels_params(model) + ['Category']
 true_df = pd.DataFrame(columns=cols_true)
 
