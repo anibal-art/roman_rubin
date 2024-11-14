@@ -364,6 +364,13 @@ class Analysis_Event:
             thE_rho_rr = theta_s/rho_dist_rr 
             thE_rho_roman = theta_s/rho_dist_roman
             
+            err_mass_rr2 = self.mass( thE_rho_rr, piEN_dist_rr, piEE_dist_rr)
+            err_mass_roman2 = self.mass(thE_rho_roman, piEN_dist_roman, piEE_dist_roman)
+            
+        else:
+            err_mass_rr2 = [0,0]
+            err_mass_roman2 = [0,0]
+            
         yr2day = 365.25        
         
         thE = self.trilegal_params["mu_rel"]* self.trilegal_params["te"]/yr2day 
@@ -373,9 +380,7 @@ class Analysis_Event:
         err_mass_rr1 = self.mass( thE_te_rr, piEN_dist_rr, piEE_dist_rr)
         err_mass_roman1 = self.mass(thE_te_roman, piEN_dist_roman, piEE_dist_roman)
         
-        err_mass_rr2 = self.mass( thE_rho_rr, piEN_dist_rr, piEE_dist_rr)
-        err_mass_roman2 = self.mass(thE_rho_roman, piEN_dist_roman, piEE_dist_roman)
-        
+
         err_mass_rr3 = self.mass( thE, piEN_dist_rr, piEE_dist_rr)
         err_mass_roman3 = self.mass(thE, piEN_dist_roman, piEE_dist_roman)
         
