@@ -1,9 +1,7 @@
-# roman_rubin
+# Roman and Rubin microlensing simulations
 Roman and Rubin simulations and analisys.
 
 The repository contains simulations and analyses to study the impact of combining observations of Roman and Rubin microlensing events.
-
-Here’s a version formatted for a GitHub README file:
 
 
 # Analysis Results
