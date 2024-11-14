@@ -1,10 +1,50 @@
 import h5py
 import math
+import os, re
 import numpy as np
 from astropy.time import Time
 from astropy.table import QTable
 from astropy import constants as const
 from astropy import units as u
+
+def labels_params(model):
+    if model == "USBL":
+        labels_params: list[str] = ['t0','u0','te','rho',"s","q","alpha",'piEN','piEE']
+    elif model == "FSPL": 
+        labels_params: list[str] = ['t0','u0','te','rho','piEN','piEE']
+    elif model == "PSPL":
+        labels_params: list[str] = ['t0','u0','te','piEN','piEE']
+    return labels_params
+
+def event_fits(path_fits):
+    '''
+    return events in common with roman and rubin
+    we have events that fits only one of two for unknown reasons
+    '''
+
+    files_fits = os.listdir(path_fits)
+
+    files_roman = [f for f in files_fits if 'Roman' in f]
+    files_rr = [f for f in files_fits if not 'Roman' in f]
+
+    n_rom = []  # list with the event number
+    for j in files_roman:
+        number = int(re.findall(r'\d+', j)[0])
+        n_rom.append(number)
+
+    n_rr = []  # # list with the event number
+    for j in files_rr:
+        number = int(re.findall(r'\d+', j)[0])
+        n_rr.append(number)
+
+    # Convert lists to sets
+    set1 = set(n_rom)
+    set2 = set(n_rr)
+    # Find the common elements using intersection
+    common_elements = set1.intersection(set2)
+    # Convert the result back to a list (if needed)
+    common_elements_list = list(common_elements)
+    return common_elements_list
 
 
 class Analysis_Event:
