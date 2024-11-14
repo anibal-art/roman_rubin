@@ -90,8 +90,10 @@ for SET in tqdm(range(1,5)):
         
         new_row['mass_thetaE'] = Event.fit_mass_rr1()
         new_row['mass_mu'] = Event.fit_mass_rr2()
-        new_row['mass_thetaS'] = Event.fit_mass_rr3()
-        
+        if 'rho' in labels_params(model):
+            new_row['mass_thetaS'] = Event.fit_mass_rr3()
+        # else:
+            
         new_row['err_mass_thetaE_NotMC'] = Event.formula_mass_uncertainty_rr()
         new_row['mass_err_thetaE'] = dict_mass['sigma_m_thetaE_rr']
         new_row['mass_err_mu'] = dict_mass['sigma_m_mu_rr']
@@ -118,7 +120,8 @@ for SET in tqdm(range(1,5)):
         
         new_row['mass_thetaE'] = Event.fit_mass_roman1()
         new_row['mass_mu'] = Event.fit_mass_roman2()
-        new_row['mass_thetaS'] = Event.fit_mass_roman3()
+        if 'rho' in labels_params(model):
+            new_row['mass_thetaS'] = Event.fit_mass_roman3()
         
         new_row['err_mass_thetaE_NotMC'] = Event.formula_mass_uncertainty_roman()
         new_row['mass_err_thetaE'] = dict_mass['sigma_m_thetaE_roman']
