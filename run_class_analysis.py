@@ -58,7 +58,7 @@ for SET in tqdm(range(1,5)):
         true, fit_rr, fit_roman = Event.fit_true()
         piE_rr, err_piE_rr, piE_roman, err_piE_roman = Event.piE()
         chi_rr, chi_roman, dof_rr, dof_roman = Event.chichi()
-        
+        err_piE_rr_MC , err_piE_roman_MC =  Event.MC_propagation_piE()
         dict_mass = Event.mass_MC()
         
         
@@ -84,7 +84,7 @@ for SET in tqdm(range(1,5)):
         
         new_row['piE'] = piE_rr
         new_row['piE_err'] = err_piE_rr
-        new_row['piE_err_MC'] = err_piE_rr
+        new_row['piE_err_MC'] = err_piE_rr_MC
         new_row['chichi'] = chi_rr
         new_row['dof'] = dof_rr
         
@@ -114,7 +114,7 @@ for SET in tqdm(range(1,5)):
         
         new_row['piE'] = piE_roman
         new_row['piE_err'] = err_piE_roman
-        new_row['piE_err_MC'] = err_piE_roman
+        new_row['piE_err_MC'] = err_piE_roman_MC
         new_row['chichi'] = chi_roman
         new_row['dof'] = dof_roman
         
