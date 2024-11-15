@@ -77,7 +77,7 @@ The notebooks in the `notebooks` directory contains three notebooks
 ### Parallax uncertainty propagation
 In the results you can find two propagation of uncertainty one using the error propagation formulae for a set of functions ![Equation](https://latex.codecogs.com/png.latex?y_1,y_2,y_3...y_m) which all depend on the n random variables ![Equation](https://latex.codecogs.com/png.latex?x_1,x_2,x_3...x_n), thus
 
-![Equation](https://latex.codecogs.com/png.latex?cov_{kl}(\vec{y})=\sum_{i=2}^{n}\sum_{j=1}^{n}\frac{\partial&space;y_k}{\partial&space;x_i}\frac{\partial&space;y_l}{\partial&space;x_j}cov(x_i,x_j))
+![Equation](https://latex.codecogs.com/png.latex?cov_{kl}(\vec{y})=\sum_{i=1}^{n}\sum_{j=1}^{n}\frac{\partial&space;y_k}{\partial&space;x_i}\frac{\partial&space;y_l}{\partial&space;x_j}cov(x_i,x_j))
 
 The second is using a montecarlo aproach by generating samples using the covariance matrix in a multinormal distribution, the covariance matrix is provided by the TRF routine in pyLIMA.
 
