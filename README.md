@@ -77,6 +77,6 @@ The notebooks in the `notebooks` directory contains three notebooks
 ### Parallax uncertainty propagation
 In the results you can find two propagation of uncertainty one using the covariance estimated from the change of variables a first order
 
-![Equation](https://latex.codecogs.com/png.latex?cov((x_i))=\frac{\sigma}{fit}\sum\sum\frac{\partial}{\partial}\frac{\partial}{\partial}cov(x_i,x_j))
+![Equation](https://latex.codecogs.com/png.latex?cov(y(\vec{x}))=\frac{\sigma}{fit}\sum\sum\frac{\partial y}{\partial x_i}\frac{\partial y}{\partial x_j}cov(x_i,x_j))
 
 ### Mass estimation
