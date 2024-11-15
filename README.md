@@ -85,7 +85,7 @@ The second is using a montecarlo aproach by generating samples using the covaria
 
 We run three test for the mass estimation using
 ![Equation](https://latex.codecogs.com/png.latex?M=\frac{\theta_E}{\kappa\pi_E}). 
-- Considering the mass estimation asumming known ![Equation](https://latex.codecogs.com/png.latex?\theta_E)
-- Considering the mass estimation asumming known ![Equation](https://latex.codecogs.com/png.latex?\theta_{star})
-- Considering the mass estimation asumming known ![Equation](https://latex.codecogs.com/png.latex?\mu_{rel})
+- Assuming known ![Equation](https://latex.codecogs.com/png.latex?\theta_E). We use only the information about the estimation of ![Equation](https://latex.codecogs.com/png.latex?\pi_E) and its uncertainty.
+- Assuming known ![Equation](https://latex.codecogs.com/png.latex?\theta_{star}). We use the information about the estimation of ![Equation](https://latex.codecogs.com/png.latex?\pi_E) and its uncertainty and the estimation of ![Equation](https://latex.codecogs.com/png.latex?\rho) and its uncertainty to compute ![Equation](https://latex.codecogs.com/png.latex?\pi_E) and propagate its uncertainty.
+- Assuming known ![Equation](https://latex.codecogs.com/png.latex?\mu_{rel}). We use the information about the estimation of ![Equation](https://latex.codecogs.com/png.latex?\pi_E) and its uncertainty and the estimation of ![Equation](https://latex.codecogs.com/png.latex?t_E) and its uncertainty to compute ![Equation](https://latex.codecogs.com/png.latex?\pi_E) and propagate its uncertainty.
 
