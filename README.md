@@ -68,6 +68,8 @@ The notebooks in the `notebooks` directory contains three notebooks
   - **`Binary_Lens_results.ipynb`** 
   - **`FFP_results.ipynb`**
   - **`BH_results.ipynb`**
-  these notebooks contain the plot of the metrics alpha, beta y gamma
-  ![Equation](https://latex.codecogs.com/png.latex?\frac{a}{b}=\int_{0}^{1}x^2dx)
+  these notebooks contain the plot of the metrics
+![Equation](https://latex.codecogs.com/png.latex?\alpha=\frac{|fit-true|}{true})
+![Equation](https://latex.codecogs.com/png.latex?\beta=\frac{|fit-true|}{\sigma})
+![Equation](https://latex.codecogs.com/png.latex?\gamma=\frac{\sigma}{fit})
 
