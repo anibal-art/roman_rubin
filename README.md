@@ -75,8 +75,10 @@ The notebooks in the `notebooks` directory contains three notebooks
 ![Equation](https://latex.codecogs.com/png.latex?\gamma=\frac{\sigma}{fit})
 
 ### Parallax uncertainty propagation
-In the results you can find two propagation of uncertainty one using the covariance estimated from the change of variables a first order
+In the results you can find two propagation of uncertainty one using the error propagation formulae
 
 ![Equation](https://latex.codecogs.com/png.latex?cov(y(\vec{x}))=\sum_i\sum_j\frac{\partial&space;y}{\partial&space;x_i}\frac{\partial&space;y}{\partial&space;x_j}cov(x_i,x_j))
+
+The second is using a montecarlo aproach by generating samples using the covariance matrix in a multinormal distribution, the covariance matrix is provided by the TRF routine in pyLIMA.
 
 ### Mass estimation
