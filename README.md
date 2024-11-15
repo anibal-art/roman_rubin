@@ -3,11 +3,11 @@ Roman and Rubin simulations and analisys.
 
 The repository contains simulations and analyses to study the impact of combining observations of Roman and Rubin microlensing events.
 
-
+---
 # Analysis Results
 
 The `all_results` directory contains analysis results for a set of events corresponding to Free Floating Planets (FFP), Black Holes (BH), and Bound Planets (PB).
-
+---
 ### File Descriptions
 
 - **`true.csv`**: Contains the true simulation parameters.
@@ -62,7 +62,7 @@ Each of these files includes the following columns:
   - **`chichi`**: Fit quality parameter.
   - **`dof`**: Degrees of freedom for the fit.
   - **`chi2`**: Chi-squared value of the fit.
-
+---
 ## Notebooks with metrics
 The notebooks in the `notebooks` directory contains three notebooks 
   - **`Binary_Lens_results.ipynb`** 
@@ -90,11 +90,11 @@ We run three test for the mass estimation using
 - Assuming known ![Equation](https://latex.codecogs.com/png.latex?\theta_E). We use only the information about the estimation of ![Equation](https://latex.codecogs.com/png.latex?\pi_E) and its uncertainty.
 - Assuming known ![Equation](https://latex.codecogs.com/png.latex?\theta_{star}). We use the information about the estimation of ![Equation](https://latex.codecogs.com/png.latex?\pi_E) and its uncertainty and the estimation of ![Equation](https://latex.codecogs.com/png.latex?\rho) and its uncertainty to compute ![Equation](https://latex.codecogs.com/png.latex?\pi_E) and propagate its uncertainty.
 - Assuming known ![Equation](https://latex.codecogs.com/png.latex?\mu_{rel}). We use the information about the estimation of ![Equation](https://latex.codecogs.com/png.latex?\pi_E) and its uncertainty and the estimation of ![Equation](https://latex.codecogs.com/png.latex?t_E) and its uncertainty to compute ![Equation](https://latex.codecogs.com/png.latex?\pi_E) and propagate its uncertainty.
-
+---
 # Fit and simulation
 The code **`functions_roman_rubin.py`** contains the fit routine and the simulation using pyLIMA and rubin_sim.
 
-
+---
 ## **Functions**
 
 ### 1. **`tel_roman_rubin`**
