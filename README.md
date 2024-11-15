@@ -65,4 +65,9 @@ Each of these files includes the following columns:
 
 ## Notebooks with metrics
 The notebooks in the `notebooks` directory contains three notebooks 
-  - **`results_PB`** 
+  - **`Binary_Lens_results.ipynb`** 
+  - **`FFP_results.ipynb`**
+  - **`BH_results.ipynb`**
+  these notebooks contain the plot of the metrics alpha, beta y gamma
+  ![Equation](https://latex.codecogs.com/png.latex?\frac{a}{b}=\int_{0}^{1}x^2dx)
+
