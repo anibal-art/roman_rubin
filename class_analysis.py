@@ -277,6 +277,13 @@ class Analysis_Event:
         mest = ((thetaE/aconv**2)*u.kpc/(k*np.sqrt(piEN**2+piEE**2))).decompose().to('M_sun')
         return mest
     
+    def mass_true(self):
+        yr2day = 365.25
+        thetaE = self.trilegal_params["te"]*self.trilegal_params["mu_rel"]/yr2day
+        piEN = self.true_values()["piEN"]
+        piEE =self.true_values()["piEE"]
+        return self.mass(thetaE, piEN, piEE)
+    
     
     def fit_mass_rr1(self):
         '''

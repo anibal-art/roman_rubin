@@ -16,7 +16,7 @@ save_results = script_dir + "/test_PB/"
 os.makedirs(save_results, exist_ok=True)
 
 path_run = '/share/storage3/rubin/microlensing/romanrubin/PB'
-cols_true = ['Source', 'Set'] + labels_params(model) + ['Category']
+cols_true = ['Source', 'Set'] + labels_params(model) + ['Category','mass']
 true_df = pd.DataFrame(columns=cols_true)
 
 cols_fit = ['Source', 'Set'] + labels_params(model)  + \
@@ -69,6 +69,7 @@ for SET in tqdm(range(1,5)):
             new_row[key]=true[key]
         
         new_row['Category'] = Event.categories_function()
+        new_row['mass'] = Event.mass_true()
         true_df = pd.concat([true_df, pd.DataFrame([new_row])], ignore_index=True)
         
         
