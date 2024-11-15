@@ -82,3 +82,10 @@ In the results you can find two propagation of uncertainty one using the error p
 The second is using a montecarlo aproach by generating samples using the covariance matrix in a multinormal distribution, the covariance matrix is provided by the TRF routine in pyLIMA.
 
 ### Mass estimation
+
+We run three test for the mass estimation using
+![Equation](https://latex.codecogs.com/png.latex?M=\frac{\theta_E}{\kappa\pi_E}). 
+- Considering the mass estimation asumming known ![Equation](https://latex.codecogs.com/png.latex?\theta_E)
+- Considering the mass estimation asumming known ![Equation](https://latex.codecogs.com/png.latex?\theta_{star})
+- Considering the mass estimation asumming known ![Equation](https://latex.codecogs.com/png.latex?\mu_{rel})
+
