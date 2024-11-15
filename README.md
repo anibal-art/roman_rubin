@@ -91,3 +91,6 @@ We run three test for the mass estimation using
 - Assuming known ![Equation](https://latex.codecogs.com/png.latex?\theta_{star}). We use the information about the estimation of ![Equation](https://latex.codecogs.com/png.latex?\pi_E) and its uncertainty and the estimation of ![Equation](https://latex.codecogs.com/png.latex?\rho) and its uncertainty to compute ![Equation](https://latex.codecogs.com/png.latex?\pi_E) and propagate its uncertainty.
 - Assuming known ![Equation](https://latex.codecogs.com/png.latex?\mu_{rel}). We use the information about the estimation of ![Equation](https://latex.codecogs.com/png.latex?\pi_E) and its uncertainty and the estimation of ![Equation](https://latex.codecogs.com/png.latex?t_E) and its uncertainty to compute ![Equation](https://latex.codecogs.com/png.latex?\pi_E) and propagate its uncertainty.
 
+# Fit and simulation
+The code **`functions_roman_rubin.py`** contains the fit routine and the simulation using pyLIMA and rubin_sim.
+
