@@ -64,7 +64,7 @@ for SET in tqdm(range(1,5)):
         
         new_row = {}
         new_row['Source']=nevent
-        new_row['Set']=nevent
+        new_row['Set']=nset
         for key in Event.labels_params():
             new_row[key]=true[key]
         
@@ -77,7 +77,7 @@ for SET in tqdm(range(1,5)):
         
         new_row = {}
         new_row['Source']=nevent
-        new_row['Set']=nevent
+        new_row['Set']=nset
         for key in Event.labels_params():
             new_row[key]=fit_rr[key]
             new_row[key+'_err']=fit_rr[key+'_err']
@@ -107,7 +107,7 @@ for SET in tqdm(range(1,5)):
         
         new_row = {}
         new_row['Source']=nevent
-        new_row['Set']=nevent
+        new_row['Set']=nset
         for key in Event.labels_params():
             new_row[key]=fit_roman[key]
             new_row[key+'_err']=fit_roman[key+'_err']
