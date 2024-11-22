@@ -12,7 +12,7 @@ script_dir = str(Path(__file__).parent)
 path_dataslice = script_dir+'/opsims/baseline/dataSlice.npy'
 model = "USBL"
 
-save_results = script_dir + "/test_PB/"
+save_results = script_dir + "/all_results/"+model+"/"
 os.makedirs(save_results, exist_ok=True)
 
 path_run = '/share/storage3/rubin/microlensing/romanrubin/PB'
@@ -32,9 +32,7 @@ for SET in tqdm(range(1,5)):
     nset=SET
     available_events = event_fits(path_run+f"/set_fit{nset}")
     for nevent in tqdm(available_events):
-        # nevent=18
 
-# 
         
         if model == "USBL":
             path_TRILEGAL = str(Path(__file__).parent)+f'/TRILEGAL/PB_planet_split_{nset}.csv'
@@ -43,9 +41,7 @@ for SET in tqdm(range(1,5)):
         elif model == "FSPL":
             path_TRILEGAL = str(Path(__file__).parent)+f'/TRILEGAL/FFP_uni_split_{nset}.csv'
     
-        # path_fit_rr = path_run+"/test_sim_fit"+f"/Event_RR_{nevent}_TRF.npy"
-        # path_fit_roman = path_run+"/test_sim_fit"+f"/Event_Roman_{nevent}_TRF.npy"
-        # path_model = path_run+"/test_sim_fit"+f"/Event_{nevent}.h5"
+
         path_fit_rr = path_run+f"/set_fit{nset}"+f"/Event_RR_{nevent}_TRF.npy"
         path_fit_roman = path_run+f"/set_fit{nset}"+f"/Event_Roman_{nevent}_TRF.npy"
         path_model = path_run+f"/set_sim{nset}"+f"/Event_{nevent}.h5"
