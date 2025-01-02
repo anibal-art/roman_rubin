@@ -345,7 +345,7 @@ def fit_rubin_roman(Source, event_params, path_save, path_ephemerides, model, al
 
 
 def save(iloc, path_TRILEGAL_set, path_to_save, my_own_model, pyLIMA_parameters):
-    print('saving...')
+    print('Saving...')
     # Save to an HDF5 file with specified names
     with h5py.File(path_to_save + 'Event_' + str(iloc) + '.h5', 'w') as file:
         # Save array with a specified name
@@ -360,6 +360,7 @@ def save(iloc, path_TRILEGAL_set, path_to_save, my_own_model, pyLIMA_parameters)
             table_group = file.create_group(telo.name)
             for col in table.colnames:
                 table_group.create_dataset(col, data=table[col])
+    print('File saved:',path_to_save + 'Event_' + str(iloc) + '.h5' )
 
 
 def read_data(path_model):
