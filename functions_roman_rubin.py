@@ -285,7 +285,7 @@ def fit_rubin_roman(Source, event_params, path_save, path_ephemerides, model, al
    # q = float(event_params['q'])
    # alpha = float(event_params['alpha'])
 
-    rango = 10
+    rango = 1
     if model == 'FSPL':
         rho = float(event_params['rho'])
         pyLIMAmodel = FSPLarge_model.FSPLargemodel(e,blend_flux_parameter='ftotal', parallax=['Full', t0])
@@ -304,6 +304,9 @@ def fit_rubin_roman(Source, event_params, path_save, path_ephemerides, model, al
         pyLIMAmodel = PSPL_model.PSPLmodel(e,blend_flux_parameter='ftotal', parallax=['Full', t0])
         param_guess = [t0, u0, tE, piEN, piEE]
 
+
+
+    
     if algo == 'TRF':
         fit_2 = TRF_fit.TRFfit(pyLIMAmodel)
         pool = None
@@ -323,7 +326,7 @@ def fit_rubin_roman(Source, event_params, path_save, path_ephemerides, model, al
         fit_2.fit_parameters['alpha'][1] = [0, np.pi]
 
     if (model == 'USBL') or (model == 'FSPL'):
-        fit_2.fit_parameters['rho'][1] = [0, rho + rango * abs(rho)]
+        fit_2.fit_parameters['rho'][1] = [rho - rango * abs(rho), rho + rango * abs(rho)]
 
     fit_2.fit_parameters['t0'][1] = [t0 - 10, t0 + 10]  # t0 limits
     fit_2.fit_parameters['u0'][1] = [u0 - abs(u0) * rango, u0 + abs(u0) * rango]  # u0 limits
