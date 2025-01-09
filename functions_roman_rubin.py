@@ -227,8 +227,8 @@ def set_photometric_parameters(exptime, nexp, readnoise=None):
     photParams = PhotometricParameters(exptime=exptime, nexp=nexp, readnoise=readnoise)
     return photParams
 
-
-def fit_rubin_roman(Source, event_params, path_save, path_ephemerides, model, algo, Origin, wfirst_lc, lsst_u, lsst_g,
+# I add rango as input
+def fit_rubin_roman(Source, event_params, path_save, path_ephemerides, model, algo, Origin,rango, wfirst_lc, lsst_u, lsst_g,
                     lsst_r, lsst_i, lsst_z,
                     lsst_y):
     '''
@@ -285,7 +285,7 @@ def fit_rubin_roman(Source, event_params, path_save, path_ephemerides, model, al
    # q = float(event_params['q'])
    # alpha = float(event_params['alpha'])
 
-    rango = 1
+    # rango = 1
     if model == 'FSPL':
         rho = float(event_params['rho'])
         pyLIMAmodel = FSPLarge_model.FSPLargemodel(e,blend_flux_parameter='ftotal', parallax=['Full', t0])
@@ -323,7 +323,7 @@ def fit_rubin_roman(Source, event_params, path_save, path_ephemerides, model, al
     if model == 'USBL':
         fit_2.fit_parameters['separation'][1] = [s - np.abs(s) * rango, s + np.abs(s) * rango]
         fit_2.fit_parameters['mass_ratio'][1] = [q - rango * q, q + rango * q]
-        fit_2.fit_parameters['alpha'][1] = [0, np.pi]
+        fit_2.fit_parameters['alpha'][1] = [alpha - rango * abs(alpha), alpha + rango * abs(alpha)]
 
     if (model == 'USBL') or (model == 'FSPL'):
         fit_2.fit_parameters['rho'][1] = [rho - rango * abs(rho), rho + rango * abs(rho)]
