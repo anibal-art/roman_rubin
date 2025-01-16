@@ -65,9 +65,11 @@ class sim_events:
         self.path_save_sim = path_save_sim
         self.path_save_fit = path_save_fit
 
+    
     def dataSlice(self):
         return np.load(self.path_dataslice, allow_pickle=True)
 
+    
     def Rubin_BandPass(self):
         LSST_BandPass = {}        
         for f in lsst_filterlist:
@@ -75,6 +77,7 @@ class sim_events:
             LSST_BandPass[f].read_throughput(str(script_dir)+'/troughputs/' + f'total_{f}.dat')
         return LSST_BandPass
 
+    
     def time_stamps_rubin(self):
         dataSlice = self.dataSlice()
         rubin_ts = {}
@@ -85,6 +88,7 @@ class sim_events:
             rubin_ts[fil] = int_array
         return rubin_ts
 
+    
     def ulens_params(self):
         data=self.data_params
         
@@ -101,6 +105,7 @@ class sim_events:
                       'piEN': data['piEN'], 'piEE': data['piEE']}        
         return params
 
+    
     def ephem(self):
         ephemerides = np.loadtxt(self.path_ephemerides)
         ephemerides[:, 0] = ephemerides[:, 0]
@@ -108,6 +113,7 @@ class sim_events:
         deltaT = tlsst - ephemerides[:, 0][0]
         ephemerides[:, 0] = ephemerides[:, 0] + deltaT
         return ephemerides
+
     
     def tel_roman_rubin(self):
         '''
@@ -169,7 +175,7 @@ class sim_events:
          constant flux by more than 3$\sigma$
         '''
         pyLIMA_telescopes = my_own_model.event.telescopes
-        pyLIMA_parameters = my_own_model.print_model_parameters()
+        pyLIMA_parameters = self.pyLIMA_parameters(my_own_model)
         # print(pyLIMA_parameters)
         # pyLIMA_telescopes = self.tel_roman_rubin().telescopes #????
         t0 = self.ulens_params()['t0']
@@ -192,7 +198,7 @@ class sim_events:
                     for j in range(len(sorted_y)):
                         if sorted_y[j] + 3 * sorted_z[j] < mag_baseline:
                             consec.append(j)
-                    result = has_consecutive_numbers(consec)
+                    result = self.has_consecutive_numbers(consec)
                     if result:
                         satis_crit[telo.name] = True
                     else:
@@ -258,7 +264,7 @@ class sim_events:
         return MJD, MAG, MAGERR, M5
     
     
-    def has_consecutive_numbers(lst):
+    def has_consecutive_numbers(self, lst):
         """
         check if there at least 3 consecutive numbers in a list lst
         """
@@ -274,7 +280,7 @@ class sim_events:
         return photParams
 
     
-    def tel_rubin_roman(self, my_own_model):
+    def tel_rr_fit(self, my_own_model):
         '''
         Perform fit for Rubin and Roman data for fspl, usbl and pspl
         '''
@@ -318,7 +324,7 @@ class sim_events:
         e.check_event()
         return e
 
-    def tel_roman(self, my_own_model):
+    def tel_roman_fit(self, my_own_model):
         '''
         Perform fit for Rubin and Roman data for fspl, usbl and pspl
         '''
@@ -427,10 +433,8 @@ class sim_events:
     
     def save(self):
         iloc = self.index
-        path_TRILEGAL_set = self.path_trilegal
-        # self.
 
-        
+        path_TRILEGAL_set = self.path_trilegal
         iloc, path_TRILEGAL_set, path_to_save, my_own_model, pyLIMA_parameters
         print('Saving...')
         # Save to an HDF5 file with specified names
@@ -448,8 +452,7 @@ class sim_events:
                 for col in table.colnames:
                     table_group.create_dataset(col, data=table[col])
         print('File saved:',path_to_save + 'Event_' + str(iloc) + '.h5' )
-    
-    
+        
     def read_data(path_model):
         # Open the HDF5 file and load data using specified names
         with h5py.File(path_model, 'r') as file:
@@ -468,7 +471,6 @@ class sim_events:
                 bands[band] = loaded_table
             return info_dataset, pyLIMA_parameters, bands
 
-
     def mag_sources(self):
         data=self.data_params
         # print(data)
@@ -483,7 +485,6 @@ class sim_events:
         my_own_parameters = []
         for key in params:
             my_own_parameters.append(params[key])
-    
         my_own_flux_parameters = []
         fs, G, F = {}, {}, {}
         np.random.seed(i)
@@ -505,7 +506,9 @@ class sim_events:
         my_own_parameters += my_own_flux_parameters
         return my_own_parameters
 
-    
+    def pyLIMA_parameters(self, my_own_model):
+        return my_own_model.compute_pyLIMA_parameters(self.sim_parameters(my_own_model))
+
     def sim_event(self):
         '''
         i (int): index of the TRILEGAL data set
@@ -541,8 +544,8 @@ class sim_events:
             my_own_model = PSPL_model.PSPLmodel(new_creation, parallax=['Full', t0])
     
         my_own_parameters = self.sim_parameters(my_own_model)
-        pyLIMA_parameters = my_own_model.compute_pyLIMA_parameters(my_own_parameters)
-        
+        pyLIMA_parameters = self.pyLIMA_parameters(my_own_model)#.compute_pyLIMA_parameters(my_own_parameters)
+        # print()        
         simulator.simulate_lightcurve_flux(my_own_model, pyLIMA_parameters)
     
         for k in range(1, len(new_creation.telescopes)):
@@ -603,9 +606,7 @@ class sim_events:
             print("Not a good event to fit since no Rubin band")
             return False
 
-     
-     
-     
+    
     def sim_fit(i, model, algo,path_TRILEGAL_set, path_to_save_model,path_to_save_fit,path_ephemerides, path_dataslice):
         pd_planets = pd.read_csv(path_TRILEGAL_set)
         event_params = pd_planets.iloc[int(i)]
