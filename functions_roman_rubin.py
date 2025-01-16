@@ -446,7 +446,7 @@ def sim_event(i, data, path_ephemerides, path_dataslice, model):
             my_own_flux_parameters.append(f_total)
         else:
             my_own_flux_parameters.append(f_source)
-            my_own_flux_parameters.append(f_source * g)  # *f_source #esto antes era g
+            my_own_flux_parameters.append(f_source * g)
 
     my_own_parameters += my_own_flux_parameters
     pyLIMA_parameters = my_own_model.compute_pyLIMA_parameters(my_own_parameters)
@@ -471,7 +471,6 @@ def sim_event(i, data, path_ephemerides, path_dataslice, model):
                 Roman_band = True
         else:
             X = telo.lightcurve_flux['time'].value
-            # print(len(X))
             ym = mag(ZP[telo.name], telo.lightcurve_flux['flux'].value)
             z, y, x, M5 = [], [], [], []
             for k in range(len(ym)):
