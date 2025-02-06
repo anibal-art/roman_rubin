@@ -508,6 +508,20 @@ class sim_events:
 
     def pyLIMA_parameters(self, my_own_model):
         return my_own_model.compute_pyLIMA_parameters(self.sim_parameters(my_own_model))
+    
+    def pyLIMA_parameters_OM(self, my_own_model):
+        v_para = 50
+        v_perp = 50
+        v_radial = 0
+        
+
+        pyLIMA_par = self.pyLIMA_parameters(my_own_model)
+
+        pyLIMA_par['v_para'] = v_para
+        pyLIMA_par['v_perp'] = v_perp
+        pyLIMA_par['v_radial'] = v_radial
+
+        return pyLIMA_par
 
     def sim_event(self):
         '''
@@ -545,6 +559,77 @@ class sim_events:
     
         my_own_parameters = self.sim_parameters(my_own_model)
         pyLIMA_parameters = self.pyLIMA_parameters(my_own_model)#.compute_pyLIMA_parameters(my_own_parameters)
+        # print()        
+        simulator.simulate_lightcurve_flux(my_own_model, pyLIMA_parameters)
+    
+        for k in range(1, len(new_creation.telescopes)):
+            model_flux = my_own_model.compute_the_microlensing_model(new_creation.telescopes[k],
+                                                                     pyLIMA_parameters)['photometry']
+            new_creation.telescopes[k].lightcurve_flux['flux'] = model_flux
+    
+        for telo in new_creation.telescopes:
+            if telo.name == 'W149':
+                x = telo.lightcurve_magnitude['time'].value
+                y = telo.lightcurve_magnitude['mag'].value
+                z = telo.lightcurve_magnitude['err_mag'].value
+                m5 = np.ones(len(x)) * 27.6
+                X, Y, Z, sigma_5 = self.filter_band(x, y - 27.4 + ZP[telo.name], z, m5, telo.name)
+                telo.lightcurve_magnitude = QTable([X, Y, Z],
+                                                   names=['time', 'mag', 'err_mag'], units=['JD', 'mag', 'mag'])
+            else:
+                X = telo.lightcurve_flux['time'].value
+                ym = self.mag(ZP[telo.name], telo.lightcurve_flux['flux'].value)
+                z, y, x, M5 = [], [], [], []
+                for k in range(len(ym)):
+                    m5 = dataSlice['fiveSigmaDepth'][np.where(dataSlice['filter'] == telo.name)][k]
+                    magerr = calc_mag_error_m5(ym[k], LSST_BandPass[telo.name], m5, photParams)[0]
+                    z.append(magerr)
+                    y.append(np.random.normal(ym[k], magerr))
+                    x.append(X[k])
+                    M5.append(m5)
+                X, Y, Z, sigma_5 = self.filter_band(x, y, z, M5, telo.name)
+                telo.lightcurve_magnitude = QTable([X, Y, Z],
+                                                   names=['time', 'mag', 'err_mag'],
+                                                   units=['JD', 'mag', 'mag'])
+        return new_creation, my_own_model
+
+    def sim_event_OM(self):
+        '''
+        USBL with orbital motion
+        i (int): index of the TRILEGAL data set
+        data (dictionary): parameters including magnitude of the stars
+        path_ephemerides (str): path to the ephemeris of Gaia
+        path_dataslice(str): path to the dataslice obtained from OpSims
+        model(str): model desired
+        '''
+        i = self.index
+        magstar = self.mag_sources()
+        my_own_creation = self.tel_roman_rubin()
+        dataSlice = self.dataSlice()
+        LSST_BandPass = self.Rubin_BandPass()
+        photParams = self.set_photometric_parameters(15, 2)
+        new_creation = copy.deepcopy(my_own_creation)
+        np.random.seed(i)
+        
+        params = self.ulens_params()
+        
+        t0 = self.ulens_params()['t0']
+        tE = self.ulens_params()['tE']
+    
+        if self.model == 'USBL':
+            choice = np.random.choice(["central_caustic", "second_caustic", "third_caustic"])
+            # usbl = pyLIMA.models.USBL_model.USBLmodel(roman_event, origin=[choice, [0, 0]],blend_flux_parameter='ftotal')
+            my_own_model = USBL_model.USBLmodel(new_creation, origin=[choice, [0, 0]],
+                                                blend_flux_parameter='ftotal',
+                                                parallax=['Full', t0], orbital_motion=['Keplerian', t0])
+            # my_own_model = USBL_model.USBLmodel(new_creation,origin=[choice, [0, 0]], parallax=['Full', t0])
+        elif self.model == 'FSPL':
+            my_own_model = FSPLarge_model.FSPLargemodel(new_creation, parallax=['Full', t0])
+        elif self.model == 'PSPL':
+            my_own_model = PSPL_model.PSPLmodel(new_creation, parallax=['Full', t0])
+    
+        my_own_parameters = self.sim_parameters(my_own_model)
+        pyLIMA_parameters = self.pyLIMA_parameters_OM(my_own_model)#.compute_pyLIMA_parameters(my_own_parameters)
         # print()        
         simulator.simulate_lightcurve_flux(my_own_model, pyLIMA_parameters)
     
