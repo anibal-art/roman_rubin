@@ -427,7 +427,7 @@ class sim_events:
     
         true_values = np.array(event_params)
         fit_2.fit_results['true_params'] = event_params
-        np.save(self.path_save_fit + e.name + '_' + algo + '.npy', fit_2.fit_results)
+        #np.save(self.path_save_fit + e.name + '_' + algo + '.npy', fit_2.fit_results)
         return fit_2
     
     
