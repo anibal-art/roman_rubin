@@ -10,7 +10,7 @@ import pickle
 
 # with open(path_save_event+"tel_roman_18.pkl", "rb") as archivo:
 #     tel_roman_rest = pickle.load(archivo)
-path_save_event = '/home/anibal-pc/roman_rubin'+'/test_interval_width/'
+path_save_event = os.path.dirname(os.getcwd())+'/test_interval_width/'
 with open(path_save_event+"sim_event/tel_rr_18.pkl", "rb") as archivo:
     tel_rr_rest = pickle.load(archivo)
 
