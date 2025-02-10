@@ -79,7 +79,7 @@ def fit_test(index):
     
     origin = 'NOTHING'
     # rango = 1
-    fit_rr, event_fit_rr, pyLIMAmodel_rr = fit_rubin_roman(Source,event_params, path_to_save_fit, path_ephemerides,model,algo,origin,rango,
+    fit_rr, event_fit_rr, pyLIMAmodel_rr = fit_rubin_roman(index, event_params, path_to_save_fit, path_ephemerides,model,algo,origin,rango,
                                wfirst_lc, lsst_u, lsst_g, lsst_r,
                                            lsst_i, lsst_z, lsst_y)
     # fit_roman, event_fit_roman, pyLIMAmodel_roman = fit_rubin_roman(Source,event_params, path_to_save_fit, path_ephemerides,model,algo,origin,rango,
