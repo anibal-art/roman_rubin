@@ -33,7 +33,7 @@ def run_command_with_logging(command):
 def parallel_test_width(N_tr):
     commands = [
         ["python", "-c",
-         f"from test_width import fit_test; fit_test({rango})"]
+         f"from test_width_v2 import fit_test; fit_test({rango})"]
         for rango in np.logspace(-4,1,30)
     ]
 
