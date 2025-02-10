@@ -74,7 +74,7 @@ def fit_test(rango):
     
     algo='TRF'
     
-    Source = i
+    Source = rango
     
     
     origin = 'NOTHING'
