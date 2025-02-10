@@ -10,7 +10,7 @@ from functions_roman_rubin import model_rubin_roman, fit_rubin_roman
 from functions_roman_rubin import read_data, save
 
 current_path = os.getcwd()
-
+i=18 #select one event by its index in the TRILEGAL set
 
 path_TRILEGAL_set= current_path+'/TRILEGAL/PB_planet_split_1.csv'
 path_to_save_model= current_path+'/test_sim_fit/'
@@ -26,7 +26,7 @@ colorbands={'W149':'b', 'u':'purple', 'g':'g', 'r':'red',
 
 def fit_test(rango):
     # print(current_path)
-    i=18 #select one event by its index in the TRILEGAL set
+
     model='USBL'   
     info_dataset, pyLIMA_parameters, bands = read_data(path_to_save_model+'/Event_18.h5')
     ulens_params = []
