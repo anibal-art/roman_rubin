@@ -19,17 +19,15 @@ path_ephemerides= current_path+'/ephemerides/Gaia.txt'
 path_dataslice = current_path+'/opsims/baseline/dataSlice.npy'
 path_fit_rr = path_to_save_fit+f'/Event_RR_{i}_TRF.npy'
 path_fit_roman =  path_to_save_fit+f'/Event_Roman_{i}_TRF.npy'
+ZP = {'W149':27.615, 'u':27.03, 'g':28.38, 'r':28.16,
+              'i':27.85, 'z':27.46, 'y':26.68}
+colorbands={'W149':'b', 'u':'purple', 'g':'g', 'r':'red',
+          'i':'yellow', 'z':'k', 'y':'cyan'}
 
 def fit_test(rango):
     # print(current_path)
     i=18 #select one event by its index in the TRILEGAL set
-    model='USBL'
-    
-   ZP = {'W149':27.615, 'u':27.03, 'g':28.38, 'r':28.16,
-              'i':27.85, 'z':27.46, 'y':26.68}
-    colorbands={'W149':'b', 'u':'purple', 'g':'g', 'r':'red',
-              'i':'yellow', 'z':'k', 'y':'cyan'}
-    
+    model='USBL'   
     info_dataset, pyLIMA_parameters, bands = read_data(path_to_save_model+'/Event_18.h5')
     ulens_params = []
     PAR = ['t_center','u_center','tE','rho','separation','mass_ratio','alpha','piEN','piEE']
