@@ -24,9 +24,9 @@ ZP = {'W149':27.615, 'u':27.03, 'g':28.38, 'r':28.16,
 colorbands={'W149':'b', 'u':'purple', 'g':'g', 'r':'red',
           'i':'yellow', 'z':'k', 'y':'cyan'}
 
-def fit_test(rango):
+def fit_test(index):
     # print(current_path)
-
+    rango = np.logspace(-4,1,30)[index]
     model='USBL'   
     info_dataset, pyLIMA_parameters, bands = read_data(path_to_save_model+'/Event_18.h5')
     ulens_params = []

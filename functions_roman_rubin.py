@@ -343,7 +343,8 @@ def fit_rubin_roman(Source, event_params, path_save, path_ephemerides, model, al
 
     true_values = np.array(event_params)
     fit_2.fit_results['true_params'] = event_params
-    np.save(path_save + e.name + '_' + algo + '.npy', fit_2.fit_results)
+    fit_2.fit_results['rango'] = rango
+    np.save(path_save + e.name + '_' + algo +'.npy', fit_2.fit_results)
     return fit_2, e, pyLIMAmodel
 
 
