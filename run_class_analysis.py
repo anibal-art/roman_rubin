@@ -82,7 +82,8 @@ for SET in tqdm(range(1,5)):
         new_data_true['Category'] = Event.categories_function()
         new_data_true['mass'] = Event.mass_true()
         #true_df = pd.concat([true_df, pd.DataFrame([new_row])], ignore_index=True)
-        new_data.to_csv(filename_true, mode="a", header=False, index=False)
+        
+        new_data_true.to_csv(filename_true, mode="a", header=False, index=False)
         
         # df de Roman+Rubin
         new_data_rr = pd.DataFrame(columns=cols_fit)
