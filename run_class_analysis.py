@@ -74,32 +74,32 @@ for SET in tqdm(range(1,5)):
         
         new_data_true = pd.DataFrame(columns=cols_true)
         #new_row = {}
-        new_data_true['Source'] = nevent
-        new_data_true['Set'] = nset
+        new_data_true['Source'] = [nevent]
+        new_data_true['Set'] = [nset]
         for key in Event.labels_params():
-            new_data_true[key]=true[key]
+            new_data_true[key]=[true[key]]
         
-        new_data_true['Category'] = Event.categories_function()
-        new_data_true['mass'] = Event.mass_true()
+        new_data_true['Category'] = [Event.categories_function()]
+        new_data_true['mass'] = [Event.mass_true()]
         #true_df = pd.concat([true_df, pd.DataFrame([new_row])], ignore_index=True)
-        
+        print(new_data_true)
         new_data_true.to_csv(filename_true, mode="a", header=False, index=False)
         
         # df de Roman+Rubin
         new_data_rr = pd.DataFrame(columns=cols_fit)
         
-        new_data_rr['Source'] = nevent
-        new_data_rr['Set'] = nset
+        new_data_rr['Source'] = [nevent]
+        new_data_rr['Set'] = [nset]
         for key in Event.labels_params():
-            new_data_rr[key]=fit_rr[key]
-            new_data_rr[key+'_err']=fit_rr[key+'_err']
+            new_data_rr[key]=[fit_rr[key]]
+            new_data_rr[key+'_err']=[fit_rr[key+'_err']]
         
         
-        new_data_rr['piE'] = piE_rr
-        new_data_rr['piE_err'] = err_piE_rr
+        new_data_rr['piE'] = [piE_rr]
+        new_data_rr['piE_err'] = [err_piE_rr]
         #new_row['piE_err_MC'] = err_piE_rr_MC
-        new_data_rr['chichi'] = chi_rr
-        new_data_rr['dof'] = dof_rr
+        new_data_rr['chichi'] = [chi_rr]
+        new_data_rr['dof'] = [dof_rr]
         
         #new_row['mass_thetaE'] = Event.fit_mass_rr1()
         #new_row['mass_mu'] = Event.fit_mass_rr2()
@@ -118,18 +118,18 @@ for SET in tqdm(range(1,5)):
         # df de Roman 
         new_data_roman = pd.DataFrame(columns=cols_fit)
         #new_row = {}
-        new_data_roman['Source']=nevent
-        new_data_roman['Set']=nset
+        new_data_roman['Source']=[nevent]
+        new_data_roman['Set']=[nset]
         for key in Event.labels_params():
-            new_data_roman[key]=fit_roman[key]
-            new_data_roman[key+'_err']=fit_roman[key+'_err']
+            new_data_roman[key]=[fit_roman[key]]
+            new_data_roman[key+'_err']=[fit_roman[key+'_err']]
         
         
-        new_data_roman['piE'] = piE_roman
-        new_data_roman['piE_err'] = err_piE_roman
+        new_data_roman['piE'] = [piE_roman]
+        new_data_roman['piE_err'] = [err_piE_roman]
         #new_row['piE_err_MC'] = err_piE_roman_MC
-        new_data_roman['chichi'] = chi_roman
-        new_data_roman['dof'] = dof_roman
+        new_data_roman['chichi'] = [chi_roman]
+        new_data_roman['dof'] = [dof_roman]
         
         #new_row['mass_thetaE'] = Event.fit_mass_roman1()
         #new_row['mass_mu'] = Event.fit_mass_roman2()
