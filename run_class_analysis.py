@@ -110,7 +110,7 @@ for SET in tqdm(range(1,5)):
         #new_row['mass_err_thetaE'] = dict_mass['sigma_m_thetaE_rr']
         #new_row['mass_err_mu'] = dict_mass['sigma_m_mu_rr']
         #new_row['mass_err_thetaS'] = dict_mass['sigma_m_thetaS_rr']
-        new_data_rr.to_csv(filename, mode="a", header=False, index=False)
+        new_data_rr.to_csv(filename_fit_rr, mode="a", header=False, index=False)
         #fit_rr_df = pd.concat([fit_rr_df, pd.DataFrame([new_row])], ignore_index=True)
         
         
@@ -140,7 +140,7 @@ for SET in tqdm(range(1,5)):
         #new_row['mass_err_mu'] = dict_mass['sigma_m_mu_roman']
         #new_row['mass_err_thetaS'] = dict_mass['sigma_m_thetaS_roman']
         
-        new_data_roman.to_csv(filename, mode="a", header=False, index=False)
+        new_data_roman.to_csv(filename_fit_roman, mode="a", header=False, index=False)
 
 
 
