@@ -7,15 +7,19 @@ import warnings
 warnings.filterwarnings("ignore")
 
 
+# Here I set the model
+model = "USBL"
+path_run = '/share/storage3/rubin/microlensing/romanrubin/PB'
+
 
 script_dir = str(Path(__file__).parent)
+print(script_dir)
 path_dataslice = script_dir+'/opsims/baseline/dataSlice.npy'
-model = "USBL"
+
 
 save_results = script_dir + "/all_results/"+model+"/"
 os.makedirs(save_results, exist_ok=True)
 
-path_run = '/share/storage3/rubin/microlensing/romanrubin/PB'
 cols_true = ['Source', 'Set'] + labels_params(model) + ['Category','mass']
 true_df = pd.DataFrame(columns=cols_true)
 
@@ -54,13 +58,13 @@ for SET in tqdm(range(1,5)):
         true, fit_rr, fit_roman = Event.fit_true()
         piE_rr, err_piE_rr, piE_roman, err_piE_roman = Event.piE()
         chi_rr, chi_roman, dof_rr, dof_roman = Event.chichi()
-        err_piE_rr_MC , err_piE_roman_MC =  Event.MC_propagation_piE()
-        dict_mass = Event.mass_MC()
+        #err_piE_rr_MC , err_piE_roman_MC =  Event.MC_propagation_piE()
+        #dict_mass = Event.mass_MC()
         
         
         new_row = {}
-        new_row['Source']=nevent
-        new_row['Set']=nset
+        new_row['Source'] = nevent
+        new_row['Set'] = nset
         for key in Event.labels_params():
             new_row[key]=true[key]
         
@@ -72,8 +76,8 @@ for SET in tqdm(range(1,5)):
         # df de Roman+Rubin
         
         new_row = {}
-        new_row['Source']=nevent
-        new_row['Set']=nset
+        new_row['Source'] = nevent
+        new_row['Set'] = nset
         for key in Event.labels_params():
             new_row[key]=fit_rr[key]
             new_row[key+'_err']=fit_rr[key+'_err']
@@ -81,20 +85,20 @@ for SET in tqdm(range(1,5)):
         
         new_row['piE'] = piE_rr
         new_row['piE_err'] = err_piE_rr
-        new_row['piE_err_MC'] = err_piE_rr_MC
+        #new_row['piE_err_MC'] = err_piE_rr_MC
         new_row['chichi'] = chi_rr
         new_row['dof'] = dof_rr
         
-        new_row['mass_thetaE'] = Event.fit_mass_rr1()
-        new_row['mass_mu'] = Event.fit_mass_rr2()
-        if 'rho' in labels_params(model):
-            new_row['mass_thetaS'] = Event.fit_mass_rr3()
-        # else:
+        #new_row['mass_thetaE'] = Event.fit_mass_rr1()
+        #new_row['mass_mu'] = Event.fit_mass_rr2()
+        #if 'rho' in labels_params(model):
+        #    new_row['mass_thetaS'] = Event.fit_mass_rr3()
+        
             
-        new_row['err_mass_thetaE_NotMC'] = Event.formula_mass_uncertainty_rr()
-        new_row['mass_err_thetaE'] = dict_mass['sigma_m_thetaE_rr']
-        new_row['mass_err_mu'] = dict_mass['sigma_m_mu_rr']
-        new_row['mass_err_thetaS'] = dict_mass['sigma_m_thetaS_rr']
+        #new_row['err_mass_thetaE_NotMC'] = Event.formula_mass_uncertainty_rr()
+        #new_row['mass_err_thetaE'] = dict_mass['sigma_m_thetaE_rr']
+        #new_row['mass_err_mu'] = dict_mass['sigma_m_mu_rr']
+        #new_row['mass_err_thetaS'] = dict_mass['sigma_m_thetaS_rr']
         
         fit_rr_df = pd.concat([fit_rr_df, pd.DataFrame([new_row])], ignore_index=True)
         
@@ -111,19 +115,19 @@ for SET in tqdm(range(1,5)):
         
         new_row['piE'] = piE_roman
         new_row['piE_err'] = err_piE_roman
-        new_row['piE_err_MC'] = err_piE_roman_MC
+        #new_row['piE_err_MC'] = err_piE_roman_MC
         new_row['chichi'] = chi_roman
         new_row['dof'] = dof_roman
         
-        new_row['mass_thetaE'] = Event.fit_mass_roman1()
-        new_row['mass_mu'] = Event.fit_mass_roman2()
-        if 'rho' in labels_params(model):
-            new_row['mass_thetaS'] = Event.fit_mass_roman3()
+        #new_row['mass_thetaE'] = Event.fit_mass_roman1()
+        #new_row['mass_mu'] = Event.fit_mass_roman2()
+        #if 'rho' in labels_params(model):
+        #    new_row['mass_thetaS'] = Event.fit_mass_roman3()
         
-        new_row['err_mass_thetaE_NotMC'] = Event.formula_mass_uncertainty_roman()
-        new_row['mass_err_thetaE'] = dict_mass['sigma_m_thetaE_roman']
-        new_row['mass_err_mu'] = dict_mass['sigma_m_mu_roman']
-        new_row['mass_err_thetaS'] = dict_mass['sigma_m_thetaS_roman']
+        #new_row['err_mass_thetaE_NotMC'] = Event.formula_mass_uncertainty_roman()
+        #new_row['mass_err_thetaE'] = dict_mass['sigma_m_thetaE_roman']
+        #new_row['mass_err_mu'] = dict_mass['sigma_m_mu_roman']
+        #new_row['mass_err_thetaS'] = dict_mass['sigma_m_thetaS_roman']
         
         fit_roman_df = pd.concat([fit_roman_df, pd.DataFrame([new_row])], ignore_index=True)
 

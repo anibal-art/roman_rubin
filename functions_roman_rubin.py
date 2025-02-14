@@ -35,7 +35,6 @@ from pyLIMA.outputs import file_outputs
 import multiprocessing as mul
 import h5py
 
-
 def tel_roman_rubin(path_ephemerides, path_dataslice):
     '''
     :param opsim:
@@ -314,6 +313,7 @@ def fit_rubin_roman(Source, event_params, path_save, path_ephemerides, model, al
         fit_2 = MCMC_fit.MCMCfit(pyLIMAmodel, MCMC_links=20000)
         pool = mul.Pool(processes=32)
     elif algo == 'DE':
+        pool = mul.Pool(processes=16)
         fit_2 = DE_fit.DEfit(pyLIMAmodel, telescopes_fluxes_method='polyfit', DE_population_size=20,
                              max_iteration=10000,
                              display_progress=True)
@@ -336,7 +336,7 @@ def fit_rubin_roman(Source, event_params, path_save, path_ephemerides, model, al
     fit_2.fit_parameters['piEN'][1] = [piEN - rango * abs(piEN),
                                        piEN + rango * abs(piEN)]  # parallax vector parameter boundaries
 
-    if algo == "MCMC":
+    if algo == "MCMC" or algo =='DE' :
         fit_2.fit(computational_pool=pool)
     else:
         fit_2.fit()
