@@ -33,7 +33,7 @@ filename_true = save_results+'true.csv'
 filename_fit_rr = save_results+'fit_rr.csv'
 filename_fit_roman = save_results+'fit_roman.csv'
 
-if not os.path.exists(filename):
+if not os.path.exists(filename_true):
     true_df = pd.DataFrame(columns=cols_true)
     fit_rr_df = pd.DataFrame(columns=cols_fit)
     fit_roman_df = pd.DataFrame(columns=cols_fit)
