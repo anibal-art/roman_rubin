@@ -19,7 +19,7 @@ save_results = script_dir + "/all_results/"+model+"/"
 os.makedirs(save_results, exist_ok=True)
 
 # columnas de df
-cols_true = ['Source', 'Set'] + labels_params(model) + ['Category','mass']
+cols_true = ['Source', 'Set'] + labels_params(model) + ['Category','mass']+['sel_crit']
 
 
 cols_fit = ['Source', 'Set'] + labels_params(model)  + \
@@ -69,6 +69,7 @@ for SET in tqdm(range(1,5)):
         true, fit_rr, fit_roman = Event.fit_true()
         piE_rr, err_piE_rr, piE_roman, err_piE_roman = Event.piE()
         chi_rr, chi_roman, dof_rr, dof_roman = Event.chichi()
+        #-------------------------------------------------------------------------------------------------------
         #err_piE_rr_MC , err_piE_roman_MC =  Event.MC_propagation_piE()
         #dict_mass = Event.mass_MC()
         
@@ -81,10 +82,12 @@ for SET in tqdm(range(1,5)):
         
         new_data_true['Category'] = [Event.categories_function()]
         new_data_true['mass'] = [Event.mass_true()]
+        new_data_true['sel_crit'] = [Event.deviation_from_constant()]
         #true_df = pd.concat([true_df, pd.DataFrame([new_row])], ignore_index=True)
         print(new_data_true)
         new_data_true.to_csv(filename_true, mode="a", header=False, index=False)
         
+        #-------------------------------------------------------------------------------------------------------
         # df de Roman+Rubin
         new_data_rr = pd.DataFrame(columns=cols_fit)
         
@@ -114,7 +117,7 @@ for SET in tqdm(range(1,5)):
         new_data_rr.to_csv(filename_fit_rr, mode="a", header=False, index=False)
         #fit_rr_df = pd.concat([fit_rr_df, pd.DataFrame([new_row])], ignore_index=True)
         
-        
+        #-------------------------------------------------------------------------------------------------------
         # df de Roman 
         new_data_roman = pd.DataFrame(columns=cols_fit)
         #new_row = {}

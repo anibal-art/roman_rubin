@@ -503,10 +503,10 @@ def sim_event(i, data, path_ephemerides, path_dataslice, model):
         print("Not a good event to fit since no Rubin band")
         return my_own_model, pyLIMA_parameters, False
 
-def sim_fit(i, model, algo,path_TRILEGAL_set, path_to_save_model,path_to_save_fit,path_ephemerides, path_dataslice):
+def sim_fit(i, model, algo,path_TRILEGAL_set, path_to_save_model, path_to_save_fit, path_ephemerides, path_dataslice):
     pd_planets = pd.read_csv(path_TRILEGAL_set)
     event_params = pd_planets.iloc[int(i)]
-    my_own_model, pyLIMA_parameters, decision = sim_event(i, event_params, path_ephemerides, path_dataslice,model)
+    my_own_model, pyLIMA_parameters, decision = sim_event(i, event_params, path_ephemerides, path_dataslice, model)
     Source = i
     print(event_params)
     print(pyLIMA_parameters)
@@ -521,13 +521,13 @@ def sim_fit(i, model, algo,path_TRILEGAL_set, path_to_save_model,path_to_save_fi
             else:
                 lc_to_fit[telo.name] = []
         origin = my_own_model.origin
-        fit_rr, event_fit_rr, pyLIMAmodel_rr = fit_rubin_roman(Source,event_params, path_to_save_fit, path_ephemerides,model,algo,origin,
+        fit_rr, event_fit_rr, pyLIMAmodel_rr = fit_rubin_roman(Source, event_params, path_to_save_fit, path_ephemerides,model,algo,origin,
                                    lc_to_fit["W149"], lc_to_fit["u"], lc_to_fit["g"], lc_to_fit["r"],
                                                lc_to_fit["i"], lc_to_fit["z"],lc_to_fit["y"])
         fit_roman, event_fit_roman, pyLIMAmodel_roman = fit_rubin_roman(Source,event_params, path_to_save_fit, path_ephemerides,model,algo,origin,
                                    lc_to_fit["W149"], [], [], [], [], [],[])
 
-        
+
 # def model_rubin_roman(Source,true_model,event_params, path_ephemerides,model, wfirst_lc, lsst_u, lsst_g, lsst_r, lsst_i, lsst_z,
 #                     lsst_y):
 #     '''
