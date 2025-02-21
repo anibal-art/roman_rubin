@@ -27,6 +27,7 @@ colorbands={'W149':'b', 'u':'purple', 'g':'g', 'r':'red',
 # def fit_test(index):
 
 # print(current_path)
+index=1
 rango =1# np.logspace(-4,1,30)[index]
 model='USBL'   
 info_dataset, pyLIMA_parameters, bands = read_data(path_to_save_model+'/Event_18.h5')
