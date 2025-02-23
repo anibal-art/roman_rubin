@@ -34,7 +34,7 @@ def parallel_test_width(N_tr):
     commands = [
         ["python", "-c",
          f"from test_width_v2 import fit_test; fit_test({rango})"]
-        for rango in range(len(np.logspace(-4,1,30)))
+        for rango in range(12)
     ]
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=N_tr) as executor:
