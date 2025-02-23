@@ -26,25 +26,25 @@ colorbands={'W149':'b', 'u':'purple', 'g':'g', 'r':'red',
 
 def fit_test(index):
     # print(current_path)
-    rango = np.logspace(-4,1,30)[index]
+    rango = [1e-4,1e-3,1e-2,1e-1,0.5,0.8,1,1.5,2,3,4,5][index]
     model='USBL'   
     info_dataset, pyLIMA_parameters, bands = read_data(path_to_save_model+'/Event_18.h5')
-    ulens_params = []
+    # ulens_params = []
     PAR = ['t_center','u_center','tE','rho','separation','mass_ratio','alpha','piEN','piEE']
     
-    for b in (PAR):
-        ulens_params.append(pyLIMA_parameters[b])
-    flux_params = []
+    # for b in (PAR):
+    #     ulens_params.append(pyLIMA_parameters[b])
+    # flux_params = []
     
     # Here we change the zero point to the pyLIMA convention in order to make the alignment
-    for b in bands:
-        if not len(bands[b])==0:
-            zp_Rubin_to_pyLIMA = (10**((-27.4+ZP[b])/2.5))
+    # for b in bands:
+    #     if not len(bands[b])==0:
+    #         zp_Rubin_to_pyLIMA = (10**((-27.4+ZP[b])/2.5))
             
-            flux_params.append(pyLIMA_parameters['fsource_'+b]/zp_Rubin_to_pyLIMA)
-            flux_params.append(pyLIMA_parameters['ftotal_'+b]/zp_Rubin_to_pyLIMA)
+    #         flux_params.append(pyLIMA_parameters['fsource_'+b]/zp_Rubin_to_pyLIMA)
+    #         flux_params.append(pyLIMA_parameters['ftotal_'+b]/zp_Rubin_to_pyLIMA)
             
-    true_params = ulens_params+flux_params
+    # true_params = ulens_params+flux_params
     
     model_ulens = 'USBL'
     
