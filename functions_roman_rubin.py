@@ -326,10 +326,14 @@ def fit_rubin_roman(Source, event_params, path_save, path_ephemerides, model, al
         fit_2.fit_parameters['alpha'][1] = [alpha - rango * abs(alpha), alpha + rango * abs(alpha)]
 
     if (model == 'USBL') or (model == 'FSPL'):
-        fit_2.fit_parameters['rho'][1] = [rho - rango * abs(rho), rho + rango * abs(rho)]
+        if (rho - rango * abs(rho))<0:
+            fit_2.fit_parameters['rho'][1] = [0, rho + rango * abs(rho)]
+        else:
+            fit_2.fit_parameters['rho'][1] = [rho - rango * abs(rho), rho + rango * abs(rho)]
 
     fit_2.fit_parameters['t0'][1] = [t0 - 10, t0 + 10]  # t0 limits
     fit_2.fit_parameters['u0'][1] = [u0 - abs(u0) * rango, u0 + abs(u0) * rango]  # u0 limits
+
     fit_2.fit_parameters['tE'][1] = [tE - tE * rango, tE + tE * rango]  # tE limits in days
     fit_2.fit_parameters['piEE'][1] = [piEE - rango * abs(piEE),
                                        piEE + rango * abs(piEE)]  # parallax vector parameter boundaries
@@ -616,7 +620,7 @@ def model_rubin_roman(Source, true_model, event_params, path_ephemerides, model,
     tel_list = []
 
     # Add a PyLIMA telescope object to the event with the Gaia lightcurve
-    tel1 = telescopes.Telescope(name=name_roman, camera_filter='W149',
+    tel1 = telescopes.Telescope(name='W149', camera_filter='W149',
                                 light_curve=wfirst_lc,
                                 light_curve_names=['time', 'mag', 'err_mag'],
                                 light_curve_units=['JD', 'mag', 'mag'],
@@ -635,7 +639,7 @@ def model_rubin_roman(Source, true_model, event_params, path_ephemerides, model,
     lsst_bands = "ugrizy"
     for j in range(len(lsst_lc_list)):
         if len(lsst_lc_list[j]) != 0:
-            tel = telescopes.Telescope(name=lsst_bands[j]+' (Rubin)', camera_filter=lsst_bands[j],
+            tel = telescopes.Telescope(name=lsst_bands[j], camera_filter=lsst_bands[j],
                                        light_curve=lsst_lc_list[j],
                                        light_curve_names=['time', 'mag', 'err_mag'],
                                        light_curve_units=['JD', 'mag', 'mag'],
