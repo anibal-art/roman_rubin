@@ -4,3 +4,4 @@ notebooks/.ipynb_checkpoints/
 .ipynb_checkpoints/
 __pycache__/
 /*.out
+.virtual_documents/
