@@ -9,16 +9,17 @@ sys.path.append(str(script_dir)+'/photutils/')
 
 path_ephemerides = str(script_dir)+'/ephemerides/Gaia.txt'
 path_dataslice = str(script_dir)+'/opsims/baseline/dataSlice.npy'
-path_storage = '/share/storage3/rubin/microlensing/romanrubin/'
+path_storage = '/share/storage3/rubin/microlensing/romanrubin/RR2025/'
+#/share/storage3/rubin/microlensing/romanrubin/RR2025
 j=1
 
 model="USBL"     #'FSPL' (Free Floating Planets)#"USBL" (Binary Lens-planetary systems) #"PSPL" (Black Holes)
 if model =="USBL":
-	TRILEGAL_file = "PB_planet_split_{j}.csv"
+	TRILEGAL_file =f"PB_planet_split_{j}.csv"
 elif model=='PSPL':
-	TRILEGAL_file = "BH_split_{j}.csv"
+	TRILEGAL_file =f"BH_split_{j}.csv"
 elif model =='FSPL':
-	TRILEGAL_file = 'FFP_uni_split_{j}.csv'	
+	TRILEGAL_file =f'FFP_uni_split_{j}.csv'	
 
 path_TRILEGAL_set =str(script_dir)+f'/TRILEGAL/'+TRILEGAL_file 
 
