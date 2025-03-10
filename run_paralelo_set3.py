@@ -14,11 +14,11 @@ j=3
 
 model="USBL"     #'FSPL' (Free Floating Planets)#"USBL" (Binary Lens-planetary systems) #"PSPL" (Black Holes)
 if model =="USBL":
-	TRILEGAL_file = "PB_planet_split_{j}.csv"
+	TRILEGAL_file = f"PB_planet_split_{j}.csv"
 elif model=='PSPL':
-	TRILEGAL_file = "BH_split_{j}.csv"
+	TRILEGAL_file = f"BH_split_{j}.csv"
 elif model =='FSPL':
-	TRILEGAL_file = 'FFP_uni_split_{j}.csv'	
+	TRILEGAL_file = f'FFP_uni_split_{j}.csv'	
 
 path_TRILEGAL_set =str(script_dir)+f'/TRILEGAL/'+TRILEGAL_file 
 
