@@ -1,5 +1,5 @@
 from sim_fit_paralelos import para_elisa
-import sys,os
+import sys, os
 from pathlib import Path
 
 # Get the directory where the script is located
@@ -9,22 +9,29 @@ sys.path.append(str(script_dir)+'/photutils/')
 
 path_ephemerides = str(script_dir)+'/ephemerides/Gaia.txt'
 path_dataslice = str(script_dir)+'/opsims/baseline/dataSlice.npy'
-path_storage = '/share/storage3/rubin/microlensing/romanrubin'
+path_storage = '/share/storage3/rubin/microlensing/romanrubin/'
 j=4
-path_TRILEGAL_set =str(script_dir)+f'/TRILEGAL/FFP_uni_split_{j}.csv'#PB_planet_split_{j}.csv'# "/home/anibal/results_roman_rubin/PB_planet_split_1.csv"FFP_uni_split_3.csv
-path_to_save_model = path_storage+f"/test/set_sim{j}/"
-path_to_save_fit = path_storage+f"/test/set_fit{j}/"
-# Create a directory if it doesn't exist
 
+model="USBL"     #'FSPL' (Free Floating Planets)#"USBL" (Binary Lens-planetary systems) #"PSPL" (Black Holes)
+if model =="USBL":
+	TRILEGAL_file = "PB_planet_split_{j}.csv"
+elif model=='PSPL':
+	TRILEGAL_file = "BH_split_{j}.csv"
+elif model =='FSPL':
+	TRILEGAL_file = 'FFP_uni_split_{j}.csv'	
+
+path_TRILEGAL_set =str(script_dir)+f'/TRILEGAL/'+TRILEGAL_file 
+
+path_to_save_model = path_storage+model+f"/set_sim{j}/"
+path_to_save_fit = path_storage+model+f"/set_fit{j}/"
+
+# Create a directory if it doesn't exist
 if not os.path.exists(path_to_save_model):
     os.makedirs(path_to_save_model)
 if not os.path.exists(path_to_save_fit):
     os.makedirs(path_to_save_fit)
 
-
-model='PSPL'#"USBL"
 algo="TRF"
-
 
 N_tr=36
 para_elisa(path_ephemerides,path_dataslice,path_TRILEGAL_set,path_to_save_fit,path_to_save_model,model,algo, N_tr)
