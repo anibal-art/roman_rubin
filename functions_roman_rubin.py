@@ -108,9 +108,10 @@ def tel_roman_rubin(path_ephemerides, path_dataslice):
 
     for band in lsst_filterlist:
         lsst_telescope = telescopes.Telescope(name=band, camera_filter=band, location='Earth',
-                                              light_curve=rubin_ts[band],
-                                              light_curve_names=['time', 'mag', 'err_mag'],
-                                              light_curve_units=['JD', 'mag', 'mag'])
+                                              lightcurve=rubin_ts[band],
+                                              lightcurve_names=['time', 'mag', 'err_mag'],
+                                              lightcurve_units=['JD', 'mag', 'mag'],
+                                             location='Earth')
         my_own_creation.telescopes.append(lsst_telescope)
 
     return my_own_creation, dataSlice, LSST_BandPass
