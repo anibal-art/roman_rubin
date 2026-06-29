@@ -1,0 +1,9 @@
+{
+    "path_storage" : "/mnt/almacenamiento/FFP_local/",
+    "model" : "FSPL" ,
+    "algo" : "TRF" ,
+    "system_type" : "FFP",
+    "N_tr" : 40,
+    "n_db_file" : 1,
+    "Nevents" : 110    
+}

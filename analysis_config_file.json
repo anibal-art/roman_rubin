@@ -1,0 +1,7 @@
+{
+    "path_run" : "/share/storage3/rubin/microlensing/romanrubin/RR2025/July_set/",
+    "description" : "last",
+    "model" : "USBL" ,
+    "system_type" : "Planets_systems",
+    "N_tr" : 40
+}

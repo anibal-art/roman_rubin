@@ -1,0 +1,8 @@
+{
+    "path_storage" : "/share/storage3/rubin/microlensing/romanrubin/RR2025/April_set/",
+    "model" : "USBL" ,
+    "algo" : "TRF" ,
+    "system_type" : "Binary_stars",
+    "N_tr" : 36,
+    "n_db_file" : 1
+}
