@@ -1,0 +1,37 @@
+{
+    "path_storage": "/mnt/almacenamiento/",
+
+    "model": "FSPL",
+    "algo": "TRF",
+    "system_type": "FFP",
+
+    "N_tr": 40,
+    "n_db_file": 2,
+    "Nevents": 1000,
+
+    "observing": {
+        "use_roman": true,
+        "use_rubin": true
+    },
+
+    "truth": {
+        "parallax": true
+    },
+
+    "fit": {
+        "model": "FSPL",
+        "parallax": true,
+        "time_window": {
+            "mode": "t0_pm_factor_tE",
+            "factor": 5
+        }
+    },
+
+    "simulation": {
+        "catalog_mode": "trilegal_genulens",
+        "rubin_pointing_mode": "fixed",
+        "rubin_cache_cell_deg": null,
+        "apply_detection_criteria": true,
+        "time_window": null
+    }
+}

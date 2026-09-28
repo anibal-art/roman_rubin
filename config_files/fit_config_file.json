@@ -1,0 +1,9 @@
+{
+    "path_storage" : "/share/storage3/rubin/microlensing/romanrubin/RR2025/July_set/",
+    "path_save_fit" : "/share/storage3/rubin/microlensing/romanrubin/RR2025/July_set/",
+    "model" : "PSPL" ,
+    "algo" : "TRF" ,
+    "system_type" : "Planets_systems",
+    "N_tr" : 36,
+    "n_db_file" : 6
+}
