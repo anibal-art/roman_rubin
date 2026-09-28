@@ -5,3 +5,5 @@ notebooks/.ipynb_checkpoints/
 __pycache__/
 /*.out
 .virtual_documents/
+.parquet
+/all_results
