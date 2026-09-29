@@ -1,0 +1,2066 @@
+#!/usr/bin/env python3
+
+from pathlib import Path
+import json
+import time
+
+import numpy as np
+import pandas as pd
+
+from astroquery.vizier import Vizier
+
+from shapely.geometry import (
+    shape,
+    box,
+    mapping,
+)
+from shapely import contains_xy
+
+
+# ============================================================
+# Configuration
+# ============================================================
+
+FOOTPRINT_FILE = Path(
+    "config/gbtds_wfi_footprint_union.geojson"
+)
+
+CATALOG = "J/A+A/644/A140/ejkmap"
+
+RAW_DIR = Path(
+    "extinction/raw"
+)
+
+PROCESSED_DIR = Path(
+    "extinction/processed"
+)
+
+CONFIG_DIR = Path(
+    "config"
+)
+
+DIAG_DIR = Path(
+    "diagnostics"
+)
+
+
+BASE_OUTPUT = (
+    PROCESSED_DIR
+    / "gbtds_real_base_cells.parquet"
+)
+
+FINAL_OUTPUT = (
+    PROCESSED_DIR
+    / "gbtds_real_adaptive_cells.parquet"
+)
+
+TRILEGAL_CONFIG = (
+    CONFIG_DIR
+    / "gbtds_trilegal_cells.csv"
+)
+
+CELL_GEOJSON = (
+    CONFIG_DIR
+    / "gbtds_trilegal_cells.geojson"
+)
+
+SUMMARY_OUTPUT = (
+    DIAG_DIR
+    / "gbtds_real_cells_summary.csv"
+)
+
+
+# ------------------------------------------------------------
+# Spatial sampling
+# ------------------------------------------------------------
+
+# 6 arcmin
+BASE_CELL_DEG = 0.1
+
+# One refinement:
+#
+#   6' x 6'
+#       ->
+#   3' x 3'
+#
+REFINEMENT_FACTOR = 2
+
+EJK_SIGMA_THRESHOLD = 0.10
+
+
+# ------------------------------------------------------------
+# TRILEGAL sampling
+# ------------------------------------------------------------
+
+DEFAULT_SAMPLE_AREA_DEG2 = 1.0e-4
+
+AV_PER_EJK = 6.0
+
+MAX_TRILEGAL_EXTINCTION_SIGMA = 0.30
+
+
+# ------------------------------------------------------------
+# Extinction sampling
+# ------------------------------------------------------------
+
+# Prefer statistics from Surot nodes actually lying within
+# Roman's active footprint inside the cell.
+#
+# For very small edge fragments, if fewer than this number
+# exist we use all Surot points in the geometric cell and
+# explicitly flag that fallback.
+MIN_ACTIVE_EXTINCTION_NODES = 10
+
+
+# ------------------------------------------------------------
+# Main / GC separation only for VizieR querying and diagnostics.
+#
+# There is a large empty region between the main mosaic at
+# b ~ -1.4 and the GC tile around b ~ -0.22.
+# ------------------------------------------------------------
+
+REGION_SPLIT_B = -0.75
+
+VIZIER_MARGIN_DEG = 0.03
+
+
+# Numerical geometry tolerance only.
+MIN_GEOMETRY_AREA = 1.0e-10
+
+
+# ============================================================
+# Helpers
+# ============================================================
+
+def load_footprint_geometries(path):
+    with open(path) as f:
+        gj = json.load(f)
+
+    geoms = {}
+
+    for feature in gj["features"]:
+
+        name = (
+            feature
+            .get("properties", {})
+            .get("name")
+        )
+
+        if name is None:
+            continue
+
+        geoms[name] = shape(
+            feature["geometry"]
+        )
+
+    required = [
+        "spring",
+        "autumn",
+        "spring_or_autumn",
+        "spring_and_autumn",
+    ]
+
+    missing = [
+        x
+        for x in required
+        if x not in geoms
+    ]
+
+    if missing:
+        raise RuntimeError(
+            "Missing footprint geometries: "
+            f"{missing}"
+        )
+
+    return geoms
+
+
+def query_surot_region(
+    name,
+    geometry,
+):
+    """
+    Query/cache Surot+2020 extinction-map nodes covering a
+    supplied footprint region.
+    """
+
+    cache = (
+        RAW_DIR
+        / f"surot2020_gbtds_real_{name}.parquet"
+    )
+
+    if cache.exists():
+
+        print(
+            f"Using cached Surot region "
+            f"{name}: {cache}"
+        )
+
+        df = pd.read_parquet(
+            cache
+        )
+
+        print(
+            f"  nodes = {len(df):,}"
+        )
+
+        return df
+
+
+    minx, miny, maxx, maxy = (
+        geometry.bounds
+    )
+
+    minx -= VIZIER_MARGIN_DEG
+    maxx += VIZIER_MARGIN_DEG
+
+    miny -= VIZIER_MARGIN_DEG
+    maxy += VIZIER_MARGIN_DEG
+
+
+    print()
+    print(
+        f"Querying Surot region '{name}':"
+    )
+
+    print(
+        f"  l = [{minx:.5f}, "
+        f"{maxx:.5f}]"
+    )
+
+    print(
+        f"  b = [{miny:.5f}, "
+        f"{maxy:.5f}]"
+    )
+
+
+    viz = Vizier(
+        columns=[
+            "GLON",
+            "GLAT",
+            "E(J-Ks)",
+            "e_E(J-Ks)",
+            "res-avg",
+            "res-max",
+            "Tile",
+        ],
+        row_limit=-1,
+    )
+
+    Vizier.TIMEOUT = 600
+
+
+    result = viz.query_constraints(
+        catalog=CATALOG,
+
+        GLON=(
+            f"{minx}..{maxx}"
+        ),
+
+        GLAT=(
+            f"{miny}..{maxy}"
+        ),
+    )
+
+
+    if len(result) == 0:
+        raise RuntimeError(
+            f"No Surot data returned "
+            f"for region {name}"
+        )
+
+
+    df = (
+        result[0]
+        .to_pandas()
+    )
+
+
+    numeric = [
+        "GLON",
+        "GLAT",
+        "E(J-Ks)",
+        "e_E(J-Ks)",
+        "res-avg",
+        "res-max",
+    ]
+
+    missing = [
+        c
+        for c in numeric
+        if c not in df.columns
+    ]
+
+    if missing:
+        print(
+            "Returned columns:"
+        )
+
+        print(
+            list(df.columns)
+        )
+
+        raise RuntimeError(
+            "Missing expected Surot "
+            f"columns: {missing}"
+        )
+
+
+    for c in numeric:
+
+        df[c] = pd.to_numeric(
+            df[c],
+            errors="coerce",
+        )
+
+
+    df = df.dropna(
+        subset=[
+            "GLON",
+            "GLAT",
+            "E(J-Ks)",
+        ]
+    )
+
+
+    RAW_DIR.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    df.to_parquet(
+        cache,
+        index=False,
+        compression="zstd",
+    )
+
+
+    print(
+        f"  downloaded {len(df):,} nodes"
+    )
+
+    print(
+        f"  cached at {cache}"
+    )
+
+
+    return df
+
+
+def select_nodes_inside(
+    geometry,
+    dust,
+):
+    """
+    Select Surot map nodes falling inside a Shapely geometry.
+
+    A bounding-box preselection keeps this fast.
+    """
+
+    minx, miny, maxx, maxy = (
+        geometry.bounds
+    )
+
+    candidate = dust[
+        (dust["GLON"] >= minx)
+        & (dust["GLON"] <= maxx)
+        & (dust["GLAT"] >= miny)
+        & (dust["GLAT"] <= maxy)
+    ]
+
+
+    if len(candidate) == 0:
+        return candidate
+
+
+    inside = contains_xy(
+        geometry,
+        candidate["GLON"].to_numpy(),
+        candidate["GLAT"].to_numpy(),
+    )
+
+
+    return candidate.loc[
+        inside
+    ]
+
+
+def extinction_statistics(
+    active_geometry,
+    full_cell_geometry,
+    dust,
+):
+    """
+    Compute E(J-Ks) statistics.
+
+    Prefer map nodes lying in the actual Roman footprint.
+    For very small edge fragments, fall back to the full
+    geometric sampling cell.
+    """
+
+    active = select_nodes_inside(
+        active_geometry,
+        dust,
+    )
+
+    n_active = len(active)
+
+
+    if n_active >= MIN_ACTIVE_EXTINCTION_NODES:
+
+        sample = active
+
+        sampling_mode = (
+            "roman_active_geometry"
+        )
+
+    else:
+
+        full = select_nodes_inside(
+            full_cell_geometry,
+            dust,
+        )
+
+        if len(full) == 0:
+
+            raise RuntimeError(
+                "No Surot nodes found even "
+                "inside the complete spatial cell."
+            )
+
+        sample = full
+
+        sampling_mode = (
+            "full_cell_fallback"
+        )
+
+
+    ejk = (
+        sample["E(J-Ks)"]
+        .to_numpy(dtype=float)
+    )
+
+
+    p16, median, p84 = (
+        np.nanpercentile(
+            ejk,
+            [16, 50, 84],
+        )
+    )
+
+
+    sigma_spatial = (
+        0.5 * (p84 - p16)
+    )
+
+
+    return {
+        "n_extinction_nodes_active":
+            n_active,
+
+        "n_extinction_nodes_used":
+            len(sample),
+
+        "extinction_sampling_mode":
+            sampling_mode,
+
+        "ejk_median":
+            median,
+
+        "ejk_p16":
+            p16,
+
+        "ejk_p84":
+            p84,
+
+        "ejk_sigma_spatial":
+            sigma_spatial,
+
+        "ejk_measurement_error_median":
+            sample[
+                "e_E(J-Ks)"
+            ].median(),
+
+        "map_res_avg_arcmin":
+            sample[
+                "res-avg"
+            ].median(),
+
+        "map_res_max_arcmin":
+            sample[
+                "res-max"
+            ].max(),
+    }
+
+
+def add_extinction_derived(
+    record,
+):
+    """
+    Convert Surot E(J-Ks) statistics into the TRILEGAL
+    extinction parameters used by the current pipeline.
+    """
+
+    record = dict(record)
+
+
+    record["av_per_ejk"] = (
+        AV_PER_EJK
+    )
+
+
+    record["av_inf"] = (
+        AV_PER_EJK
+        * record["ejk_median"]
+    )
+
+
+    record["av_p16"] = (
+        AV_PER_EJK
+        * record["ejk_p16"]
+    )
+
+
+    record["av_p84"] = (
+        AV_PER_EJK
+        * record["ejk_p84"]
+    )
+
+
+    record["av_sigma_spatial"] = (
+        AV_PER_EJK
+        * record["ejk_sigma_spatial"]
+    )
+
+
+    if record["ejk_median"] > 0:
+
+        raw_sigma = (
+            record[
+                "ejk_sigma_spatial"
+            ]
+            / record[
+                "ejk_median"
+            ]
+        )
+
+    else:
+
+        raw_sigma = 0.0
+
+
+    record[
+        "extinction_sigma_raw"
+    ] = raw_sigma
+
+
+    record[
+        "extinction_sigma"
+    ] = float(
+        np.clip(
+            raw_sigma,
+            0.0,
+            MAX_TRILEGAL_EXTINCTION_SIGMA,
+        )
+    )
+
+
+    record[
+        "extinction_sigma_was_capped"
+    ] = bool(
+        raw_sigma
+        > MAX_TRILEGAL_EXTINCTION_SIGMA
+    )
+
+
+    record[
+        "needs_refinement"
+    ] = bool(
+        record[
+            "ejk_sigma_spatial"
+        ]
+        > EJK_SIGMA_THRESHOLD
+    )
+
+
+    return record
+
+
+def build_cell_record(
+    field_id,
+    parent_cell_id,
+    refinement_level,
+    full_cell,
+    spring,
+    autumn,
+    union,
+    overlap,
+    dust,
+):
+    """
+    Build all geometry, coverage, extinction and TRILEGAL
+    metadata for one sampling cell.
+    """
+
+    active = (
+        full_cell
+        .intersection(union)
+    )
+
+
+    if (
+        active.is_empty
+        or active.area
+        <= MIN_GEOMETRY_AREA
+    ):
+        return None
+
+
+    spring_part = (
+        full_cell
+        .intersection(spring)
+    )
+
+    autumn_part = (
+        full_cell
+        .intersection(autumn)
+    )
+
+    overlap_part = (
+        full_cell
+        .intersection(overlap)
+    )
+
+
+    cell_area = float(
+        full_cell.area
+    )
+
+    union_area = float(
+        active.area
+    )
+
+    spring_area = float(
+        spring_part.area
+    )
+
+    autumn_area = float(
+        autumn_part.area
+    )
+
+    overlap_area = float(
+        overlap_part.area
+    )
+
+
+    # Use the centroid of the actual Roman-active geometry
+    # as the representative TRILEGAL line of sight.
+    centroid = (
+        active.centroid
+    )
+
+    l_deg = float(
+        centroid.x
+    )
+
+    b_deg = float(
+        centroid.y
+    )
+
+
+    region = (
+        "gc"
+        if b_deg > REGION_SPLIT_B
+        else "main"
+    )
+
+
+    target_area = union_area
+
+
+    # Never ask TRILEGAL to simulate a larger area than the
+    # physical piece represented by this cell.
+    sample_area = min(
+        DEFAULT_SAMPLE_AREA_DEG2,
+        target_area,
+    )
+
+
+    if sample_area <= 0:
+        raise RuntimeError(
+            f"{field_id}: invalid sample area."
+        )
+
+
+    record = {
+        "field_id":
+            field_id,
+
+        "parent_cell_id":
+            parent_cell_id,
+
+        "refinement_level":
+            refinement_level,
+
+        "region":
+            region,
+
+        "l_deg":
+            l_deg,
+
+        "b_deg":
+            b_deg,
+
+        "cell_center_l_deg":
+            float(
+                full_cell.centroid.x
+            ),
+
+        "cell_center_b_deg":
+            float(
+                full_cell.centroid.y
+            ),
+
+        "l_min_deg":
+            float(
+                full_cell.bounds[0]
+            ),
+
+        "b_min_deg":
+            float(
+                full_cell.bounds[1]
+            ),
+
+        "l_max_deg":
+            float(
+                full_cell.bounds[2]
+            ),
+
+        "b_max_deg":
+            float(
+                full_cell.bounds[3]
+            ),
+
+        "cell_geom_area_deg2":
+            cell_area,
+
+        # ----------------------------------------------------
+        # Roman effective areas
+        # ----------------------------------------------------
+
+        "target_area_deg2":
+            target_area,
+
+        "area_union_deg2":
+            union_area,
+
+        "area_spring_deg2":
+            spring_area,
+
+        "area_autumn_deg2":
+            autumn_area,
+
+        "area_overlap_deg2":
+            overlap_area,
+
+        # Fraction of the complete square cell covered by
+        # each footprint.
+        "fraction_union":
+            union_area / cell_area,
+
+        "fraction_spring":
+            spring_area / cell_area,
+
+        "fraction_autumn":
+            autumn_area / cell_area,
+
+        "fraction_overlap":
+            overlap_area / cell_area,
+
+        # Fraction of the Roman-observable part represented
+        # in each season.
+        "fraction_spring_of_union":
+            spring_area / union_area,
+
+        "fraction_autumn_of_union":
+            autumn_area / union_area,
+
+        "fraction_overlap_of_union":
+            overlap_area / union_area,
+
+        "covered_spring":
+            spring_area
+            > MIN_GEOMETRY_AREA,
+
+        "covered_autumn":
+            autumn_area
+            > MIN_GEOMETRY_AREA,
+
+        # ----------------------------------------------------
+        # TRILEGAL area sampling
+        # ----------------------------------------------------
+
+        "sample_area_deg2":
+            sample_area,
+
+        "area_weight":
+            target_area
+            / sample_area,
+
+        # ----------------------------------------------------
+        # Geometry retained for later exact source-position
+        # sampling.
+        # ----------------------------------------------------
+
+        "_cell_geometry":
+            full_cell,
+
+        "_union_geometry":
+            active,
+
+        "_spring_geometry":
+            spring_part,
+
+        "_autumn_geometry":
+            autumn_part,
+    }
+
+
+    if (
+        record["covered_spring"]
+        and record["covered_autumn"]
+    ):
+
+        record[
+            "season_coverage"
+        ] = "spring_and_autumn"
+
+    elif record[
+        "covered_spring"
+    ]:
+
+        record[
+            "season_coverage"
+        ] = "spring_only"
+
+    else:
+
+        record[
+            "season_coverage"
+        ] = "autumn_only"
+
+
+    stats = extinction_statistics(
+        active,
+        full_cell,
+        dust,
+    )
+
+
+    record.update(
+        stats
+    )
+
+
+    record = (
+        add_extinction_derived(
+            record
+        )
+    )
+
+
+    record[
+        "extinction_map"
+    ] = "Surot2020_VVVEXMAP"
+
+
+    record[
+        "extinction_catalog"
+    ] = CATALOG
+
+
+    record[
+        "geometry_version"
+    ] = (
+        "APT1420_PySIAF_adaptive_v1"
+    )
+
+
+    return record
+
+
+def public_record(
+    record,
+    include_geometry_wkt=True,
+):
+    """
+    Convert an internal record into a serializable dictionary.
+    """
+
+    x = dict(record)
+
+
+    cell_geometry = (
+        x.pop("_cell_geometry")
+    )
+
+    union_geometry = (
+        x.pop("_union_geometry")
+    )
+
+    spring_geometry = (
+        x.pop("_spring_geometry")
+    )
+
+    autumn_geometry = (
+        x.pop("_autumn_geometry")
+    )
+
+
+    if include_geometry_wkt:
+
+        x[
+            "cell_geometry_wkt"
+        ] = cell_geometry.wkt
+
+        x[
+            "union_geometry_wkt"
+        ] = union_geometry.wkt
+
+        x[
+            "spring_geometry_wkt"
+        ] = spring_geometry.wkt
+
+        x[
+            "autumn_geometry_wkt"
+        ] = autumn_geometry.wkt
+
+
+    return x
+
+
+# ============================================================
+# Main
+# ============================================================
+
+def main():
+
+    for d in [
+        RAW_DIR,
+        PROCESSED_DIR,
+        CONFIG_DIR,
+        DIAG_DIR,
+    ]:
+        d.mkdir(
+            parents=True,
+            exist_ok=True,
+        )
+
+
+    if not FOOTPRINT_FILE.exists():
+        raise FileNotFoundError(
+            FOOTPRINT_FILE
+        )
+
+
+    # --------------------------------------------------------
+    # Load Roman footprint
+    # --------------------------------------------------------
+
+    geoms = (
+        load_footprint_geometries(
+            FOOTPRINT_FILE
+        )
+    )
+
+
+    spring = geoms["spring"]
+    autumn = geoms["autumn"]
+
+    union = geoms[
+        "spring_or_autumn"
+    ]
+
+    overlap = geoms[
+        "spring_and_autumn"
+    ]
+
+
+    print()
+    print("=======================================")
+    print("Roman footprint")
+    print("=======================================")
+
+    print(
+        "Spring area       =",
+        f"{spring.area:.6f}",
+        "deg^2",
+    )
+
+    print(
+        "Autumn area       =",
+        f"{autumn.area:.6f}",
+        "deg^2",
+    )
+
+    print(
+        "Union area        =",
+        f"{union.area:.6f}",
+        "deg^2",
+    )
+
+    print(
+        "Intersection area =",
+        f"{overlap.area:.6f}",
+        "deg^2",
+    )
+
+
+    # --------------------------------------------------------
+    # Split only for efficient extinction-map download.
+    # --------------------------------------------------------
+
+    main_halfplane = box(
+        -180.0,
+        -90.0,
+        180.0,
+        REGION_SPLIT_B,
+    )
+
+    gc_halfplane = box(
+        -180.0,
+        REGION_SPLIT_B,
+        180.0,
+        90.0,
+    )
+
+
+    main_geom = (
+        union.intersection(
+            main_halfplane
+        )
+    )
+
+    gc_geom = (
+        union.intersection(
+            gc_halfplane
+        )
+    )
+
+
+    # --------------------------------------------------------
+    # Query Surot.
+    # --------------------------------------------------------
+
+    print()
+    print("=======================================")
+    print("Surot extinction map")
+    print("=======================================")
+
+
+    dust_parts = []
+
+
+    if not main_geom.is_empty:
+
+        dust_parts.append(
+            query_surot_region(
+                "main",
+                main_geom,
+            )
+        )
+
+
+    time.sleep(1)
+
+
+    if not gc_geom.is_empty:
+
+        dust_parts.append(
+            query_surot_region(
+                "gc",
+                gc_geom,
+            )
+        )
+
+
+    dust = pd.concat(
+        dust_parts,
+        ignore_index=True,
+    )
+
+
+    dust = (
+        dust.drop_duplicates(
+            subset=[
+                "GLON",
+                "GLAT",
+            ]
+        )
+        .reset_index(
+            drop=True
+        )
+    )
+
+
+    print()
+    print(
+        "Total unique Surot nodes:",
+        f"{len(dust):,}",
+    )
+
+
+    # --------------------------------------------------------
+    # Base 6' x 6' grid.
+    # --------------------------------------------------------
+
+    minx, miny, maxx, maxy = (
+        union.bounds
+    )
+
+
+    x0 = (
+        np.floor(
+            minx
+            / BASE_CELL_DEG
+        )
+        * BASE_CELL_DEG
+    )
+
+    y0 = (
+        np.floor(
+            miny
+            / BASE_CELL_DEG
+        )
+        * BASE_CELL_DEG
+    )
+
+
+    x1 = (
+        np.ceil(
+            maxx
+            / BASE_CELL_DEG
+        )
+        * BASE_CELL_DEG
+    )
+
+    y1 = (
+        np.ceil(
+            maxy
+            / BASE_CELL_DEG
+        )
+        * BASE_CELL_DEG
+    )
+
+
+    x_edges = np.arange(
+        x0,
+        x1 + BASE_CELL_DEG * 0.5,
+        BASE_CELL_DEG,
+    )
+
+    y_edges = np.arange(
+        y0,
+        y1 + BASE_CELL_DEG * 0.5,
+        BASE_CELL_DEG,
+    )
+
+
+    print()
+    print("=======================================")
+    print("Base grid")
+    print("=======================================")
+
+    print(
+        "Grid l range =",
+        x_edges[0],
+        "to",
+        x_edges[-1],
+    )
+
+    print(
+        "Grid b range =",
+        y_edges[0],
+        "to",
+        y_edges[-1],
+    )
+
+    print(
+        "Cell size =",
+        BASE_CELL_DEG * 60,
+        "arcmin",
+    )
+
+
+    base_records = []
+
+
+    for iy in range(
+        len(y_edges) - 1
+    ):
+
+        for ix in range(
+            len(x_edges) - 1
+        ):
+
+            cell = box(
+                x_edges[ix],
+                y_edges[iy],
+                x_edges[ix + 1],
+                y_edges[iy + 1],
+            )
+
+
+            if (
+                cell
+                .intersection(union)
+                .area
+                <= MIN_GEOMETRY_AREA
+            ):
+                continue
+
+
+            field_id = (
+                f"gbtds_base_"
+                f"y{iy:03d}_"
+                f"x{ix:03d}"
+            )
+
+
+            rec = build_cell_record(
+                field_id=field_id,
+                parent_cell_id="",
+                refinement_level=0,
+                full_cell=cell,
+                spring=spring,
+                autumn=autumn,
+                union=union,
+                overlap=overlap,
+                dust=dust,
+            )
+
+
+            if rec is not None:
+
+                base_records.append(
+                    rec
+                )
+
+
+    print(
+        "Base cells intersecting Roman =",
+        len(base_records),
+    )
+
+
+    n_refine = sum(
+        r["needs_refinement"]
+        for r in base_records
+    )
+
+
+    print(
+        "Base cells flagged for "
+        "3' refinement =",
+        n_refine,
+    )
+
+
+    # --------------------------------------------------------
+    # Save base grid before refinement.
+    # --------------------------------------------------------
+
+    base_df = pd.DataFrame(
+        [
+            public_record(r)
+            for r in base_records
+        ]
+    )
+
+
+    base_df.to_parquet(
+        BASE_OUTPUT,
+        index=False,
+        compression="zstd",
+    )
+
+
+    # --------------------------------------------------------
+    # One adaptive refinement level.
+    # --------------------------------------------------------
+
+    final_records = []
+
+
+    child_size = (
+        BASE_CELL_DEG
+        / REFINEMENT_FACTOR
+    )
+
+
+    for rec in base_records:
+
+        if not rec[
+            "needs_refinement"
+        ]:
+
+            final_records.append(
+                rec
+            )
+
+            continue
+
+
+        parent = rec[
+            "_cell_geometry"
+        ]
+
+
+        mincx, mincy, maxcx, maxcy = (
+            parent.bounds
+        )
+
+
+        for iy in range(
+            REFINEMENT_FACTOR
+        ):
+
+            for ix in range(
+                REFINEMENT_FACTOR
+            ):
+
+                child = box(
+                    mincx
+                    + ix * child_size,
+
+                    mincy
+                    + iy * child_size,
+
+                    mincx
+                    + (ix + 1)
+                    * child_size,
+
+                    mincy
+                    + (iy + 1)
+                    * child_size,
+                )
+
+
+                if (
+                    child
+                    .intersection(union)
+                    .area
+                    <= MIN_GEOMETRY_AREA
+                ):
+                    continue
+
+
+                child_id = (
+                    f"{rec['field_id']}"
+                    f"_r1_"
+                    f"y{iy}_x{ix}"
+                )
+
+
+                child_rec = (
+                    build_cell_record(
+                        field_id=child_id,
+                        parent_cell_id=(
+                            rec[
+                                "field_id"
+                            ]
+                        ),
+                        refinement_level=1,
+                        full_cell=child,
+                        spring=spring,
+                        autumn=autumn,
+                        union=union,
+                        overlap=overlap,
+                        dust=dust,
+                    )
+                )
+
+
+                if child_rec is not None:
+
+                    final_records.append(
+                        child_rec
+                    )
+
+
+    # --------------------------------------------------------
+    # Integrity checks.
+    # --------------------------------------------------------
+
+    final_union_area = sum(
+        x[
+            "area_union_deg2"
+        ]
+        for x in final_records
+    )
+
+    final_spring_area = sum(
+        x[
+            "area_spring_deg2"
+        ]
+        for x in final_records
+    )
+
+    final_autumn_area = sum(
+        x[
+            "area_autumn_deg2"
+        ]
+        for x in final_records
+    )
+
+    final_overlap_area = sum(
+        x[
+            "area_overlap_deg2"
+        ]
+        for x in final_records
+    )
+
+
+    if not np.isclose(
+        final_union_area,
+        union.area,
+        rtol=0.0,
+        atol=1.0e-7,
+    ):
+
+        raise RuntimeError(
+            "Final cell grid does not conserve "
+            "Roman union area: "
+            f"{final_union_area} != {union.area}"
+        )
+
+
+    if not np.isclose(
+        final_spring_area,
+        spring.area,
+        rtol=0.0,
+        atol=1.0e-7,
+    ):
+
+        raise RuntimeError(
+            "Spring area not conserved."
+        )
+
+
+    if not np.isclose(
+        final_autumn_area,
+        autumn.area,
+        rtol=0.0,
+        atol=1.0e-7,
+    ):
+
+        raise RuntimeError(
+            "Autumn area not conserved."
+        )
+
+
+    # --------------------------------------------------------
+    # Serialize.
+    # --------------------------------------------------------
+
+    final_public = [
+        public_record(r)
+        for r in final_records
+    ]
+
+
+    final_df = pd.DataFrame(
+        final_public
+    )
+
+
+    final_df.to_parquet(
+        FINAL_OUTPUT,
+        index=False,
+        compression="zstd",
+    )
+
+
+    # --------------------------------------------------------
+    # CSV consumed by download_trilegal.py
+    #
+    # Keep it reasonably compact. Exact geometry remains in
+    # the parquet and GeoJSON products.
+    # --------------------------------------------------------
+
+    config_columns = [
+        "field_id",
+        "parent_cell_id",
+        "refinement_level",
+        "region",
+
+        "l_deg",
+        "b_deg",
+
+        "l_min_deg",
+        "l_max_deg",
+        "b_min_deg",
+        "b_max_deg",
+
+        "target_area_deg2",
+        "sample_area_deg2",
+        "area_weight",
+
+        "covered_spring",
+        "covered_autumn",
+        "season_coverage",
+
+        "fraction_union",
+        "fraction_spring",
+        "fraction_autumn",
+        "fraction_overlap",
+
+        "fraction_spring_of_union",
+        "fraction_autumn_of_union",
+        "fraction_overlap_of_union",
+
+        "area_spring_deg2",
+        "area_autumn_deg2",
+        "area_overlap_deg2",
+
+        "ejk_median",
+        "ejk_p16",
+        "ejk_p84",
+        "ejk_sigma_spatial",
+
+        "av_inf",
+        "extinction_sigma",
+
+        "n_extinction_nodes_active",
+        "n_extinction_nodes_used",
+        "extinction_sampling_mode",
+
+        "map_res_avg_arcmin",
+        "map_res_max_arcmin",
+
+        "needs_refinement",
+        "extinction_sigma_was_capped",
+
+        "extinction_map",
+        "extinction_catalog",
+        "av_per_ejk",
+        "geometry_version",
+    ]
+
+
+    final_df[
+        config_columns
+    ].to_csv(
+        TRILEGAL_CONFIG,
+        index=False,
+    )
+
+
+    # --------------------------------------------------------
+    # GeoJSON with exact Roman-active geometry per cell.
+    # --------------------------------------------------------
+
+    features = []
+
+
+    for rec in final_records:
+
+        properties = {
+            "field_id":
+                rec["field_id"],
+
+            "refinement_level":
+                rec[
+                    "refinement_level"
+                ],
+
+            "region":
+                rec["region"],
+
+            "season_coverage":
+                rec[
+                    "season_coverage"
+                ],
+
+            "target_area_deg2":
+                rec[
+                    "target_area_deg2"
+                ],
+
+            "fraction_spring":
+                rec[
+                    "fraction_spring"
+                ],
+
+            "fraction_autumn":
+                rec[
+                    "fraction_autumn"
+                ],
+
+            "ejk_median":
+                rec[
+                    "ejk_median"
+                ],
+
+            "ejk_sigma_spatial":
+                rec[
+                    "ejk_sigma_spatial"
+                ],
+
+            "av_inf":
+                rec["av_inf"],
+
+            "extinction_sigma":
+                rec[
+                    "extinction_sigma"
+                ],
+        }
+
+
+        features.append(
+            {
+                "type":
+                    "Feature",
+
+                "properties":
+                    properties,
+
+                "geometry":
+                    mapping(
+                        rec[
+                            "_union_geometry"
+                        ]
+                    ),
+            }
+        )
+
+
+    geojson = {
+        "type":
+            "FeatureCollection",
+
+        "features":
+            features,
+    }
+
+
+    CELL_GEOJSON.write_text(
+        json.dumps(
+            geojson,
+            indent=2,
+        )
+    )
+
+
+    # --------------------------------------------------------
+    # Diagnostics
+    # --------------------------------------------------------
+
+    remaining_refine = int(
+        final_df[
+            "needs_refinement"
+        ].sum()
+    )
+
+
+    level0 = int(
+        (
+            final_df[
+                "refinement_level"
+            ]
+            == 0
+        ).sum()
+    )
+
+
+    level1 = int(
+        (
+            final_df[
+                "refinement_level"
+            ]
+            == 1
+        ).sum()
+    )
+
+
+    both = int(
+        (
+            final_df[
+                "season_coverage"
+            ]
+            == "spring_and_autumn"
+        ).sum()
+    )
+
+
+    spring_only = int(
+        (
+            final_df[
+                "season_coverage"
+            ]
+            == "spring_only"
+        ).sum()
+    )
+
+
+    autumn_only = int(
+        (
+            final_df[
+                "season_coverage"
+            ]
+            == "autumn_only"
+        ).sum()
+    )
+
+
+    fallback = int(
+        (
+            final_df[
+                "extinction_sampling_mode"
+            ]
+            != "roman_active_geometry"
+        ).sum()
+    )
+
+
+    summary = pd.DataFrame(
+        [
+            {
+                "metric":
+                    "roman_union_area_deg2",
+                "value":
+                    union.area,
+            },
+
+            {
+                "metric":
+                    "spring_area_deg2",
+                "value":
+                    spring.area,
+            },
+
+            {
+                "metric":
+                    "autumn_area_deg2",
+                "value":
+                    autumn.area,
+            },
+
+            {
+                "metric":
+                    "overlap_area_deg2",
+                "value":
+                    overlap.area,
+            },
+
+            {
+                "metric":
+                    "base_cells",
+                "value":
+                    len(base_records),
+            },
+
+            {
+                "metric":
+                    "base_cells_refined",
+                "value":
+                    n_refine,
+            },
+
+            {
+                "metric":
+                    "final_cells",
+                "value":
+                    len(final_records),
+            },
+
+            {
+                "metric":
+                    "final_level0",
+                "value":
+                    level0,
+            },
+
+            {
+                "metric":
+                    "final_level1",
+                "value":
+                    level1,
+            },
+
+            {
+                "metric":
+                    "cells_both_seasons",
+                "value":
+                    both,
+            },
+
+            {
+                "metric":
+                    "cells_spring_only",
+                "value":
+                    spring_only,
+            },
+
+            {
+                "metric":
+                    "cells_autumn_only",
+                "value":
+                    autumn_only,
+            },
+
+            {
+                "metric":
+                    "remaining_sigma_gt_0p1",
+                "value":
+                    remaining_refine,
+            },
+
+            {
+                "metric":
+                    "extinction_full_cell_fallbacks",
+                "value":
+                    fallback,
+            },
+        ]
+    )
+
+
+    summary.to_csv(
+        SUMMARY_OUTPUT,
+        index=False,
+    )
+
+
+    # --------------------------------------------------------
+    # Console report
+    # --------------------------------------------------------
+
+    print()
+    print("=======================================")
+    print("FINAL REAL GBTDS CELL GRID")
+    print("=======================================")
+
+    print()
+    print(
+        "Base cells              =",
+        len(base_records),
+    )
+
+    print(
+        "Base cells refined      =",
+        n_refine,
+    )
+
+    print(
+        "Final cells             =",
+        len(final_records),
+    )
+
+    print(
+        "  level 0 (6 arcmin)    =",
+        level0,
+    )
+
+    print(
+        "  level 1 (3 arcmin)    =",
+        level1,
+    )
+
+
+    print()
+    print("Area conservation:")
+
+    print(
+        "  footprint union       =",
+        f"{union.area:.9f}",
+    )
+
+    print(
+        "  cells union           =",
+        f"{final_union_area:.9f}",
+    )
+
+    print(
+        "  spring footprint      =",
+        f"{spring.area:.9f}",
+    )
+
+    print(
+        "  cells spring          =",
+        f"{final_spring_area:.9f}",
+    )
+
+    print(
+        "  autumn footprint      =",
+        f"{autumn.area:.9f}",
+    )
+
+    print(
+        "  cells autumn          =",
+        f"{final_autumn_area:.9f}",
+    )
+
+    print(
+        "  overlap footprint     =",
+        f"{overlap.area:.9f}",
+    )
+
+    print(
+        "  cells overlap         =",
+        f"{final_overlap_area:.9f}",
+    )
+
+
+    print()
+    print("Season coverage:")
+
+    print(
+        "  Spring + Autumn       =",
+        both,
+    )
+
+    print(
+        "  Spring only           =",
+        spring_only,
+    )
+
+    print(
+        "  Autumn only           =",
+        autumn_only,
+    )
+
+
+    print()
+    print("Extinction:")
+
+    print(
+        "  residual sigma_EJK>0.1 =",
+        remaining_refine,
+    )
+
+    print(
+        "  full-cell fallbacks    =",
+        fallback,
+    )
+
+    print(
+        "  sigma capped at 0.30   =",
+        int(
+            final_df[
+                "extinction_sigma_was_capped"
+            ].sum()
+        ),
+    )
+
+
+    print()
+    print(
+        "Final cells by region:"
+    )
+
+    print(
+        final_df[
+            "region"
+        ]
+        .value_counts()
+        .to_string()
+    )
+
+
+    print()
+    print(
+        "E(J-Ks) by region:"
+    )
+
+    print(
+        final_df
+        .groupby(
+            "region"
+        )[
+            "ejk_median"
+        ]
+        .describe()
+        .to_string()
+    )
+
+
+    print()
+    print(
+        "Av(infinity) by region:"
+    )
+
+    print(
+        final_df
+        .groupby(
+            "region"
+        )[
+            "av_inf"
+        ]
+        .describe()
+        .to_string()
+    )
+
+
+    print()
+    print("Smallest Roman-covered cells:")
+
+    print(
+        final_df[
+            [
+                "field_id",
+                "region",
+                "refinement_level",
+                "target_area_deg2",
+                "sample_area_deg2",
+                "area_weight",
+                "fraction_union",
+            ]
+        ]
+        .sort_values(
+            "target_area_deg2"
+        )
+        .head(15)
+        .to_string(
+            index=False
+        )
+    )
+
+
+    print()
+    print("Saved:")
+    print(
+        " ",
+        BASE_OUTPUT,
+    )
+
+    print(
+        " ",
+        FINAL_OUTPUT,
+    )
+
+    print(
+        " ",
+        TRILEGAL_CONFIG,
+    )
+
+    print(
+        " ",
+        CELL_GEOJSON,
+    )
+
+    print(
+        " ",
+        SUMMARY_OUTPUT,
+    )
+
+
+    print()
+    print(
+        "IMPORTANT: TRILEGAL has NOT "
+        "been launched."
+    )
+
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,678 @@
+#!/usr/bin/env python3
+
+from __future__ import annotations
+
+import argparse
+import io
+import json
+import re
+import time
+from pathlib import Path
+from urllib.parse import urljoin
+
+import pandas as pd
+import requests
+from bs4 import BeautifulSoup
+
+
+TRILEGAL_URL = "https://stev.oapd.inaf.it/cgi-bin/trilegal_1.7"
+
+
+# ============================================================
+# Read current TRILEGAL form
+# ============================================================
+
+def read_form(session: requests.Session):
+    print(f"Reading TRILEGAL form:\n  {TRILEGAL_URL}")
+
+    r = session.get(TRILEGAL_URL, timeout=60)
+    r.raise_for_status()
+
+    soup = BeautifulSoup(r.text, "html.parser")
+
+    form = soup.find("form")
+    if form is None:
+        raise RuntimeError("Could not find a FORM element on the TRILEGAL page.")
+
+    action = urljoin(TRILEGAL_URL, form.get("action", TRILEGAL_URL))
+
+    defaults = {}
+
+    # input elements
+    for element in form.find_all("input"):
+        name = element.get("name")
+        if not name:
+            continue
+
+        typ = element.get("type", "text").lower()
+        value = element.get("value", "")
+
+        if typ in {"text", "hidden"}:
+            defaults[name] = value
+
+        elif typ in {"radio", "checkbox"} and element.has_attr("checked"):
+            defaults[name] = value
+
+    # select elements
+    for select in form.find_all("select"):
+        name = select.get("name")
+        if not name:
+            continue
+
+        selected = select.find("option", selected=True)
+
+        if selected is None:
+            selected = select.find("option")
+
+        if selected is not None:
+            defaults[name] = selected.get("value", "")
+
+    print(f"Submission URL:\n  {action}")
+    print(f"Recovered {len(defaults)} default form parameters.")
+
+    return soup, action, defaults
+
+
+# ============================================================
+# Find Roman2024 photometric system
+# ============================================================
+
+def find_roman2024(soup):
+    select = soup.find("select", attrs={"name": "photsys_file"})
+
+    if select is None:
+        raise RuntimeError(
+            "Could not find the 'photsys_file' selector in the current "
+            "TRILEGAL form."
+        )
+
+    matches = []
+
+    for option in select.find_all("option"):
+        value = option.get("value", "")
+        text = option.get_text(" ", strip=True)
+
+        if "roman2024" in value.lower() or "roman2024" in text.lower():
+            matches.append((value, text))
+
+    if not matches:
+        roman_like = []
+
+        for option in select.find_all("option"):
+            value = option.get("value", "")
+            text = option.get_text(" ", strip=True)
+
+            if "roman" in value.lower() or "roman" in text.lower():
+                roman_like.append((value, text))
+
+        msg = "\n".join(f"  {v} -> {t}" for v, t in roman_like)
+
+        raise RuntimeError(
+            "Roman2024 was not found in the current TRILEGAL form.\n"
+            "Roman-like systems found:\n"
+            f"{msg}"
+        )
+
+    print("\nRoman2024 matches:")
+
+    for value, text in matches:
+        print(f"  {value} -> {text}")
+
+    return matches[0][0]
+
+
+# ============================================================
+# Find output URL returned by TRILEGAL
+# ============================================================
+
+def extract_result_url(html: str, base_url: str):
+    """
+    Extract only the generated TRILEGAL catalogue URL.
+
+    The response HTML also contains many .dat files describing
+    photometric systems (tab_mag_*.dat), IMFs, SFRs, etc.
+    Those must NOT be interpreted as result catalogues.
+
+    TRILEGAL generated catalogues live in paths containing
+    tmp/output (historically lgirardi/tmp/output).
+    """
+    soup = BeautifulSoup(html, "html.parser")
+
+    dat_links = []
+
+    for link in soup.find_all("a", href=True):
+        href = link.get("href", "").strip()
+
+        if ".dat" not in href.lower():
+            continue
+
+        dat_links.append(href)
+
+        low = href.lower()
+
+        # Generated TRILEGAL catalogue
+        if "tmp/output" in low:
+            return urljoin(base_url, href)
+
+    # Helpful diagnostics if the website changes again
+    if dat_links:
+        msg = "\n".join(f"  {x}" for x in dat_links)
+        raise RuntimeError(
+            "Found .dat links in the TRILEGAL response, but none "
+            "looks like a generated tmp/output catalogue.\n"
+            "Links found:\n"
+            + msg
+        )
+
+    raise RuntimeError(
+        "No .dat links were found in the TRILEGAL response."
+    )
+
+
+# ============================================================
+# Submit TRILEGAL job
+# ============================================================
+
+def submit_job(
+    session: requests.Session,
+    action: str,
+    params: dict,
+    debug_path: Path,
+    poll_seconds: int = 15,
+    max_wait_seconds: int = 650,
+):
+    print("\nSubmitting TRILEGAL job...")
+    print(f"  l       = {params.get('gc_l')}")
+    print(f"  b       = {params.get('gc_b')}")
+    print(f"  area    = {params.get('field')} deg^2")
+    print(f"  mag_lim = {params.get('mag_lim')}")
+    print(f"  icm_lim = {params.get('icm_lim')}")
+    print(f"  photsys = {params.get('photsys_file')}")
+
+    r = session.post(
+        action,
+        data=params,
+        timeout=120,
+    )
+    r.raise_for_status()
+
+    debug_path.write_text(r.text)
+
+    result_url = extract_result_url(r.text, r.url)
+
+    if result_url is None:
+        raise RuntimeError(
+            "\nTRILEGAL submission succeeded at HTTP level, but no "
+            ".dat output link could be found.\n\n"
+            f"The response was saved to:\n  {debug_path}\n\n"
+            "Inspect it with e.g.:\n"
+            f"  less {debug_path}\n"
+        )
+
+    print(f"\nOutput URL:\n  {result_url}")
+
+    elapsed = 0
+
+    while elapsed <= max_wait_seconds:
+        r = session.get(result_url, timeout=60)
+
+        if r.status_code == 200:
+            text = r.text
+
+            # Successful TRILEGAL output normally has a #Gc header.
+            if "#Gc" in text or "# Gc" in text:
+                print(f"\nTRILEGAL catalogue ready after ~{elapsed} s.")
+                return text
+
+        time.sleep(poll_seconds)
+        elapsed += poll_seconds
+
+        print(f"  waiting... {elapsed} s")
+
+    raise TimeoutError(
+        "TRILEGAL output was not ready before timeout.\n"
+        "Try reducing sample_area_deg2."
+    )
+
+
+# ============================================================
+# Parse TRILEGAL catalogue
+# ============================================================
+
+def trilegal_to_dataframe(text: str):
+    lines = text.splitlines()
+
+    header_idx = None
+
+    for i, line in enumerate(lines):
+        stripped = line.strip()
+
+        if stripped.startswith("#Gc") or stripped.startswith("# Gc"):
+            header_idx = i
+            break
+
+    if header_idx is None:
+        raise RuntimeError(
+            "Could not find the TRILEGAL catalogue header beginning with #Gc."
+        )
+
+    header = lines[header_idx].lstrip("#").strip()
+    columns = header.split()
+
+    rows = []
+
+    for line in lines[header_idx + 1:]:
+        stripped = line.strip()
+
+        if not stripped:
+            continue
+
+        if stripped.startswith("#"):
+            continue
+
+        rows.append(stripped)
+
+    if not rows:
+        raise RuntimeError("TRILEGAL returned a catalogue with no data rows.")
+
+    df = pd.read_csv(
+        io.StringIO("\n".join(rows)),
+        sep=r"\s+",
+        names=columns,
+        engine="python",
+    )
+
+    return df
+
+
+# ============================================================
+# Helpers
+# ============================================================
+
+def find_column_case_insensitive(columns, target):
+    lookup = {c.lower(): c for c in columns}
+    return lookup.get(target.lower())
+
+
+def infer_f146_filter_index(
+    session,
+    action,
+    defaults,
+    roman_photsys,
+    l_deg,
+    b_deg,
+    debug_dir,
+):
+    """
+    Determine which icm_lim index corresponds to F146.
+
+    We submit a tiny simulation and inspect only the output header.
+    No stellar rows are required for determining the filter order.
+    """
+
+    params = defaults.copy()
+
+    params.update(
+        {
+            "gal_coord": "1",
+            "gc_l": str(l_deg),
+            "gc_b": str(b_deg),
+
+            # Tiny probe field
+            "field": "0.0001",
+
+            "photsys_file": roman_photsys,
+
+            # Temporary selection band.
+            # We only need the output header.
+            "icm_lim": "1",
+            "mag_lim": "32",
+
+            "mag_res": "0.1",
+        }
+    )
+
+    probe_text = submit_job(
+        session=session,
+        action=action,
+        params=params,
+        debug_path=debug_dir / "probe_submit_response.html",
+        poll_seconds=10,
+        max_wait_seconds=650,
+    )
+
+    # Read header directly. This works even if the probe contains
+    # zero stellar rows.
+    header = None
+
+    for line in probe_text.splitlines():
+        stripped = line.strip()
+
+        if stripped.startswith("#Gc"):
+            header = stripped.lstrip("#").strip()
+            break
+
+        if stripped.startswith("# Gc"):
+            header = stripped.lstrip("#").strip()
+            break
+
+    if header is None:
+        raise RuntimeError(
+            "Could not find the #Gc header in the TRILEGAL output."
+        )
+
+    columns = header.split()
+
+    print("\nPhotometric-system columns returned by TRILEGAL:")
+    for i, column in enumerate(columns):
+        print(f"  {i:3d}  {column}")
+
+    # Case-insensitive lookup
+    lookup = {c.lower(): c for c in columns}
+
+    if "f146" not in lookup:
+        raise RuntimeError(
+            "F146 was not found in the TRILEGAL output header."
+        )
+
+    f146_col = lookup["f146"]
+
+    # TRILEGAL has historically used both Mbol and mbol labels.
+    mbol_col = lookup.get("mbol")
+
+    if mbol_col is None:
+        raise RuntimeError(
+            "Mbol/mbol was not found in the TRILEGAL output header."
+        )
+
+    i_mbol = columns.index(mbol_col)
+    i_f146 = columns.index(f146_col)
+
+    # icm_lim=1 means the first photometric band after Mbol.
+    filter_index = i_f146 - i_mbol
+
+    if filter_index < 1:
+        raise RuntimeError(
+            "Unexpected filter ordering: "
+            f"Mbol index={i_mbol}, F146 index={i_f146}"
+        )
+
+    print("\n=======================================")
+    print(f"F146 identified as filter #{filter_index}")
+    print("=======================================")
+
+    return filter_index
+
+
+# ============================================================
+# Main
+# ============================================================
+
+def main():
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument(
+        "--fields",
+        type=Path,
+        required=True,
+    )
+
+    parser.add_argument(
+        "--outdir",
+        type=Path,
+        default=Path("."),
+    )
+
+    parser.add_argument(
+        "--f146-limit",
+        type=float,
+        default=32.0,
+    )
+
+    parser.add_argument(
+        "--insecure-ssl",
+        action="store_true",
+        help=(
+            "Disable SSL certificate verification for the TRILEGAL "
+            "server. Intended only as a workaround for the current "
+            "stev.oapd.inaf.it certificate-chain problem."
+        ),
+    )
+
+    args = parser.parse_args()
+
+    outdir = args.outdir.resolve()
+
+    raw_dir = outdir / "raw"
+    processed_dir = outdir / "processed"
+    metadata_dir = outdir / "metadata"
+
+    raw_dir.mkdir(parents=True, exist_ok=True)
+    processed_dir.mkdir(parents=True, exist_ok=True)
+    metadata_dir.mkdir(parents=True, exist_ok=True)
+
+    fields = pd.read_csv(args.fields)
+
+    required = {
+        "field_id",
+        "l_deg",
+        "b_deg",
+        "target_area_deg2",
+        "sample_area_deg2",
+    }
+
+    missing = required - set(fields.columns)
+
+    if missing:
+        raise ValueError(
+            f"Missing required columns in {args.fields}:\n"
+            f"  {sorted(missing)}"
+        )
+
+    print("\n=======================================")
+    print("TRILEGAL Roman/Rubin stellar catalogue")
+    print("=======================================")
+    print(f"Fields config: {args.fields}")
+    print(f"Output dir:    {outdir}")
+    print(f"F146 limit:    {args.f146_limit}")
+    print("\nNOTE:")
+    print(
+        "  This first run keeps the extinction configuration from the "
+        "current TRILEGAL form.\n"
+        "  It is a smoke test, not yet the final science catalogue."
+    )
+
+    session = requests.Session()
+
+    if args.insecure_ssl:
+        import urllib3
+
+        urllib3.disable_warnings(
+            urllib3.exceptions.InsecureRequestWarning
+        )
+
+        session.verify = False
+
+        print()
+        print("WARNING:")
+        print(
+            "  SSL certificate verification is disabled for "
+            "this TRILEGAL session."
+        )
+
+    session.headers.update(
+        {
+            "User-Agent": (
+                "roman-rubin-microlensing-stellar-population/1.0"
+            )
+        }
+    )
+
+    soup, action, defaults = read_form(session)
+
+    roman_photsys = find_roman2024(soup)
+
+    print("\nRoman2024 internal value:")
+    print(f"  {roman_photsys}")
+
+    first = fields.iloc[0]
+
+    f146_index = infer_f146_filter_index(
+        session=session,
+        action=action,
+        defaults=defaults,
+        roman_photsys=roman_photsys,
+        l_deg=float(first["l_deg"]),
+        b_deg=float(first["b_deg"]),
+        debug_dir=metadata_dir,
+    )
+
+    all_catalogues = []
+
+    for _, field in fields.iterrows():
+        field_id = str(field["field_id"])
+
+        print("\n\n#######################################")
+        print(f"FIELD: {field_id}")
+        print("#######################################")
+
+        params = defaults.copy()
+
+        params.update(
+            {
+                "gal_coord": "1",
+                "gc_l": str(float(field["l_deg"])),
+                "gc_b": str(float(field["b_deg"])),
+
+                "field": str(float(field["sample_area_deg2"])),
+
+                "photsys_file": roman_photsys,
+                "icm_lim": str(f146_index),
+                "mag_lim": str(float(args.f146_limit)),
+
+                "mag_res": "0.1",
+            }
+        )
+
+        text = submit_job(
+            session=session,
+            action=action,
+            params=params,
+            debug_path=metadata_dir
+            / f"{field_id}_submit_response.html",
+            poll_seconds=15,
+            max_wait_seconds=650,
+        )
+
+        raw_path = raw_dir / f"{field_id}.dat"
+        raw_path.write_text(text)
+
+        df = trilegal_to_dataframe(text)
+
+        df.insert(0, "field_id", field_id)
+
+        df["field_l_deg"] = float(field["l_deg"])
+        df["field_b_deg"] = float(field["b_deg"])
+
+        df["sample_area_deg2"] = float(
+            field["sample_area_deg2"]
+        )
+
+        df["target_area_deg2"] = float(
+            field["target_area_deg2"]
+        )
+
+        df["area_weight"] = (
+            float(field["target_area_deg2"])
+            / float(field["sample_area_deg2"])
+        )
+
+        df.insert(
+            1,
+            "star_id",
+            [
+                f"{field_id}_{i:09d}"
+                for i in range(len(df))
+            ],
+        )
+
+        parquet_path = (
+            processed_dir / f"{field_id}_physical.parquet"
+        )
+
+        df.to_parquet(
+            parquet_path,
+            index=False,
+            compression="zstd",
+        )
+
+        metadata = {
+            "field_id": field_id,
+            "l_deg": float(field["l_deg"]),
+            "b_deg": float(field["b_deg"]),
+            "target_area_deg2": float(
+                field["target_area_deg2"]
+            ),
+            "sample_area_deg2": float(
+                field["sample_area_deg2"]
+            ),
+            "area_weight": float(
+                field["target_area_deg2"]
+                / field["sample_area_deg2"]
+            ),
+            "photometric_system": "Roman2024",
+            "photometric_system_internal": roman_photsys,
+            "selection_band": "F146",
+            "f146_filter_index": int(f146_index),
+            "f146_parent_limit": float(args.f146_limit),
+            "n_stars": int(len(df)),
+            "extinction_note": (
+                "Smoke-test run uses the default extinction "
+                "configuration recovered from the live TRILEGAL form."
+            ),
+        }
+
+        metadata_path = metadata_dir / f"{field_id}.json"
+
+        with open(metadata_path, "w") as f:
+            json.dump(metadata, f, indent=2)
+
+        print("\nField complete:")
+        print(f"  stars:    {len(df):,}")
+        print(f"  raw:      {raw_path}")
+        print(f"  parquet:  {parquet_path}")
+        print(f"  metadata: {metadata_path}")
+
+        all_catalogues.append(df)
+
+    master = pd.concat(
+        all_catalogues,
+        ignore_index=True,
+    )
+
+    master_path = (
+        processed_dir / "trilegal_physical_catalog.parquet"
+    )
+
+    master.to_parquet(
+        master_path,
+        index=False,
+        compression="zstd",
+    )
+
+    print("\n\n=======================================")
+    print("DONE")
+    print("=======================================")
+    print(f"Total stars: {len(master):,}")
+    print(f"Master file: {master_path}")
+
+    print("\nColumns:")
+    for column in master.columns:
+        print(f"  {column}")
+
+    print("\nFirst rows:")
+    print(master.head().to_string())
+
+
+if __name__ == "__main__":
+    main()

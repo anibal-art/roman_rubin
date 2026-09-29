@@ -1,0 +1,460 @@
+#!/usr/bin/env python3
+
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+
+from astropy.coordinates import SkyCoord
+import astropy.units as u
+
+
+INPUT = Path(
+    "config/apt_1420_pointings_normalized.parquet"
+)
+
+OUTPUT = Path(
+    "config/gbtds_apt_tile_centers.csv"
+)
+
+COMPARISON_OUTPUT = Path(
+    "diagnostics/gbtds_spring_autumn_offsets.csv"
+)
+
+
+# ============================================================
+# Helpers
+# ============================================================
+
+def spherical_center(ra_deg, dec_deg):
+    """
+    Mean position on the unit sphere.
+    """
+
+    c = SkyCoord(
+        ra=np.asarray(ra_deg) * u.deg,
+        dec=np.asarray(dec_deg) * u.deg,
+        frame="icrs",
+    )
+
+    xyz = c.cartesian.xyz.value
+
+    vec = np.mean(
+        xyz,
+        axis=1,
+    )
+
+    vec = vec / np.linalg.norm(vec)
+
+    center = SkyCoord(
+        x=vec[0],
+        y=vec[1],
+        z=vec[2],
+        representation_type="cartesian",
+        frame="icrs",
+    )
+
+    return center
+
+
+def signed_l(l_deg):
+    return (
+        (np.asarray(l_deg) + 180.0)
+        % 360.0
+        - 180.0
+    )
+
+
+# ============================================================
+# Load APT output
+# ============================================================
+
+if not INPUT.exists():
+    raise FileNotFoundError(INPUT)
+
+df = pd.read_parquet(INPUT)
+
+required = [
+    "RA",
+    "DEC",
+    "PA",
+    "BANDPASS",
+    "VISIT",
+    "TARGET_NAME",
+]
+
+missing = [
+    c for c in required
+    if c not in df.columns
+]
+
+if missing:
+    raise RuntimeError(
+        f"Missing required columns: {missing}"
+    )
+
+
+# ============================================================
+# APT high-cadence survey definitions
+# ============================================================
+
+configs = [
+    {
+        "season": "spring",
+        "pa": 90.6,
+        "target": "spring-tile3-00",
+    },
+    {
+        "season": "autumn",
+        "pa": 270.6,
+        "target": "autumn-tile3-00",
+    },
+]
+
+tile_names = {
+    1: "tile1",
+    2: "tile2",
+    3: "tile3",
+    4: "tile4",
+    5: "tile5",
+    6: "tileGC",
+}
+
+
+rows = []
+
+
+# ============================================================
+# Extract six repeating WFI_CEN positions per season
+# ============================================================
+
+for cfg in configs:
+
+    season = cfg["season"]
+    pa = cfg["pa"]
+    target = cfg["target"]
+
+    sub = df[
+        (df["TARGET_NAME"] == target)
+        & np.isclose(
+            pd.to_numeric(
+                df["PA"],
+                errors="coerce",
+            ),
+            pa,
+            atol=1e-6,
+        )
+        & (df["BANDPASS"] == "F146")
+    ].copy()
+
+    if len(sub) == 0:
+        raise RuntimeError(
+            f"No rows found for {season}"
+        )
+
+    sub["VISIT"] = pd.to_numeric(
+        sub["VISIT"],
+        errors="raise",
+    ).astype(int)
+
+    # The high-cadence mosaic visits repeat in blocks of six:
+    #
+    # 1 -> tile1
+    # 2 -> tile2
+    # 3 -> tile3
+    # 4 -> tile4
+    # 5 -> tile5
+    # 6 -> tileGC
+    #
+    sub["tile_slot"] = (
+        (sub["VISIT"] - 1) % 6
+    ) + 1
+
+    print()
+    print("=======================================")
+    print(season.upper())
+    print("=======================================")
+
+    print(
+        "Selected F146 exposures:",
+        len(sub),
+    )
+
+    print()
+    print("Tile-slot counts:")
+    print(
+        sub["tile_slot"]
+        .value_counts()
+        .sort_index()
+        .to_string()
+    )
+
+    for slot in range(1, 7):
+
+        x = sub[
+            sub["tile_slot"] == slot
+        ].copy()
+
+        if len(x) == 0:
+            raise RuntimeError(
+                f"{season}: no rows for slot {slot}"
+            )
+
+        center = spherical_center(
+            x["RA"].to_numpy(),
+            x["DEC"].to_numpy(),
+        )
+
+        center_ra = center.ra.deg
+        center_dec = center.dec.deg
+
+        center_gal = center.galactic
+
+        center_l = float(
+            signed_l(center_gal.l.deg)
+        )
+
+        center_b = center_gal.b.deg
+
+        all_coord = SkyCoord(
+            ra=x["RA"].to_numpy() * u.deg,
+            dec=x["DEC"].to_numpy() * u.deg,
+            frame="icrs",
+        )
+
+        sep_arcsec = (
+            all_coord
+            .separation(center)
+            .arcsec
+        )
+
+        row = {
+            "season": season,
+            "tile_slot": slot,
+            "tile_name": tile_names[slot],
+
+            "ra_deg": center_ra,
+            "dec_deg": center_dec,
+
+            "l_deg": center_l,
+            "b_deg": center_b,
+
+            "pa_deg": pa,
+
+            "n_f146_exposures": len(x),
+
+            "dither_sep_median_arcsec": (
+                np.median(sep_arcsec)
+            ),
+
+            "dither_sep_p95_arcsec": (
+                np.percentile(
+                    sep_arcsec,
+                    95,
+                )
+            ),
+
+            "dither_sep_max_arcsec": (
+                np.max(sep_arcsec)
+            ),
+
+            "ra_min_deg": x["RA"].min(),
+            "ra_max_deg": x["RA"].max(),
+
+            "dec_min_deg": x["DEC"].min(),
+            "dec_max_deg": x["DEC"].max(),
+        }
+
+        rows.append(row)
+
+
+centers = pd.DataFrame(rows)
+
+OUTPUT.parent.mkdir(
+    parents=True,
+    exist_ok=True,
+)
+
+centers.to_csv(
+    OUTPUT,
+    index=False,
+)
+
+
+# ============================================================
+# Print exact centers
+# ============================================================
+
+print()
+print("=======================================")
+print("APT GBTDS TILE CENTERS")
+print("=======================================")
+print()
+
+print(
+    centers[
+        [
+            "season",
+            "tile_name",
+            "ra_deg",
+            "dec_deg",
+            "l_deg",
+            "b_deg",
+            "pa_deg",
+            "n_f146_exposures",
+            "dither_sep_median_arcsec",
+            "dither_sep_p95_arcsec",
+            "dither_sep_max_arcsec",
+        ]
+    ].to_string(
+        index=False,
+        float_format=lambda x: f"{x:.6f}",
+    )
+)
+
+
+# ============================================================
+# Compare Spring vs Autumn
+# ============================================================
+
+spring = (
+    centers[
+        centers["season"] == "spring"
+    ]
+    .set_index("tile_name")
+)
+
+autumn = (
+    centers[
+        centers["season"] == "autumn"
+    ]
+    .set_index("tile_name")
+)
+
+comparison = []
+
+for tile in tile_names.values():
+
+    s = spring.loc[tile]
+    a = autumn.loc[tile]
+
+    cs = SkyCoord(
+        ra=s["ra_deg"] * u.deg,
+        dec=s["dec_deg"] * u.deg,
+        frame="icrs",
+    )
+
+    ca = SkyCoord(
+        ra=a["ra_deg"] * u.deg,
+        dec=a["dec_deg"] * u.deg,
+        frame="icrs",
+    )
+
+    separation = (
+        cs.separation(ca).arcmin
+    )
+
+    comparison.append(
+        {
+            "tile_name": tile,
+
+            "spring_l_deg": s["l_deg"],
+            "spring_b_deg": s["b_deg"],
+
+            "autumn_l_deg": a["l_deg"],
+            "autumn_b_deg": a["b_deg"],
+
+            "delta_l_deg": (
+                a["l_deg"]
+                - s["l_deg"]
+            ),
+
+            "delta_b_deg": (
+                a["b_deg"]
+                - s["b_deg"]
+            ),
+
+            "center_separation_arcmin": (
+                separation
+            ),
+        }
+    )
+
+comparison = pd.DataFrame(
+    comparison
+)
+
+COMPARISON_OUTPUT.parent.mkdir(
+    parents=True,
+    exist_ok=True,
+)
+
+comparison.to_csv(
+    COMPARISON_OUTPUT,
+    index=False,
+)
+
+
+print()
+print("=======================================")
+print("SPRING <-> AUTUMN CENTER OFFSETS")
+print("=======================================")
+print()
+
+print(
+    comparison.to_string(
+        index=False,
+        float_format=lambda x: f"{x:.6f}",
+    )
+)
+
+
+# ============================================================
+# Sanity checks
+# ============================================================
+
+print()
+print("=======================================")
+print("SANITY CHECKS")
+print("=======================================")
+
+if len(centers) != 12:
+    raise RuntimeError(
+        f"Expected 12 centers, got {len(centers)}"
+    )
+
+# We expect dithers to be tiny compared with the ~0.4 deg
+# separation between the five main fields.
+bad = centers[
+    centers["dither_sep_max_arcsec"]
+    > 120.0
+]
+
+if len(bad):
+    print()
+    print(
+        "WARNING: at least one nominal tile has "
+        "a >2 arcmin spread."
+    )
+
+    print(
+        bad[
+            [
+                "season",
+                "tile_name",
+                "dither_sep_max_arcsec",
+            ]
+        ].to_string(index=False)
+    )
+
+else:
+    print(
+        "PASS: all six tile clusters are "
+        "compact relative to tile separation."
+    )
+
+
+print()
+print("Saved:")
+print(" ", OUTPUT)
+print(" ", COMPARISON_OUTPUT)

@@ -360,7 +360,25 @@ def submit_job(
 
             output_wait = 0
             output_poll_seconds = 5
-            output_max_wait = 120
+            output_max_wait = 300
+
+            # A TRILEGAL result URL may become visible while the
+            # catalogue file is still being written.
+            #
+            # Seeing '#Gc' is therefore NOT sufficient.
+            #
+            # Require:
+            #
+            #   1. a valid header;
+            #   2. no truncated stellar row;
+            #   3. identical file size / row count for four
+            #      consecutive downloads.
+            #
+            # This corresponds to at least ~15 s of stability.
+
+            stable_required = 4
+            stable_count = 0
+            previous_signature = None
 
             while output_wait <= output_max_wait:
 
@@ -368,52 +386,211 @@ def submit_job(
                     result = session.get(
                         result_url,
                         timeout=120,
-                        headers={"Connection": "close"},
+                        headers={
+                            "Connection": "close"
+                        },
                     )
 
                 except requests.exceptions.RequestException as exc:
                     print(
                         "  transient output-download error "
-                        f"({type(exc).__name__}); retrying..."
+                        f"({type(exc).__name__}); "
+                        "retrying..."
                     )
 
-                    time.sleep(output_poll_seconds)
-                    output_wait += output_poll_seconds
+                    stable_count = 0
+                    previous_signature = None
+
+                    time.sleep(
+                        output_poll_seconds
+                    )
+
+                    output_wait += (
+                        output_poll_seconds
+                    )
+
                     continue
 
-                if result.status_code == 200:
-                    catalogue_text = result.text
+                if result.status_code == 404:
+                    print(
+                        "  output link announced but "
+                        "file is not visible yet "
+                        f"({output_wait} s)"
+                    )
+
+                    stable_count = 0
+                    previous_signature = None
+
+                    time.sleep(
+                        output_poll_seconds
+                    )
+
+                    output_wait += (
+                        output_poll_seconds
+                    )
+
+                    continue
+
+                if result.status_code != 200:
+                    print(
+                        "  output returned HTTP "
+                        f"{result.status_code}; "
+                        "retrying..."
+                    )
+
+                    stable_count = 0
+                    previous_signature = None
+
+                    time.sleep(
+                        output_poll_seconds
+                    )
+
+                    output_wait += (
+                        output_poll_seconds
+                    )
+
+                    continue
+
+                catalogue_text = result.text
+                lines = catalogue_text.splitlines()
+
+                header_idx = None
+                header_columns = None
+
+                for i, line in enumerate(lines):
+                    stripped = line.strip()
 
                     if (
-                        "#Gc" in catalogue_text
-                        or "# Gc" in catalogue_text
+                        stripped.startswith("#Gc")
+                        or
+                        stripped.startswith("# Gc")
                     ):
-                        print(
-                            "Catalogue downloaded successfully "
-                            f"after ~{elapsed + output_wait} s."
+                        header_idx = i
+                        header_columns = (
+                            stripped
+                            .lstrip("#")
+                            .split()
                         )
 
-                        return catalogue_text
+                        break
 
+                if header_idx is None:
                     print(
-                        "  output exists but catalogue header "
+                        "  output exists but header "
                         "is not ready yet..."
                     )
 
-                elif result.status_code == 404:
-                    print(
-                        "  output link announced but file is not "
-                        f"visible yet ({output_wait} s)"
+                    stable_count = 0
+                    previous_signature = None
+
+                    time.sleep(
+                        output_poll_seconds
                     )
+
+                    output_wait += (
+                        output_poll_seconds
+                    )
+
+                    continue
+
+                n_columns = len(
+                    header_columns
+                )
+
+                n_complete_rows = 0
+                n_malformed_rows = 0
+
+                for line in lines[
+                    header_idx + 1:
+                ]:
+                    stripped = line.strip()
+
+                    if (
+                        not stripped
+                        or stripped.startswith("#")
+                    ):
+                        continue
+
+                    parts = stripped.split()
+
+                    if not parts:
+                        continue
+
+                    # Genuine TRILEGAL stellar rows begin
+                    # with Galactic-component code 1..5.
+                    if parts[0] not in {
+                        "1",
+                        "2",
+                        "3",
+                        "4",
+                        "5",
+                    }:
+                        continue
+
+                    if len(parts) == n_columns:
+                        n_complete_rows += 1
+                    else:
+                        n_malformed_rows += 1
+
+                signature = (
+                    len(result.content),
+                    n_complete_rows,
+                    n_malformed_rows,
+                )
+
+                structurally_complete = (
+                    n_complete_rows > 0
+                    and n_malformed_rows == 0
+                )
+
+                if (
+                    structurally_complete
+                    and
+                    signature == previous_signature
+                ):
+                    stable_count += 1
+
+                elif structurally_complete:
+                    stable_count = 1
 
                 else:
+                    stable_count = 0
+
+                previous_signature = signature
+
+                print(
+                    "  output snapshot: "
+                    f"bytes={len(result.content):,}, "
+                    f"rows={n_complete_rows:,}, "
+                    f"partial={n_malformed_rows}, "
+                    f"stable={stable_count}/"
+                    f"{stable_required}"
+                )
+
+                if (
+                    stable_count
+                    >= stable_required
+                ):
                     print(
-                        "  output download returned HTTP "
-                        f"{result.status_code}; retrying..."
+                        "Catalogue is structurally "
+                        "complete and stable."
                     )
 
-                time.sleep(output_poll_seconds)
-                output_wait += output_poll_seconds
+                    print(
+                        "Catalogue downloaded "
+                        "successfully after "
+                        f"~{elapsed + output_wait} s."
+                    )
+
+                    return catalogue_text
+
+                time.sleep(
+                    output_poll_seconds
+                )
+
+                output_wait += (
+                    output_poll_seconds
+                )
 
             result_debug = debug_path.with_name(
                 debug_path.stem + "_output_not_ready.txt"
@@ -529,6 +706,8 @@ def trilegal_to_dataframe(text: str):
 
     rows = []
 
+    expected_columns = len(columns)
+
     for line in lines[header_idx + 1:]:
         stripped = line.strip()
 
@@ -537,6 +716,30 @@ def trilegal_to_dataframe(text: str):
 
         if stripped.startswith("#"):
             continue
+
+        parts = stripped.split()
+
+        if not parts:
+            continue
+
+        # Genuine stellar rows use Gc=1..5.
+        # Ignore any footer/status text.
+        if parts[0] not in {
+            "1",
+            "2",
+            "3",
+            "4",
+            "5",
+        }:
+            continue
+
+        if len(parts) != expected_columns:
+            raise RuntimeError(
+                "Incomplete TRILEGAL stellar row "
+                "encountered while parsing: "
+                f"expected {expected_columns} "
+                f"columns, got {len(parts)}."
+            )
 
         rows.append(stripped)
 
@@ -636,11 +839,17 @@ def main():
     print(f"Output dir:    {outdir}")
     print(f"F146 limit:    {args.f146_limit}")
     print("\nNOTE:")
-    print(
-        "  This first run keeps the extinction configuration from the "
-        "current TRILEGAL form.\n"
-        "  It is a smoke test, not yet the final science catalogue."
-    )
+    if "av_inf" in fields.columns:
+        print(
+            "  Per-field extinction is enabled: "
+            "Av(infinity) and differential extinction are "
+            "read from the field configuration."
+        )
+    else:
+        print(
+            "  No per-field extinction columns were supplied; "
+            "TRILEGAL form defaults will be used."
+        )
 
     session = requests.Session()
 
@@ -704,6 +913,34 @@ def main():
     for _, field in fields.iterrows():
         field_id = str(field["field_id"])
 
+        # Validate spatial extinction inputs
+        if "av_inf" in fields.columns:
+            if pd.isna(field["av_inf"]):
+                raise ValueError(
+                    f"{field_id}: av_inf is NaN"
+                )
+
+            if float(field["av_inf"]) < 0:
+                raise ValueError(
+                    f"{field_id}: av_inf must be >= 0"
+                )
+
+        if "extinction_sigma" in fields.columns:
+            if pd.isna(field["extinction_sigma"]):
+                raise ValueError(
+                    f"{field_id}: extinction_sigma is NaN"
+                )
+
+            sigma_ext = float(
+                field["extinction_sigma"]
+            )
+
+            if not (0.0 <= sigma_ext <= 0.30):
+                raise ValueError(
+                    f"{field_id}: extinction_sigma="
+                    f"{sigma_ext} outside [0, 0.30]"
+                )
+
         print("\n\n#######################################")
         print(f"FIELD: {field_id}")
         print("#######################################")
@@ -724,6 +961,38 @@ def main():
 
                 "mag_res": "0.1",
 
+            # ------------------------------------------------
+            # Extinction normalization for this spatial cell.
+            #
+            # extinction_kind=2 means calibration at infinity:
+            #
+            #     Av(infinity) = extinction_infty
+            #
+            # TRILEGAL then distributes extinction with distance.
+            #
+            # extinction_sigma is the fractional 1-sigma
+            # differential extinction within the cell.
+            # ------------------------------------------------
+            "extinction_kind": "2",
+
+            "extinction_infty": (
+                str(float(field["av_inf"]))
+                if "av_inf" in fields.columns
+                else defaults.get(
+                    "extinction_infty",
+                    "0.0378",
+                )
+            ),
+
+            "extinction_sigma": (
+                str(float(field["extinction_sigma"]))
+                if "extinction_sigma" in fields.columns
+                else defaults.get(
+                    "extinction_sigma",
+                    "0",
+                )
+            ),
+
             # Required by the TRILEGAL CGI to actually launch
             # the simulation rather than simply redisplay the form.
             "submit_form": "Submit",
@@ -737,7 +1006,7 @@ def main():
             debug_path=metadata_dir
             / f"{field_id}_submit_response.html",
             poll_seconds=15,
-            max_wait_seconds=650,
+            max_wait_seconds=1800,
         )
 
         raw_path = raw_dir / f"{field_id}.dat"
@@ -749,6 +1018,26 @@ def main():
 
         df["field_l_deg"] = float(field["l_deg"])
         df["field_b_deg"] = float(field["b_deg"])
+
+        if "av_inf" in fields.columns:
+            df["cell_av_inf"] = float(
+                field["av_inf"]
+            )
+
+        if "extinction_sigma" in fields.columns:
+            df["cell_extinction_sigma"] = float(
+                field["extinction_sigma"]
+            )
+
+        if "ejk_median" in fields.columns:
+            df["cell_ejk_median"] = float(
+                field["ejk_median"]
+            )
+
+        if "ejk_sigma_spatial" in fields.columns:
+            df["cell_ejk_sigma_spatial"] = float(
+                field["ejk_sigma_spatial"]
+            )
 
         df["sample_area_deg2"] = float(
             field["sample_area_deg2"]
@@ -802,9 +1091,28 @@ def main():
             "f146_filter_index": int(f146_index),
             "f146_parent_limit": float(args.f146_limit),
             "n_stars": int(len(df)),
-            "extinction_note": (
-                "Smoke-test run uses the default extinction "
-                "configuration recovered from the live TRILEGAL form."
+            "extinction_kind": 2,
+
+            "av_inf_input": (
+                float(field["av_inf"])
+                if "av_inf" in fields.columns
+                else float(
+                    defaults.get(
+                        "extinction_infty",
+                        0.0378,
+                    )
+                )
+            ),
+
+            "extinction_sigma_input": (
+                float(field["extinction_sigma"])
+                if "extinction_sigma" in fields.columns
+                else float(
+                    defaults.get(
+                        "extinction_sigma",
+                        0.0,
+                    )
+                )
             ),
         }
 

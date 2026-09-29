@@ -1,0 +1,1162 @@
+#!/usr/bin/env python3
+
+from __future__ import annotations
+
+import argparse
+import io
+import json
+import re
+import time
+from pathlib import Path
+from urllib.parse import urljoin
+
+import pandas as pd
+import requests
+from bs4 import BeautifulSoup
+
+
+TRILEGAL_URL = "https://stev.oapd.inaf.it/cgi-bin/trilegal_1.7"
+
+
+# ============================================================
+# Read current TRILEGAL form
+# ============================================================
+
+def read_form(session: requests.Session):
+    print(f"Reading TRILEGAL form:\n  {TRILEGAL_URL}")
+
+    r = session.get(TRILEGAL_URL, timeout=60)
+    r.raise_for_status()
+
+    soup = BeautifulSoup(r.text, "html.parser")
+
+    form = soup.find("form")
+    if form is None:
+        raise RuntimeError("Could not find a FORM element on the TRILEGAL page.")
+
+    action = urljoin(TRILEGAL_URL, form.get("action", TRILEGAL_URL))
+
+    defaults = {}
+
+    # input elements
+    for element in form.find_all("input"):
+        name = element.get("name")
+        if not name:
+            continue
+
+        typ = element.get("type", "text").lower()
+        value = element.get("value", "")
+
+        if typ in {"text", "hidden"}:
+            defaults[name] = value
+
+        elif typ in {"radio", "checkbox"} and element.has_attr("checked"):
+            defaults[name] = value
+
+    # select elements
+    for select in form.find_all("select"):
+        name = select.get("name")
+        if not name:
+            continue
+
+        selected = select.find("option", selected=True)
+
+        if selected is None:
+            selected = select.find("option")
+
+        if selected is not None:
+            defaults[name] = selected.get("value", "")
+
+    print(f"Submission URL:\n  {action}")
+    print(f"Recovered {len(defaults)} default form parameters.")
+
+    return soup, action, defaults
+
+
+# ============================================================
+# Find Roman2024 photometric system
+# ============================================================
+
+def find_roman2024(soup):
+    select = soup.find("select", attrs={"name": "photsys_file"})
+
+    if select is None:
+        raise RuntimeError(
+            "Could not find the 'photsys_file' selector in the current "
+            "TRILEGAL form."
+        )
+
+    matches = []
+
+    for option in select.find_all("option"):
+        value = option.get("value", "")
+        text = option.get_text(" ", strip=True)
+
+        if "roman2024" in value.lower() or "roman2024" in text.lower():
+            matches.append((value, text))
+
+    if not matches:
+        roman_like = []
+
+        for option in select.find_all("option"):
+            value = option.get("value", "")
+            text = option.get_text(" ", strip=True)
+
+            if "roman" in value.lower() or "roman" in text.lower():
+                roman_like.append((value, text))
+
+        msg = "\n".join(f"  {v} -> {t}" for v, t in roman_like)
+
+        raise RuntimeError(
+            "Roman2024 was not found in the current TRILEGAL form.\n"
+            "Roman-like systems found:\n"
+            f"{msg}"
+        )
+
+    print("\nRoman2024 matches:")
+
+    for value, text in matches:
+        print(f"  {value} -> {text}")
+
+    return matches[0][0]
+
+
+# ============================================================
+# Find output URL returned by TRILEGAL
+# ============================================================
+
+def extract_result_url(html: str, base_url: str):
+    """
+    Extract the generated TRILEGAL catalogue URL.
+
+    TRILEGAL result pages may define an HTML <base href=...>.
+    Relative links must therefore be resolved against that base,
+    not simply against the CGI URL.
+
+    Historically, generated catalogues are stored below
+    ~lgirardi/tmp/output*.dat.
+    """
+    soup = BeautifulSoup(html, "html.parser")
+
+    # Respect an HTML <base href=...>, exactly as a browser would.
+    base_tag = soup.find("base", href=True)
+
+    if base_tag is not None:
+        document_base = urljoin(
+            base_url,
+            base_tag.get("href", ""),
+        )
+    else:
+        document_base = base_url
+
+    print(f"  HTML document base = {document_base}")
+
+    for link in soup.find_all("a", href=True):
+        href = link.get("href", "").strip()
+
+        if not href:
+            continue
+
+        low = href.lower()
+
+        if "tmp/output" in low:
+            resolved = urljoin(document_base, href)
+
+            print(f"  raw output href    = {href}")
+            print(f"  resolved output    = {resolved}")
+
+            return resolved
+
+    return None
+
+
+# ============================================================
+# Submit TRILEGAL job
+# ============================================================
+
+def _form_request_from_html(html: str, current_url: str):
+    """
+    Recover the first form in a TRILEGAL waiting page.
+
+    TRILEGAL uses this form as a Refresh button while the remote
+    simulation is running.
+
+    Returns
+    -------
+    (method, action, payload) or None
+    """
+    soup = BeautifulSoup(html, "html.parser")
+
+    form = soup.find("form")
+
+    if form is None:
+        return None
+
+    action = urljoin(
+        current_url,
+        form.get("action") or current_url,
+    )
+
+    method = form.get("method", "get").lower()
+
+    payload = {}
+
+    # Standard inputs
+    for element in form.find_all("input"):
+        name = element.get("name")
+
+        if not name:
+            continue
+
+        typ = element.get("type", "text").lower()
+        value = element.get("value", "")
+
+        if typ in {
+            "hidden",
+            "text",
+            "number",
+            "submit",
+        }:
+            payload[name] = value
+
+        elif typ in {"radio", "checkbox"}:
+            if element.has_attr("checked"):
+                payload[name] = value
+
+    # Select elements, just in case the waiting form contains any
+    for select in form.find_all("select"):
+        name = select.get("name")
+
+        if not name:
+            continue
+
+        selected = select.find("option", selected=True)
+
+        if selected is None:
+            selected = select.find("option")
+
+        if selected is not None:
+            payload[name] = selected.get("value", "")
+
+    # HTML <button> elements
+    for button in form.find_all("button"):
+        name = button.get("name")
+
+        if not name:
+            continue
+
+        value = button.get("value")
+
+        if value is None:
+            value = button.get_text(" ", strip=True)
+
+        payload[name] = value
+
+    return method, action, payload
+
+
+def submit_job(
+    session: requests.Session,
+    action: str,
+    params: dict,
+    debug_path: Path,
+    poll_seconds: int = 15,
+    max_wait_seconds: int = 650,
+):
+    """
+    Submit a TRILEGAL simulation and poll its Refresh form until
+    the generated catalogue becomes available.
+    """
+
+    print("\nSubmitting TRILEGAL job...")
+    print(f"  l       = {params.get('gc_l')}")
+    print(f"  b       = {params.get('gc_b')}")
+    print(f"  area    = {params.get('field')} deg^2")
+    print(f"  mag_lim = {params.get('mag_lim')}")
+    print(f"  icm_lim = {params.get('icm_lim')}")
+    print(f"  photsys = {params.get('photsys_file')}")
+
+    # --------------------------------------------------------
+    # Initial submission
+    # --------------------------------------------------------
+
+    response = session.post(
+        action,
+        data=params,
+        timeout=120,
+    )
+
+    response.raise_for_status()
+
+    current_html = response.text
+    current_url = response.url
+
+    # --------------------------------------------------------
+    # Detect a rejected/non-triggered submission.
+    #
+    # If the CGI simply redisplays the normal input form,
+    # there will be a form containing gc_l/gc_b/field instead
+    # of the special waiting/refresh form.
+    # --------------------------------------------------------
+
+    initial_soup = BeautifulSoup(current_html, "html.parser")
+
+    normal_input_form = (
+        initial_soup.find("input", attrs={"name": "gc_l"}) is not None
+        and initial_soup.find("input", attrs={"name": "gc_b"}) is not None
+        and initial_soup.find("input", attrs={"name": "field"}) is not None
+    )
+
+    if normal_input_form:
+        failed_path = debug_path.with_name(
+            debug_path.stem + "_submission_rejected.html"
+        )
+        failed_path.write_text(current_html)
+
+        raise RuntimeError(
+            "TRILEGAL returned the normal input form instead of "
+            "launching the simulation.\n"
+            "This means the CGI did not accept the submission.\n"
+            f"Response saved to:\n  {failed_path}"
+        )
+
+    # Save exactly what TRILEGAL returned after submission.
+    debug_path.write_text(current_html)
+
+    initial_debug = debug_path.with_name(
+        debug_path.stem + "_initial.html"
+    )
+    initial_debug.write_text(current_html)
+
+    print("\nTRILEGAL job submitted.")
+    print(f"  waiting-page URL = {current_url}")
+
+    elapsed = 0
+    poll_number = 0
+
+    # --------------------------------------------------------
+    # Poll waiting page
+    # --------------------------------------------------------
+
+    while elapsed <= max_wait_seconds:
+
+        # Has the output link appeared?
+        result_url = extract_result_url(
+            current_html,
+            current_url,
+        )
+
+        if result_url is not None:
+            print("\nTRILEGAL reports that the job is finished.")
+            print(f"Output URL:\n  {result_url}")
+
+            # ------------------------------------------------
+            # Retrieve final catalogue.
+            #
+            # TRILEGAL may advertise the output link a few seconds
+            # before the actual file becomes visible on the web
+            # server. A transient HTTP 404 is therefore retried.
+            # ------------------------------------------------
+
+            output_wait = 0
+            output_poll_seconds = 5
+            output_max_wait = 300
+
+            # A TRILEGAL result URL may become visible while the
+            # catalogue file is still being written.
+            #
+            # Seeing '#Gc' is therefore NOT sufficient.
+            #
+            # Require:
+            #
+            #   1. a valid header;
+            #   2. no truncated stellar row;
+            #   3. identical file size / row count for four
+            #      consecutive downloads.
+            #
+            # This corresponds to at least ~15 s of stability.
+
+            stable_required = 4
+            stable_count = 0
+            previous_signature = None
+
+            while output_wait <= output_max_wait:
+
+                try:
+                    result = session.get(
+                        result_url,
+                        timeout=120,
+                        headers={
+                            "Connection": "close"
+                        },
+                    )
+
+                except requests.exceptions.RequestException as exc:
+                    print(
+                        "  transient output-download error "
+                        f"({type(exc).__name__}); "
+                        "retrying..."
+                    )
+
+                    stable_count = 0
+                    previous_signature = None
+
+                    time.sleep(
+                        output_poll_seconds
+                    )
+
+                    output_wait += (
+                        output_poll_seconds
+                    )
+
+                    continue
+
+                if result.status_code == 404:
+                    print(
+                        "  output link announced but "
+                        "file is not visible yet "
+                        f"({output_wait} s)"
+                    )
+
+                    stable_count = 0
+                    previous_signature = None
+
+                    time.sleep(
+                        output_poll_seconds
+                    )
+
+                    output_wait += (
+                        output_poll_seconds
+                    )
+
+                    continue
+
+                if result.status_code != 200:
+                    print(
+                        "  output returned HTTP "
+                        f"{result.status_code}; "
+                        "retrying..."
+                    )
+
+                    stable_count = 0
+                    previous_signature = None
+
+                    time.sleep(
+                        output_poll_seconds
+                    )
+
+                    output_wait += (
+                        output_poll_seconds
+                    )
+
+                    continue
+
+                catalogue_text = result.text
+                lines = catalogue_text.splitlines()
+
+                header_idx = None
+                header_columns = None
+
+                for i, line in enumerate(lines):
+                    stripped = line.strip()
+
+                    if (
+                        stripped.startswith("#Gc")
+                        or
+                        stripped.startswith("# Gc")
+                    ):
+                        header_idx = i
+                        header_columns = (
+                            stripped
+                            .lstrip("#")
+                            .split()
+                        )
+
+                        break
+
+                if header_idx is None:
+                    print(
+                        "  output exists but header "
+                        "is not ready yet..."
+                    )
+
+                    stable_count = 0
+                    previous_signature = None
+
+                    time.sleep(
+                        output_poll_seconds
+                    )
+
+                    output_wait += (
+                        output_poll_seconds
+                    )
+
+                    continue
+
+                n_columns = len(
+                    header_columns
+                )
+
+                n_complete_rows = 0
+                n_malformed_rows = 0
+
+                for line in lines[
+                    header_idx + 1:
+                ]:
+                    stripped = line.strip()
+
+                    if (
+                        not stripped
+                        or stripped.startswith("#")
+                    ):
+                        continue
+
+                    parts = stripped.split()
+
+                    if not parts:
+                        continue
+
+                    # Genuine TRILEGAL stellar rows begin
+                    # with Galactic-component code 1..5.
+                    if parts[0] not in {
+                        "1",
+                        "2",
+                        "3",
+                        "4",
+                        "5",
+                    }:
+                        continue
+
+                    if len(parts) == n_columns:
+                        n_complete_rows += 1
+                    else:
+                        n_malformed_rows += 1
+
+                signature = (
+                    len(result.content),
+                    n_complete_rows,
+                    n_malformed_rows,
+                )
+
+                structurally_complete = (
+                    n_complete_rows > 0
+                    and n_malformed_rows == 0
+                )
+
+                if (
+                    structurally_complete
+                    and
+                    signature == previous_signature
+                ):
+                    stable_count += 1
+
+                elif structurally_complete:
+                    stable_count = 1
+
+                else:
+                    stable_count = 0
+
+                previous_signature = signature
+
+                print(
+                    "  output snapshot: "
+                    f"bytes={len(result.content):,}, "
+                    f"rows={n_complete_rows:,}, "
+                    f"partial={n_malformed_rows}, "
+                    f"stable={stable_count}/"
+                    f"{stable_required}"
+                )
+
+                if (
+                    stable_count
+                    >= stable_required
+                ):
+                    print(
+                        "Catalogue is structurally "
+                        "complete and stable."
+                    )
+
+                    print(
+                        "Catalogue downloaded "
+                        "successfully after "
+                        f"~{elapsed + output_wait} s."
+                    )
+
+                    return catalogue_text
+
+                time.sleep(
+                    output_poll_seconds
+                )
+
+                output_wait += (
+                    output_poll_seconds
+                )
+
+            result_debug = debug_path.with_name(
+                debug_path.stem + "_output_not_ready.txt"
+            )
+
+            result_debug.write_text(
+                result.text if "result" in locals() else ""
+            )
+
+            raise RuntimeError(
+                "TRILEGAL announced the output catalogue, but "
+                "the file did not become available within "
+                f"{output_max_wait} s.\n"
+                f"Last response saved to:\n  {result_debug}"
+            )
+
+        # Useful status
+        finished_text = "Your job was finished" in current_html
+
+        if finished_text:
+            print(
+                "\nWARNING: TRILEGAL says the job is finished, "
+                "but no tmp/output link was found yet."
+            )
+
+        # Obtain the Refresh form
+        refresh_request = _form_request_from_html(
+            current_html,
+            current_url,
+        )
+
+        if refresh_request is None:
+            noform_debug = debug_path.with_name(
+                debug_path.stem + "_no_refresh_form.html"
+            )
+            noform_debug.write_text(current_html)
+
+            raise RuntimeError(
+                "TRILEGAL returned neither an output catalogue "
+                "nor a Refresh form.\n"
+                f"Response saved to:\n  {noform_debug}"
+            )
+
+        method, refresh_url, payload = refresh_request
+
+        poll_number += 1
+
+        print(
+            f"  waiting... {elapsed:4d} s "
+            f"(poll {poll_number}, {method.upper()})"
+        )
+
+        # Avoid hammering the public TRILEGAL server.
+        time.sleep(poll_seconds)
+        elapsed += poll_seconds
+
+        if method == "post":
+            response = session.post(
+                refresh_url,
+                data=payload,
+                timeout=120,
+            )
+        else:
+            response = session.get(
+                refresh_url,
+                params=payload,
+                timeout=120,
+            )
+
+        response.raise_for_status()
+
+        current_html = response.text
+        current_url = response.url
+
+        # Keep the most recent waiting page for diagnostics.
+        debug_path.write_text(current_html)
+
+    timeout_debug = debug_path.with_name(
+        debug_path.stem + "_timeout.html"
+    )
+    timeout_debug.write_text(current_html)
+
+    raise TimeoutError(
+        "TRILEGAL job exceeded the maximum waiting time "
+        f"({max_wait_seconds} s).\n"
+        f"Last response saved to:\n  {timeout_debug}"
+    )
+
+
+# ============================================================
+# Parse TRILEGAL catalogue
+# ============================================================
+
+def trilegal_to_dataframe(text: str):
+    lines = text.splitlines()
+
+    header_idx = None
+
+    for i, line in enumerate(lines):
+        stripped = line.strip()
+
+        if stripped.startswith("#Gc") or stripped.startswith("# Gc"):
+            header_idx = i
+            break
+
+    if header_idx is None:
+        raise RuntimeError(
+            "Could not find the TRILEGAL catalogue header beginning with #Gc."
+        )
+
+    header = lines[header_idx].lstrip("#").strip()
+    columns = header.split()
+
+    rows = []
+
+    expected_columns = len(columns)
+
+    for line in lines[header_idx + 1:]:
+        stripped = line.strip()
+
+        if not stripped:
+            continue
+
+        if stripped.startswith("#"):
+            continue
+
+        parts = stripped.split()
+
+        if not parts:
+            continue
+
+        # Genuine stellar rows use Gc=1..5.
+        # Ignore any footer/status text.
+        if parts[0] not in {
+            "1",
+            "2",
+            "3",
+            "4",
+            "5",
+        }:
+            continue
+
+        if len(parts) != expected_columns:
+            raise RuntimeError(
+                "Incomplete TRILEGAL stellar row "
+                "encountered while parsing: "
+                f"expected {expected_columns} "
+                f"columns, got {len(parts)}."
+            )
+
+        rows.append(stripped)
+
+    if not rows:
+        raise RuntimeError("TRILEGAL returned a catalogue with no data rows.")
+
+    df = pd.read_csv(
+        io.StringIO("\n".join(rows)),
+        sep=r"\s+",
+        names=columns,
+        engine="python",
+    )
+
+    return df
+
+
+# ============================================================
+# Helpers
+# ============================================================
+
+def find_column_case_insensitive(columns, target):
+    lookup = {c.lower(): c for c in columns}
+    return lookup.get(target.lower())
+
+
+
+
+# ============================================================
+# Main
+# ============================================================
+
+def main():
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument(
+        "--fields",
+        type=Path,
+        required=True,
+    )
+
+    parser.add_argument(
+        "--outdir",
+        type=Path,
+        default=Path("."),
+    )
+
+    parser.add_argument(
+        "--f146-limit",
+        type=float,
+        default=32.0,
+    )
+
+    parser.add_argument(
+        "--insecure-ssl",
+        action="store_true",
+        help=(
+            "Disable SSL certificate verification for the TRILEGAL "
+            "server. Intended only as a workaround for the current "
+            "stev.oapd.inaf.it certificate-chain problem."
+        ),
+    )
+
+    args = parser.parse_args()
+
+    outdir = args.outdir.resolve()
+
+    raw_dir = outdir / "raw"
+    processed_dir = outdir / "processed"
+    metadata_dir = outdir / "metadata"
+
+    raw_dir.mkdir(parents=True, exist_ok=True)
+    processed_dir.mkdir(parents=True, exist_ok=True)
+    metadata_dir.mkdir(parents=True, exist_ok=True)
+
+    fields = pd.read_csv(args.fields)
+
+    required = {
+        "field_id",
+        "l_deg",
+        "b_deg",
+        "target_area_deg2",
+        "sample_area_deg2",
+    }
+
+    missing = required - set(fields.columns)
+
+    if missing:
+        raise ValueError(
+            f"Missing required columns in {args.fields}:\n"
+            f"  {sorted(missing)}"
+        )
+
+    print("\n=======================================")
+    print("TRILEGAL Roman/Rubin stellar catalogue")
+    print("=======================================")
+    print(f"Fields config: {args.fields}")
+    print(f"Output dir:    {outdir}")
+    print(f"F146 limit:    {args.f146_limit}")
+    print("\nNOTE:")
+    if "av_inf" in fields.columns:
+        print(
+            "  Per-field extinction is enabled: "
+            "Av(infinity) and differential extinction are "
+            "read from the field configuration."
+        )
+    else:
+        print(
+            "  No per-field extinction columns were supplied; "
+            "TRILEGAL form defaults will be used."
+        )
+
+    session = requests.Session()
+
+    if args.insecure_ssl:
+        import urllib3
+
+        urllib3.disable_warnings(
+            urllib3.exceptions.InsecureRequestWarning
+        )
+
+        session.verify = False
+
+        print()
+        print("WARNING:")
+        print(
+            "  SSL certificate verification is disabled for "
+            "this TRILEGAL session."
+        )
+
+    session.headers.update(
+        {
+            "User-Agent": (
+                "roman-rubin-microlensing-stellar-population/1.0"
+            )
+        }
+    )
+
+    soup, action, defaults = read_form(session)
+
+    roman_photsys = find_roman2024(soup)
+
+    print("\nRoman2024 internal value:")
+    print(f"  {roman_photsys}")
+
+    first = fields.iloc[0]
+
+    # Fixed filter ordering for:
+    # tab_mag_lsstR1.9_gaiaEDR3_euclid_Roman2024.dat
+    #
+    # Filters after mbolmag:
+    #  1 u
+    #  2 g
+    #  3 r
+    #  4 i
+    #  5 z
+    #  6 y
+    #  ...
+    # 16 F062
+    # 17 F087
+    # 18 F106
+    # 19 F129
+    # 20 F158
+    # 21 F184
+    # 22 F146
+    # 23 F213
+    #
+    f146_index = 22
+
+    all_catalogues = []
+
+    for _, field in fields.iterrows():
+        field_id = str(field["field_id"])
+
+        # Validate spatial extinction inputs
+        if "av_inf" in fields.columns:
+            if pd.isna(field["av_inf"]):
+                raise ValueError(
+                    f"{field_id}: av_inf is NaN"
+                )
+
+            if float(field["av_inf"]) < 0:
+                raise ValueError(
+                    f"{field_id}: av_inf must be >= 0"
+                )
+
+        if "extinction_sigma" in fields.columns:
+            if pd.isna(field["extinction_sigma"]):
+                raise ValueError(
+                    f"{field_id}: extinction_sigma is NaN"
+                )
+
+            sigma_ext = float(
+                field["extinction_sigma"]
+            )
+
+            if not (0.0 <= sigma_ext <= 0.30):
+                raise ValueError(
+                    f"{field_id}: extinction_sigma="
+                    f"{sigma_ext} outside [0, 0.30]"
+                )
+
+        print("\n\n#######################################")
+        print(f"FIELD: {field_id}")
+        print("#######################################")
+
+        params = defaults.copy()
+
+        params.update(
+            {
+                "gal_coord": "1",
+                "gc_l": str(float(field["l_deg"])),
+                "gc_b": str(float(field["b_deg"])),
+
+                "field": str(float(field["sample_area_deg2"])),
+
+                "photsys_file": roman_photsys,
+                "icm_lim": str(f146_index),
+                "mag_lim": str(float(args.f146_limit)),
+
+                "mag_res": "0.1",
+
+            # ------------------------------------------------
+            # Extinction normalization for this spatial cell.
+            #
+            # extinction_kind=2 means calibration at infinity:
+            #
+            #     Av(infinity) = extinction_infty
+            #
+            # TRILEGAL then distributes extinction with distance.
+            #
+            # extinction_sigma is the fractional 1-sigma
+            # differential extinction within the cell.
+            # ------------------------------------------------
+            "extinction_kind": "2",
+
+            "extinction_infty": (
+                str(float(field["av_inf"]))
+                if "av_inf" in fields.columns
+                else defaults.get(
+                    "extinction_infty",
+                    "0.0378",
+                )
+            ),
+
+            "extinction_sigma": (
+                str(float(field["extinction_sigma"]))
+                if "extinction_sigma" in fields.columns
+                else defaults.get(
+                    "extinction_sigma",
+                    "0",
+                )
+            ),
+
+            # Required by the TRILEGAL CGI to actually launch
+            # the simulation rather than simply redisplay the form.
+            "submit_form": "Submit",
+            }
+        )
+
+        text = submit_job(
+            session=session,
+            action=action,
+            params=params,
+            debug_path=metadata_dir
+            / f"{field_id}_submit_response.html",
+            poll_seconds=15,
+            max_wait_seconds=650,
+        )
+
+        raw_path = raw_dir / f"{field_id}.dat"
+        raw_path.write_text(text)
+
+        df = trilegal_to_dataframe(text)
+
+        df.insert(0, "field_id", field_id)
+
+        df["field_l_deg"] = float(field["l_deg"])
+        df["field_b_deg"] = float(field["b_deg"])
+
+        if "av_inf" in fields.columns:
+            df["cell_av_inf"] = float(
+                field["av_inf"]
+            )
+
+        if "extinction_sigma" in fields.columns:
+            df["cell_extinction_sigma"] = float(
+                field["extinction_sigma"]
+            )
+
+        if "ejk_median" in fields.columns:
+            df["cell_ejk_median"] = float(
+                field["ejk_median"]
+            )
+
+        if "ejk_sigma_spatial" in fields.columns:
+            df["cell_ejk_sigma_spatial"] = float(
+                field["ejk_sigma_spatial"]
+            )
+
+        df["sample_area_deg2"] = float(
+            field["sample_area_deg2"]
+        )
+
+        df["target_area_deg2"] = float(
+            field["target_area_deg2"]
+        )
+
+        df["area_weight"] = (
+            float(field["target_area_deg2"])
+            / float(field["sample_area_deg2"])
+        )
+
+        df.insert(
+            1,
+            "star_id",
+            [
+                f"{field_id}_{i:09d}"
+                for i in range(len(df))
+            ],
+        )
+
+        parquet_path = (
+            processed_dir / f"{field_id}_physical.parquet"
+        )
+
+        df.to_parquet(
+            parquet_path,
+            index=False,
+            compression="zstd",
+        )
+
+        metadata = {
+            "field_id": field_id,
+            "l_deg": float(field["l_deg"]),
+            "b_deg": float(field["b_deg"]),
+            "target_area_deg2": float(
+                field["target_area_deg2"]
+            ),
+            "sample_area_deg2": float(
+                field["sample_area_deg2"]
+            ),
+            "area_weight": float(
+                field["target_area_deg2"]
+                / field["sample_area_deg2"]
+            ),
+            "photometric_system": "Roman2024",
+            "photometric_system_internal": roman_photsys,
+            "selection_band": "F146",
+            "f146_filter_index": int(f146_index),
+            "f146_parent_limit": float(args.f146_limit),
+            "n_stars": int(len(df)),
+            "extinction_kind": 2,
+
+            "av_inf_input": (
+                float(field["av_inf"])
+                if "av_inf" in fields.columns
+                else float(
+                    defaults.get(
+                        "extinction_infty",
+                        0.0378,
+                    )
+                )
+            ),
+
+            "extinction_sigma_input": (
+                float(field["extinction_sigma"])
+                if "extinction_sigma" in fields.columns
+                else float(
+                    defaults.get(
+                        "extinction_sigma",
+                        0.0,
+                    )
+                )
+            ),
+        }
+
+        metadata_path = metadata_dir / f"{field_id}.json"
+
+        with open(metadata_path, "w") as f:
+            json.dump(metadata, f, indent=2)
+
+        print("\nField complete:")
+        print(f"  stars:    {len(df):,}")
+        print(f"  raw:      {raw_path}")
+        print(f"  parquet:  {parquet_path}")
+        print(f"  metadata: {metadata_path}")
+
+        all_catalogues.append(df)
+
+    master = pd.concat(
+        all_catalogues,
+        ignore_index=True,
+    )
+
+    master_path = (
+        processed_dir / "trilegal_physical_catalog.parquet"
+    )
+
+    master.to_parquet(
+        master_path,
+        index=False,
+        compression="zstd",
+    )
+
+    print("\n\n=======================================")
+    print("DONE")
+    print("=======================================")
+    print(f"Total stars: {len(master):,}")
+    print(f"Master file: {master_path}")
+
+    print("\nColumns:")
+    for column in master.columns:
+        print(f"  {column}")
+
+    print("\nFirst rows:")
+    print(master.head().to_string())
+
+
+if __name__ == "__main__":
+    main()

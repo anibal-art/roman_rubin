@@ -1,0 +1,812 @@
+#!/usr/bin/env python3
+
+from pathlib import Path
+import json
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+
+import astropy.units as u
+from astropy.coordinates import SkyCoord
+
+import pysiaf
+from pysiaf.utils.rotations import attitude
+
+from shapely.geometry import Polygon, mapping
+from shapely.ops import unary_union
+
+
+CENTERS = Path(
+    "config/gbtds_apt_tile_centers.csv"
+)
+
+OUT_SCA = Path(
+    "config/gbtds_wfi_sca_footprints.csv"
+)
+
+OUT_GEOJSON = Path(
+    "config/gbtds_wfi_footprint_union.geojson"
+)
+
+OUT_SUMMARY = Path(
+    "diagnostics/gbtds_wfi_footprint_summary.csv"
+)
+
+OUT_PNG = Path(
+    "diagnostics/gbtds_wfi_footprints.png"
+)
+
+
+# ============================================================
+# Helpers
+# ============================================================
+
+def signed_l(l_deg):
+    return (
+        (np.asarray(l_deg) + 180.0)
+        % 360.0
+        - 180.0
+    )
+
+
+def galactic_polygon_from_radec(ra, dec):
+    """
+    Convert a sequence of ICRS vertices into a Shapely polygon
+    in signed Galactic longitude / latitude.
+
+    The GBTDS footprint lies very close to l=0, so signed l
+    avoids the 359 <-> 0 degree discontinuity.
+    """
+
+    c = SkyCoord(
+        ra=np.asarray(ra) * u.deg,
+        dec=np.asarray(dec) * u.deg,
+        frame="icrs",
+    )
+
+    g = c.galactic
+
+    l = signed_l(g.l.deg)
+    b = g.b.deg
+
+    return Polygon(
+        np.column_stack([l, b])
+    )
+
+
+def sky_polygon_for_sca(
+    aperture,
+    att,
+):
+    """
+    Project one WFI SCA physical science-array footprint
+    onto the sky using the supplied attitude matrix.
+    """
+
+    aperture.set_attitude_matrix(att)
+
+    # PySIAF corners are the outside corners of the corner
+    # pixels, which is exactly what we want for footprint area.
+    x_sci, y_sci = aperture.corners(
+        "sci"
+    )
+
+    ra, dec = aperture.sci_to_sky(
+        x_sci,
+        y_sci,
+    )
+
+    return (
+        np.asarray(ra, dtype=float),
+        np.asarray(dec, dtype=float),
+    )
+
+
+# ============================================================
+# Load APT centers
+# ============================================================
+
+if not CENTERS.exists():
+    raise FileNotFoundError(CENTERS)
+
+centers = pd.read_csv(CENTERS)
+
+required = [
+    "season",
+    "tile_name",
+    "ra_deg",
+    "dec_deg",
+    "l_deg",
+    "b_deg",
+    "pa_deg",
+]
+
+missing = [
+    c
+    for c in required
+    if c not in centers.columns
+]
+
+if missing:
+    raise RuntimeError(
+        f"Missing columns in {CENTERS}: {missing}"
+    )
+
+
+# We intentionally use only the two physical F146 orientations.
+centers = centers[
+    (
+        (centers["season"] == "spring")
+        & np.isclose(
+            centers["pa_deg"],
+            90.6,
+        )
+    )
+    |
+    (
+        (centers["season"] == "autumn")
+        & np.isclose(
+            centers["pa_deg"],
+            270.6,
+        )
+    )
+].copy()
+
+
+if len(centers) != 12:
+    raise RuntimeError(
+        f"Expected 12 nominal F146 pointings; "
+        f"found {len(centers)}."
+    )
+
+
+# ============================================================
+# Load Roman SIAF
+# ============================================================
+
+print()
+print("=======================================")
+print("Roman SIAF")
+print("=======================================")
+
+rsiaf = pysiaf.Siaf("Roman")
+
+wfi_cen = rsiaf["WFI_CEN"]
+
+sca_names = [
+    f"WFI{i:02d}_FULL"
+    for i in range(1, 19)
+]
+
+for name in sca_names:
+    if name not in rsiaf.apertures:
+        raise RuntimeError(
+            f"Missing Roman aperture: {name}"
+        )
+
+print(
+    "WFI_CEN V2Ref =",
+    wfi_cen.V2Ref,
+)
+
+print(
+    "WFI_CEN V3Ref =",
+    wfi_cen.V3Ref,
+)
+
+print(
+    "Number of SCAs =",
+    len(sca_names),
+)
+
+
+# ============================================================
+# Build the 18-SCA footprint for every nominal APT pointing
+# ============================================================
+
+sca_rows = []
+
+season_polygons = {
+    "spring": [],
+    "autumn": [],
+}
+
+tile_polygons = {}
+
+
+for _, row in centers.iterrows():
+
+    season = row["season"]
+    tile = row["tile_name"]
+
+    ra0 = float(row["ra_deg"])
+    dec0 = float(row["dec_deg"])
+
+    # --------------------------------------------------------
+    # APT simulator-input PA
+    #
+    # The simulator input provides RA, DEC and PA for WFI_CEN.
+    # For construction of the PySIAF attitude we use the APT
+    # PA directly as the V3 position angle.
+    #
+    # IMPORTANT:
+    # Do NOT add the WFI_CEN 60-deg APA/V3PA offset here.
+    # That conversion applies when explicitly converting between
+    # aperture PA and V3PA; the simulator-input PA is already the
+    # spacecraft orientation required by the footprint machinery.
+    # --------------------------------------------------------
+
+    pa_v3 = float(
+        row["pa_deg"]
+    )
+
+    # Keep this only as useful metadata.
+    pa_aperture = (
+        pa_v3 - 60.0
+    ) % 360.0
+
+
+    att = attitude(
+        wfi_cen.V2Ref,
+        wfi_cen.V3Ref,
+        ra0,
+        dec0,
+        pa_v3,
+    )
+
+
+    # --------------------------------------------------------
+    # Verify WFI_CEN lands where APT says it should.
+    # --------------------------------------------------------
+
+    wfi_cen.set_attitude_matrix(
+        att
+    )
+
+    check_ra, check_dec = (
+        wfi_cen.idl_to_sky(
+            0.0,
+            0.0,
+        )
+    )
+
+    check = SkyCoord(
+        ra=check_ra * u.deg,
+        dec=check_dec * u.deg,
+    )
+
+    target = SkyCoord(
+        ra=ra0 * u.deg,
+        dec=dec0 * u.deg,
+    )
+
+    center_error_arcsec = (
+        check.separation(target)
+        .arcsec
+    )
+
+    if center_error_arcsec > 1e-3:
+        raise RuntimeError(
+            f"{season}/{tile}: "
+            "WFI_CEN attitude validation failed: "
+            f"{center_error_arcsec} arcsec"
+        )
+
+
+    this_tile = []
+
+
+    for sca_name in sca_names:
+
+        ap = rsiaf[sca_name]
+
+        ra, dec = sky_polygon_for_sca(
+            ap,
+            att,
+        )
+
+        poly = galactic_polygon_from_radec(
+            ra,
+            dec,
+        )
+
+        if not poly.is_valid:
+            poly = poly.buffer(0)
+
+        if poly.is_empty:
+            raise RuntimeError(
+                f"Empty polygon for "
+                f"{season}/{tile}/{sca_name}"
+            )
+
+        this_tile.append(poly)
+
+        season_polygons[
+            season
+        ].append(poly)
+
+        # Corner coordinates, useful for later auditing.
+        sky = SkyCoord(
+            ra=ra * u.deg,
+            dec=dec * u.deg,
+        )
+
+        gal = sky.galactic
+
+        l = signed_l(
+            gal.l.deg
+        )
+
+        b = gal.b.deg
+
+        sca_rows.append(
+            {
+                "season": season,
+                "tile_name": tile,
+                "sca_name": sca_name,
+
+                "wfi_cen_ra_deg": ra0,
+                "wfi_cen_dec_deg": dec0,
+
+                "wfi_cen_l_deg": float(
+                    row["l_deg"]
+                ),
+
+                "wfi_cen_b_deg": float(
+                    row["b_deg"]
+                ),
+
+                "pa_aperture_deg": (
+                    pa_aperture
+                ),
+
+                "pa_v3_deg": pa_v3,
+
+                "center_validation_arcsec": (
+                    center_error_arcsec
+                ),
+
+                "l_corner_1": l[0],
+                "b_corner_1": b[0],
+
+                "l_corner_2": l[1],
+                "b_corner_2": b[1],
+
+                "l_corner_3": l[2],
+                "b_corner_3": b[2],
+
+                "l_corner_4": l[3],
+                "b_corner_4": b[3],
+
+                "polygon_wkt": poly.wkt,
+            }
+        )
+
+
+    tile_union = unary_union(
+        this_tile
+    )
+
+    tile_polygons[
+        (season, tile)
+    ] = tile_union
+
+
+# ============================================================
+# Union footprints
+# ============================================================
+
+spring_union = unary_union(
+    season_polygons["spring"]
+)
+
+autumn_union = unary_union(
+    season_polygons["autumn"]
+)
+
+mission_union = spring_union.union(
+    autumn_union
+)
+
+mission_intersection = (
+    spring_union
+    .intersection(
+        autumn_union
+    )
+)
+
+
+# ============================================================
+# Approximate areas
+#
+# Because the whole region is at |b| < ~2 deg, planar Galactic
+# lon/lat areas differ negligibly for this diagnostic.
+# We explicitly label them approximate.
+# ============================================================
+
+def approx_area_deg2(poly):
+    return float(poly.area)
+
+
+summary_rows = []
+
+for season, poly in [
+    ("spring", spring_union),
+    ("autumn", autumn_union),
+    ("spring_or_autumn", mission_union),
+    ("spring_and_autumn", mission_intersection),
+]:
+
+    summary_rows.append(
+        {
+            "footprint": season,
+            "approx_area_deg2": (
+                approx_area_deg2(poly)
+            ),
+        }
+    )
+
+
+for (
+    season,
+    tile,
+), poly in tile_polygons.items():
+
+    summary_rows.append(
+        {
+            "footprint": (
+                f"{season}_{tile}"
+            ),
+            "approx_area_deg2": (
+                approx_area_deg2(poly)
+            ),
+        }
+    )
+
+
+summary = pd.DataFrame(
+    summary_rows
+)
+
+
+# ============================================================
+# Save SCA table
+# ============================================================
+
+OUT_SCA.parent.mkdir(
+    parents=True,
+    exist_ok=True,
+)
+
+pd.DataFrame(
+    sca_rows
+).to_csv(
+    OUT_SCA,
+    index=False,
+)
+
+
+# ============================================================
+# Save GeoJSON
+# ============================================================
+
+features = []
+
+for name, poly in [
+    ("spring", spring_union),
+    ("autumn", autumn_union),
+    (
+        "spring_or_autumn",
+        mission_union,
+    ),
+    (
+        "spring_and_autumn",
+        mission_intersection,
+    ),
+]:
+
+    features.append(
+        {
+            "type": "Feature",
+
+            "properties": {
+                "name": name,
+                "coordinate_system": (
+                    "Galactic signed longitude/latitude"
+                ),
+            },
+
+            "geometry": mapping(poly),
+        }
+    )
+
+
+geojson = {
+    "type": "FeatureCollection",
+    "features": features,
+}
+
+OUT_GEOJSON.parent.mkdir(
+    parents=True,
+    exist_ok=True,
+)
+
+OUT_GEOJSON.write_text(
+    json.dumps(
+        geojson,
+        indent=2,
+    )
+)
+
+
+# ============================================================
+# Save summary
+# ============================================================
+
+OUT_SUMMARY.parent.mkdir(
+    parents=True,
+    exist_ok=True,
+)
+
+summary.to_csv(
+    OUT_SUMMARY,
+    index=False,
+)
+
+
+# ============================================================
+# Diagnostic figure
+# ============================================================
+
+fig, ax = plt.subplots(
+    figsize=(10, 8)
+)
+
+
+def draw_geom(
+    ax,
+    geom,
+    label=None,
+    linewidth=1.2,
+):
+
+    if geom.geom_type == "Polygon":
+        geoms = [geom]
+
+    elif geom.geom_type == "MultiPolygon":
+        geoms = list(
+            geom.geoms
+        )
+
+    else:
+        return
+
+    first = True
+
+    for g in geoms:
+
+        x, y = (
+            g.exterior.xy
+        )
+
+        ax.plot(
+            x,
+            y,
+            linewidth=linewidth,
+            label=(
+                label
+                if first
+                else None
+            ),
+        )
+
+        first = False
+
+
+draw_geom(
+    ax,
+    spring_union,
+    label="Spring",
+)
+
+draw_geom(
+    ax,
+    autumn_union,
+    label="Autumn",
+)
+
+
+for _, row in centers.iterrows():
+
+    ax.scatter(
+        row["l_deg"],
+        row["b_deg"],
+        s=18,
+    )
+
+    ax.text(
+        row["l_deg"],
+        row["b_deg"],
+        (
+            f"{row['season'][0].upper()}"
+            f"-{row['tile_name']}"
+        ),
+        fontsize=7,
+    )
+
+
+ax.set_xlabel(
+    "Galactic longitude l [deg]"
+)
+
+ax.set_ylabel(
+    "Galactic latitude b [deg]"
+)
+
+ax.set_title(
+    "GBTDS F146 footprint from APT 1420 + Roman PySIAF"
+)
+
+ax.set_aspect(
+    "equal",
+    adjustable="box",
+)
+
+ax.grid(
+    alpha=0.25
+)
+
+ax.legend()
+
+fig.tight_layout()
+
+OUT_PNG.parent.mkdir(
+    parents=True,
+    exist_ok=True,
+)
+
+fig.savefig(
+    OUT_PNG,
+    dpi=180,
+)
+
+plt.close(fig)
+
+
+# ============================================================
+# Diagnostics
+# ============================================================
+
+print()
+print("=======================================")
+print("GBTDS PySIAF footprint")
+print("=======================================")
+
+print()
+print(
+    "Nominal APT pointings =",
+    len(centers),
+)
+
+print(
+    "SCAs per pointing     =",
+    len(sca_names),
+)
+
+print(
+    "Total SCA polygons    =",
+    len(sca_rows),
+)
+
+
+print()
+print("Approximate areas:")
+print(
+    summary[
+        summary["footprint"].isin(
+            [
+                "spring",
+                "autumn",
+                "spring_or_autumn",
+                "spring_and_autumn",
+            ]
+        )
+    ]
+    .to_string(
+        index=False,
+        float_format=lambda x: f"{x:.6f}",
+    )
+)
+
+
+print()
+print("Per-tile approximate areas:")
+
+tile_summary = summary[
+    ~summary["footprint"].isin(
+        [
+            "spring",
+            "autumn",
+            "spring_or_autumn",
+            "spring_and_autumn",
+        ]
+    )
+]
+
+print(
+    tile_summary
+    .to_string(
+        index=False,
+        float_format=lambda x: f"{x:.6f}",
+    )
+)
+
+
+# ============================================================
+# Coverage fractions
+# ============================================================
+
+spring_area = (
+    spring_union.area
+)
+
+autumn_area = (
+    autumn_union.area
+)
+
+union_area = (
+    mission_union.area
+)
+
+intersection_area = (
+    mission_intersection.area
+)
+
+
+print()
+print("=======================================")
+print("Spring / Autumn overlap")
+print("=======================================")
+
+print(
+    "Spring area       =",
+    f"{spring_area:.6f}",
+    "deg^2",
+)
+
+print(
+    "Autumn area       =",
+    f"{autumn_area:.6f}",
+    "deg^2",
+)
+
+print(
+    "Union area        =",
+    f"{union_area:.6f}",
+    "deg^2",
+)
+
+print(
+    "Intersection area =",
+    f"{intersection_area:.6f}",
+    "deg^2",
+)
+
+print(
+    "Intersection/Spring =",
+    f"{intersection_area / spring_area:.4f}",
+)
+
+print(
+    "Intersection/Union  =",
+    f"{intersection_area / union_area:.4f}",
+)
+
+
+print()
+print("Saved:")
+print(" ", OUT_SCA)
+print(" ", OUT_GEOJSON)
+print(" ", OUT_SUMMARY)
+print(" ", OUT_PNG)
