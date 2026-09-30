@@ -47,6 +47,8 @@ from ulens_params import event_param_from_pair_row
 # import h5py
 from fit_lc import fit_rubin_roman
 from timing_utils import StageTimer
+from stellar_population.noise_models.roman_photometry import apply_roman_f146_photometry
+# ROMAN_F146_PANDEIA_INTEGRATION_V2
 from detection_criteria import filter5points, deviation_from_constant, has_consecutive_numbers, filter_band, mag, debug_nsigma_global
 from read_save import save_sim, save_fit, read_data
 from set_model_pyLIMA import (
@@ -351,38 +353,11 @@ def apply_roman_rubin_photometry(
 
         if telo.name == roman_band_name:
 
-            model_mag = (
-                _plain_array(telo.lightcurve["mag"], dtype=float)
-                - roman_original_zp
-                + ZP[telo.name]
+            telo = apply_roman_f146_photometry(
+                telescope=telo,
+                zero_point=ZP[telo.name],
+                apply_photometric_filter=apply_photometric_filter,
             )
-
-            obs_mag = model_mag.copy()
-
-            telo.lightcurve["mag"] = obs_mag * u.mag
-
-            m5_rom = np.ones(len(obs_mag), dtype=float) * roman_m5
-
-            sat_rom = _as_band_limit_array(
-                roman_saturation_mag,
-                telo.name,
-                len(obs_mag),
-                default=np.nan,
-            )
-
-            telo.lightcurve = _append_photometry_flag_columns(
-                telo.lightcurve,
-                model_mag=model_mag,
-                m5=m5_rom,
-                saturation_mag=sat_rom,
-            )
-
-            if apply_photometric_filter:
-                keep = _plain_array(
-                    telo.lightcurve["photometry_keep"],
-                    dtype=bool,
-                )
-                telo.lightcurve = telo.lightcurve[keep]
 
             if len(telo.lightcurve["mag"]) != 0:
                 Roman_band = True
@@ -532,11 +507,11 @@ def inject_model_flux_for_ground_telescopes(
     roman_band_name="W149",
 ):
     """
-    Reemplaza el flujo por el flujo del modelo solamente para telescopios
-    no Roman.
+    Refuerza el flujo teórico del modelo para telescopios Rubin.
 
-    Roman se deja como lo generó simulator.simulate_lightcurve(),
-    porque pyLIMA ya le aplica su tratamiento propio.
+    Roman también contiene ahora flujo teórico porque
+    simulator.simulate_lightcurve() se llama con add_noise=False.
+    Su ruido instrumental se agrega después con RomanF146Noise.
     """
 
     for tel in new_creation.telescopes:
@@ -809,6 +784,7 @@ def sim_event(
     simulator.simulate_lightcurve(
         my_own_model,
         pyLIMA_parameters,
+        add_noise=False,
     )
     _sim_timer.stop("simulation_pylima_lightcurve")
 
@@ -839,6 +815,21 @@ def sim_event(
         roman_saturation_mag=roman_saturation_mag,
     )
     _sim_timer.stop("simulation_photometry")
+
+
+    # ============================================================
+    # Synchronize magnitude and flux representations
+    # ============================================================
+    #
+    # Roman and Rubin instrumental noise has already been applied
+    # in magnitude space.  Make flux / err_flux consistent before
+    # any detection criterion or likelihood calculation.
+    #
+    # PHOTOMETRY_FLUX_SYNC_BEFORE_DETECTION_V1
+    replace_flux_by_noisy_magnitude_flux_ZP(
+        my_own_model,
+        verbose=False,
+    )
 
 
     # ============================================================
@@ -1584,6 +1575,34 @@ def build_event_params_from_rows(
     Construye event_params a partir de TRILEGAL + GENULENS,
     permitiendo modificar las distribuciones de parámetros.
     """
+    # Roman2024 TRILEGAL uses F146mag in Vega.
+    # Keep W149 as the legacy internal Roman channel name.
+    TRILEGAL_row = TRILEGAL_row.copy()
+
+    roman_catalog_mag_column = None
+
+    for _candidate in (
+        "F146mag",
+        "F146",
+        "W149",
+    ):
+        if _candidate in TRILEGAL_row.columns:
+            roman_catalog_mag_column = _candidate
+            break
+
+    if roman_catalog_mag_column is None:
+        raise KeyError(
+            "No Roman magnitude column found in TRILEGAL row. "
+            "Expected one of: F146mag, F146, W149."
+        )
+
+    if "W149" not in TRILEGAL_row.columns:
+        TRILEGAL_row["W149"] = (
+            TRILEGAL_row[
+                roman_catalog_mag_column
+            ]
+        )
+
     magstar = TRILEGAL_row[
         [
             "W149",
@@ -1608,6 +1627,20 @@ def build_event_params_from_rows(
             param_samplers=param_samplers,
         ),
     }
+
+    event_params[
+        "roman_catalog_mag_column"
+    ] = roman_catalog_mag_column
+
+    if roman_catalog_mag_column in {
+        "F146mag",
+        "F146",
+    }:
+        event_params["F146mag"] = float(
+            TRILEGAL_row[
+                roman_catalog_mag_column
+            ].iloc[0]
+        )
 
     return event_params
 def simulate_event_for_fit(
@@ -3264,11 +3297,6 @@ def sim_fit(
     # ============================================================
     # 4. Flujo ruidoso y chi2 verdadero
     # ============================================================
-
-    replace_flux_by_noisy_magnitude_flux_ZP(
-        my_own_model,
-        verbose=False,
-    )
 
     chi2_true_info = all_telescope_photometric_chi2_robust(
         my_own_model,

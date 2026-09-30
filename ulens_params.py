@@ -106,6 +106,101 @@ def sample_from_spec(name, spec, rng, context=None):
     raise TypeError(f"Sampler inválido para {name}: {spec}")
     
     
+
+# ============================================================
+# Default mass ranges for controlled characterization studies
+# ============================================================
+
+# Planetary-mass range:
+#   0.01 M_earth <= M <= 13 M_jup
+#
+# mass_planet is represented internally in M_jup.
+PLANET_MASS_MIN_MJUP = 0.01 / 317.828
+PLANET_MASS_MAX_MJUP = 13.0
+
+# Stellar-mass range:
+#   1 M_sun <= M <= 100 M_sun
+STELLAR_MASS_MIN_MSUN = 1.0
+STELLAR_MASS_MAX_MSUN = 100.0
+
+# ------------------------------------------------------------
+# Controlled parameter-space scan for planetary binary lenses
+# ------------------------------------------------------------
+#
+# These are exploration priors, not an astrophysical occurrence
+# distribution.
+#
+# The host mass, q, and s are sampled independently in log-space.
+PLANET_HOST_MASS_MIN_MSUN = 0.08
+PLANET_HOST_MASS_MAX_MSUN = 10.0
+
+# Unit conversion used for planetary binary lenses.
+M_JUP_TO_M_SUN = u.M_jup.to(u.M_sun)
+
+# Physical planetary-mass limits expressed in solar masses.
+PLANET_MASS_MIN_MSUN = (
+    PLANET_MASS_MIN_MJUP
+    * M_JUP_TO_M_SUN
+)
+
+PLANET_MASS_MAX_MSUN = (
+    PLANET_MASS_MAX_MJUP
+    * M_JUP_TO_M_SUN
+)
+
+# Global q range compatible with at least one combination of
+# the adopted host- and planet-mass ranges.
+#
+# q_min:
+#     minimum planet / maximum host
+#
+# q_max:
+#     maximum planet / minimum host
+# Mass-ratio range for the controlled binary-lens scan.
+#
+# q is a primary parameter and is not restricted by an
+# independently imposed companion-mass interval.
+PLANET_Q_MIN = 1.0e-8
+PLANET_Q_MAX = 1.0e-1
+
+PLANET_S_MIN = 0.1
+PLANET_S_MAX = 10.0
+
+
+def log_uniform(rng, low, high):
+    """
+    Sample uniformly in log10(parameter).
+
+    This is appropriate for the controlled mass scans used here,
+    because the simulated lens masses span several orders of
+    magnitude.
+
+    The resulting sampling distribution is
+
+        p(M) proportional to 1 / M
+
+    between low and high.
+    """
+    low = float(low)
+    high = float(high)
+
+    if (
+        not np.isfinite(low)
+        or not np.isfinite(high)
+        or low <= 0
+        or high <= low
+    ):
+        raise ValueError(
+            "log_uniform requires 0 < low < high; "
+            f"got low={low}, high={high}"
+        )
+
+    return 10.0 ** rng.uniform(
+        np.log10(low),
+        np.log10(high),
+    )
+
+
 def event_param(
     random_seed,
     data_TRILEGAL,
@@ -132,7 +227,48 @@ def event_param(
 
     DL = data_Genulens["D_L"]
     DS = data_Genulens["D_S"]
-    mu_rel = data_Genulens["mu_rel"]
+
+    # GENULENS provides the relative proper-motion vector.
+    # Use its physical direction to orient the microlensing
+    # parallax vector instead of drawing a random angle.
+    mu_rel_N = float(data_Genulens["mu_rel_N"])
+    mu_rel_E = float(data_Genulens["mu_rel_E"])
+
+    mu_rel_vector_norm = float(
+        np.hypot(mu_rel_N, mu_rel_E)
+    )
+
+    if (
+        not np.isfinite(mu_rel_vector_norm)
+        or mu_rel_vector_norm <= 0
+    ):
+        raise ValueError(
+            "Invalid GENULENS relative proper-motion vector: "
+            f"mu_rel_N={mu_rel_N}, mu_rel_E={mu_rel_E}"
+        )
+
+    # Keep GENULENS vector components internally self-consistent.
+    # The scalar column is retained only as a consistency check.
+    mu_rel_catalog = float(data_Genulens["mu_rel"])
+
+    if (
+        np.isfinite(mu_rel_catalog)
+        and mu_rel_catalog > 0
+    ):
+        rel_diff = abs(
+            mu_rel_vector_norm - mu_rel_catalog
+        ) / mu_rel_catalog
+
+        if rel_diff > 1e-6:
+            raise ValueError(
+                "GENULENS mu_rel is inconsistent with "
+                "hypot(mu_rel_N, mu_rel_E): "
+                f"mu_rel={mu_rel_catalog}, "
+                f"norm={mu_rel_vector_norm}, "
+                f"relative_difference={rel_diff}"
+            )
+
+    mu_rel = mu_rel_vector_norm
 
     logL = data_TRILEGAL["logL"]
     logTe = data_TRILEGAL["logTe"]
@@ -145,6 +281,9 @@ def event_param(
         "DL": DL,
         "DS": DS,
         "mu_rel": mu_rel,
+        "mu_rel_N": mu_rel_N,
+        "mu_rel_E": mu_rel_E,
+        "mu_rel_catalog": mu_rel_catalog,
         "logL": logL,
         "logTe": logTe,
     }
@@ -157,30 +296,130 @@ def event_param(
         default_sampler=lambda: 0,
     )
 
-    semi_major_axis = get_sampled_or_default(
-        "semi_major_axis",
-        param_samplers,
-        rng,
-        context,
-        default_sampler=lambda: rng.uniform(0.1, 28),
-    )
+    if system_type == "Planets_systems":
+
+        # For planetary binary lenses, s is the primary
+        # projected-separation parameter.
+        #
+        # We therefore do NOT generate an independent orbital
+        # semi-major axis.  NaN is passed internally because
+        # microlensing_params retains the historical argument,
+        # but ulens.s() is never called for Planets_systems.
+        if (
+            param_samplers is not None
+            and "semi_major_axis" in param_samplers
+        ):
+            raise ValueError(
+                "For Planets_systems, semi_major_axis is no "
+                "longer an independent parameter. Specify s."
+            )
+
+        semi_major_axis = np.nan
+
+    else:
+
+        semi_major_axis = get_sampled_or_default(
+            "semi_major_axis",
+            param_samplers,
+            rng,
+            context,
+            default_sampler=lambda: rng.uniform(
+                0.1,
+                28,
+            ),
+        )
 
     if system_type == "Planets_systems":
+
+        # ----------------------------------------------------
+        # Controlled binary-lens parameter scan
+        #
+        # Primary independent variables:
+        #
+        #     M_star
+        #     q
+        #
+        # with both sampled uniformly in log10.
+        #
+        # The companion mass is derived exactly from
+        #
+        #     M_planet = q * M_star.
+        #
+        # No independent hard cut on M_planet is imposed here.
+        # ----------------------------------------------------
+
+        if (
+            param_samplers is not None
+            and "mass_planet" in param_samplers
+        ):
+            raise ValueError(
+                "For Planets_systems, mass_planet is a "
+                "derived quantity. Specify q and/or "
+                "star_mass instead."
+            )
+
+        q_target = get_sampled_or_default(
+            "q",
+            param_samplers,
+            rng,
+            context,
+            default_sampler=lambda: log_uniform(
+                rng,
+                PLANET_Q_MIN,
+                PLANET_Q_MAX,
+            ),
+        )
+
+        q_target = float(q_target)
+
+        if (
+            not np.isfinite(q_target)
+            or q_target <= 0
+        ):
+            raise ValueError(
+                "Invalid planetary-binary mass ratio: "
+                f"q={q_target}"
+            )
 
         star_mass = get_sampled_or_default(
             "star_mass",
             param_samplers,
             rng,
             context,
-            default_sampler=lambda: rng.uniform(1, 100),
+            default_sampler=lambda: log_uniform(
+                rng,
+                PLANET_HOST_MASS_MIN_MSUN,
+                PLANET_HOST_MASS_MAX_MSUN,
+            ),
         )
 
-        mass_planet = get_sampled_or_default(
-            "mass_planet",
-            param_samplers,
-            rng,
-            context,
-            default_sampler=lambda: rng.uniform(1 / 300, 13),
+        star_mass = float(star_mass)
+
+        if (
+            not np.isfinite(star_mass)
+            or star_mass <= 0
+        ):
+            raise ValueError(
+                "Invalid planetary-binary host mass: "
+                f"Mstar={star_mass} Msun"
+            )
+
+        # q = M_planet / M_star.
+        #
+        # star_mass is stored in Msun while mass_planet is
+        # stored internally in Mjup.
+        mass_planet = (
+            q_target
+            * star_mass
+            / M_JUP_TO_M_SUN
+        )
+
+        context.update(
+            {
+                "q_target": q_target,
+                "planet_host_mass_msun":
+                    star_mass,
+            }
         )
 
     elif system_type == "Binary_stars":
@@ -208,7 +447,11 @@ def event_param(
             param_samplers,
             rng,
             context,
-            default_sampler=lambda: rng.uniform(1, 100),
+            default_sampler=lambda: log_uniform(
+                rng,
+                STELLAR_MASS_MIN_MSUN,
+                STELLAR_MASS_MAX_MSUN,
+            ),
         )
 
         mass_planet = get_sampled_or_default(
@@ -234,7 +477,11 @@ def event_param(
             param_samplers,
             rng,
             context,
-            default_sampler=lambda: rng.uniform(3.146351865506143e-05, 20),
+            default_sampler=lambda: log_uniform(
+                rng,
+                PLANET_MASS_MIN_MJUP,
+                PLANET_MASS_MAX_MJUP,
+            ),
         )
 
     elif system_type == "custom":
@@ -328,24 +575,42 @@ def event_param(
         default_sampler=lambda: rng.uniform(0, 2 * np.pi),
     )
 
-    piE_angle = get_sampled_or_default(
-        "piE_angle",
-        param_samplers,
-        rng,
-        context,
-        default_sampler=lambda: rng.uniform(0, 2 * np.pi),
+    # --------------------------------------------------------
+    # Physical microlensing-parallax direction
+    # --------------------------------------------------------
+    #
+    # pi_E is parallel to the lens-source relative proper-motion
+    # vector. Its magnitude is still computed from the imposed
+    # lens mass together with GENULENS D_L and D_S.
+    #
+    # GENULENS components are North/East:
+    #
+    #   piEN = piE * mu_rel_N / |mu_rel|
+    #   piEE = piE * mu_rel_E / |mu_rel|
+    #
+    # This replaces the previous random parallax angle.
+    # --------------------------------------------------------
+
+    muhat_N = mu_rel_N / mu_rel
+    muhat_E = mu_rel_E / mu_rel
+
+    piEN = piE * muhat_N
+    piEE = piE * muhat_E
+
+    piE_angle = float(
+        np.arctan2(mu_rel_N, mu_rel_E)
     )
 
-    piEE = piE * np.cos(piE_angle)
-    piEN = piE * np.sin(piE_angle)
-
-    # Opcional: permitir pisar directamente piEN y piEE
     context.update(
         {
             "t0": t0,
             "u0": u0,
             "alpha": alpha,
             "piE_angle": piE_angle,
+            "mu_rel_N": mu_rel_N,
+            "mu_rel_E": mu_rel_E,
+            "muhat_N": muhat_N,
+            "muhat_E": muhat_E,
             "piEN_default": piEN.value,
             "piEE_default": piEE.value,
         }
@@ -390,31 +655,132 @@ def event_param(
         )
 
     if system_type in ["Binary_stars", "Planets_systems"]:
-        s = ulens.s()
-        q = ulens.mass_ratio()
 
-        context.update(
-            {
-                "s_default": s.value,
-                "q_default": q.value,
-            }
+        q_physical = float(
+            ulens.mass_ratio().value
         )
 
-        params_ulens["s"] = get_sampled_or_default(
-            "s",
-            param_samplers,
-            rng,
-            context,
-            default_sampler=lambda: s.value,
-        )
+        if system_type == "Planets_systems":
 
-        params_ulens["q"] = get_sampled_or_default(
-            "q",
-            param_samplers,
-            rng,
-            context,
-            default_sampler=lambda: q.value,
-        )
+            # ----------------------------------------------
+            # q consistency
+            # ----------------------------------------------
+
+            if not np.isclose(
+                q_physical,
+                q_target,
+                rtol=1e-12,
+                atol=0.0,
+            ):
+                raise RuntimeError(
+                    "Internal q inconsistency: "
+                    f"sampled q={q_target}, "
+                    f"Mplanet/Mstar={q_physical}"
+                )
+
+            params_ulens["q"] = q_physical
+
+            # ----------------------------------------------
+            # s is the primary projected-separation
+            # parameter.
+            # ----------------------------------------------
+
+            s_final = get_sampled_or_default(
+                "s",
+                param_samplers,
+                rng,
+                context,
+                default_sampler=lambda: log_uniform(
+                    rng,
+                    PLANET_S_MIN,
+                    PLANET_S_MAX,
+                ),
+            )
+
+            s_final = float(s_final)
+
+            if (
+                not np.isfinite(s_final)
+                or s_final <= 0
+            ):
+                raise ValueError(
+                    "Invalid planetary-binary "
+                    f"separation s={s_final}"
+                )
+
+            params_ulens["s"] = s_final
+
+            # ----------------------------------------------
+            # Derived projected physical separation
+            #
+            # 1 mas at 1 kpc = 1 AU
+            #
+            # DL is stored in pc:
+            #
+            # a_perp[AU]
+            #   = s * thetaE[mas] * DL[kpc].
+            # ----------------------------------------------
+
+            params_ulens["a_perp_au"] = (
+                s_final
+                * float(
+                    ulens.theta_E().value
+                )
+                * float(DL)
+                / 1000.0
+            )
+
+            context.update(
+                {
+                    "q_default":
+                        q_physical,
+                    "s_default":
+                        s_final,
+                    "a_perp_au":
+                        params_ulens[
+                            "a_perp_au"
+                        ],
+                }
+            )
+
+        else:
+
+            # ----------------------------------------------
+            # Preserve Binary_stars behavior.
+            # ----------------------------------------------
+
+            s_physical = ulens.s()
+
+            context.update(
+                {
+                    "s_default":
+                        s_physical.value,
+                    "q_default":
+                        q_physical,
+                }
+            )
+
+            params_ulens["s"] = (
+                get_sampled_or_default(
+                    "s",
+                    param_samplers,
+                    rng,
+                    context,
+                    default_sampler=lambda:
+                        s_physical.value,
+                )
+            )
+
+            params_ulens["q"] = (
+                get_sampled_or_default(
+                    "q",
+                    param_samplers,
+                    rng,
+                    context,
+                    default_sampler=lambda:
+                        q_physical,
+                )
+            )
 
         params_ulens["alpha"] = alpha
 

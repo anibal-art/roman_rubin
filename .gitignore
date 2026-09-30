@@ -12,3 +12,16 @@ __pycache__/
 *.parquet
 *.json
 *.geojson
+
+# Roman+Rubin local runtime / production artifacts
+.rr_cache/
+resultsDb_sqlite.db
+*.bak
+*.before_*
+
+# Large locally generated stellar/event catalogues
+stellar_population/pilots/
+stellar_population/production/
+stellar_population/trilegal/production/
+stellar_population/genulens/production/
+stellar_population/precomputed_events/production/
