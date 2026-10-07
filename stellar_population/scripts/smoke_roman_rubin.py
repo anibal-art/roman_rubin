@@ -15,7 +15,7 @@ from functions_roman_rubin import sim_fit
 import fit_lc
 
 MODELS = {
-    "BH": "PSPL",
+    "BH": "FSPL",
     "FFP": "FSPL",
     "Planets_systems": "USBL",
 }
@@ -36,7 +36,7 @@ def select_candidate(population):
 
     columns = ["t0", "u0", "tE", "W149", "i", "z"]
 
-    if population == "FFP":
+    if population in {"FFP", "BH"}:
         columns.append("rho")
 
     if population == "Planets_systems":
