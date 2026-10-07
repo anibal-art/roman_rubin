@@ -546,6 +546,10 @@ def build_system_catalog(
     base_seed,
     t0_range=None,
 ):
+    from catalog.caustic_origin import (
+        choose_catalog_caustic_origin,
+    )
+
     system_type = SYSTEMS[
         system_key
     ]
@@ -610,6 +614,11 @@ def build_system_catalog(
         out["system_type"] = (
             system_type
         )
+
+        if system_type in ("Planets_systems", "Binary_stars"):
+            out["caustic_origin"] = (
+                choose_catalog_caustic_origin(event_seed)
+            )
 
         # Current event_param is the single authority for
         # microlensing parameter calculation.
@@ -676,7 +685,25 @@ def build_system_catalog(
 
         records.append(out)
 
-    return pd.DataFrame(records)
+    catalog = pd.DataFrame(records)
+
+    if catalog.empty:
+        return catalog
+
+    from catalog.blending import (
+        blending_columns,
+    )
+
+    additions = blending_columns(catalog)
+
+    for name, values in additions.items():
+        if name in catalog.columns:
+            raise RuntimeError(
+                f"Duplicate catalog column: {name}"
+            )
+        catalog[name] = values
+
+    return catalog
 
 
 
@@ -770,6 +797,20 @@ def validate_system_catalog(
 
     elif system_key == "bh":
 
+        required = {
+            "rho",
+            "thetas",
+            "radius",
+        }
+
+        missing = required - set(df.columns)
+
+        if missing:
+            raise RuntimeError(
+                "bh: missing finite-source parameters: "
+                f"{sorted(missing)}"
+            )
+
         ms = df[
             "mass_star"
         ].to_numpy(float)
@@ -782,6 +823,35 @@ def validate_system_catalog(
             raise RuntimeError(
                 "BH/compact-lens mass outside "
                 "production prior."
+            )
+
+        rho = df["rho"].to_numpy(float)
+        theta_s = df["thetas"].to_numpy(float)
+        theta_e = df["thetaE"].to_numpy(float)
+        radius = df["radius"].to_numpy(float)
+
+        if not np.all(
+            np.isfinite(rho)
+            & np.isfinite(theta_s)
+            & np.isfinite(radius)
+            & (rho > 0.0)
+            & (theta_s > 0.0)
+            & (radius > 0.0)
+        ):
+            raise RuntimeError(
+                "BH catalogue contains invalid "
+                "finite-source parameters."
+            )
+
+        if not np.allclose(
+            rho,
+            theta_s / theta_e,
+            rtol=1e-12,
+            atol=0.0,
+        ):
+            raise RuntimeError(
+                "BH rho is inconsistent with "
+                "theta_star / thetaE."
             )
 
     elif system_key == "binary_lens":

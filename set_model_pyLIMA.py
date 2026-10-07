@@ -193,6 +193,7 @@ def model_choice(
     model,
     parallax=["None", 0.0],
     BL_random_origin=True,
+    BL_origin=None,
 ):
     """
     Wrapper compatible con sim_event.
@@ -207,8 +208,10 @@ def model_choice(
         pyLIMA_event=new_creation,
         model=model,
         parallax=parallax,
-        origin=None,
-        random_origin=BL_random_origin,
+        origin=BL_origin,
+        random_origin=(
+            BL_random_origin if BL_origin is None else False
+        ),
         blend_flux_parameter="ftotal",
     )
 
@@ -295,22 +298,14 @@ def parameters_model(
     return params, param_order
 
 
-def flux_parameters_model(
-    magstar,
-    ZP,
-    pyLIMA_model,
-    band_order=None,
-    rng=None,
-):
-    """
-    Construye los parámetros de flujo para pyLIMA.
+def _flux_parameters_for_bands(magstar, ZP, pyLIMA_model, band_order, g_for_band):
+    """Shared flux-parameter math (single source of truth).
 
-    Si rng=None usa np.random.uniform para respetar el estado global
-    fijado con np.random.seed(i).
+    `g_for_band(band)` returns the blending ratio g = Fblend/Fsource
+    for that band; callers decide HOW g is obtained (sampled or
+    already materialized) -- this function never samples anything
+    itself.
     """
-
-    if band_order is None:
-        band_order = list(magstar.keys())
 
     flux_parameters = []
     fs, G, F = {}, {}, {}
@@ -327,10 +322,7 @@ def flux_parameters_model(
             (ZP[band] - magstar[band]) / 2.5
         )
 
-        if rng is None:
-            g = np.random.uniform(0, 1)
-        else:
-            g = rng.uniform(0, 1)
+        g = g_for_band(band)
 
         f_source = flux_baseline / (1 + g)
         f_blend = g * f_source
@@ -348,3 +340,60 @@ def flux_parameters_model(
             flux_parameters.append(f_blend)
 
     return flux_parameters, fs, G, F
+
+
+def flux_parameters_model(
+    magstar,
+    ZP,
+    pyLIMA_model,
+    band_order=None,
+    rng=None,
+):
+    """
+    Construye los parámetros de flujo para pyLIMA.
+
+    Firma e invocación históricas, SIN CAMBIOS: este es el punto que
+    LRT reemplaza vía monkey-patching
+    (functions_roman_rubin.flux_parameters_model = ...), y su reemplazo
+    no acepta blend_ratio ni **kwargs. No agregar parámetros nuevos
+    aquí -- ver flux_parameters_from_blend_ratio para la ruta de
+    realización explícita.
+
+    Si rng=None usa np.random.uniform para respetar el estado global
+    fijado con np.random.seed(i); si rng no es None, usa rng.uniform.
+    """
+
+    if band_order is None:
+        band_order = list(magstar.keys())
+
+    def _sampled_g(band):
+        if rng is None:
+            return np.random.uniform(0, 1)
+        return rng.uniform(0, 1)
+
+    return _flux_parameters_for_bands(magstar, ZP, pyLIMA_model, band_order, _sampled_g)
+
+
+def flux_parameters_from_blend_ratio(
+    magstar,
+    ZP,
+    pyLIMA_model,
+    band_order,
+    blend_ratio,
+):
+    """
+    Construye los parámetros de flujo a partir de un blend_ratio YA
+    DECIDIDO (p.ej. por catalog.blending), uno por banda. No sortea
+    nada.
+
+    Deliberadamente NO es el nombre que LRT monkey-patchea
+    (flux_parameters_model) -- es una API interna explícita para la
+    ruta de realización con blending precomputado, usada solo cuando
+    esa realización efectivamente lo trae. Comparte la fórmula de
+    flujo con flux_parameters_model vía _flux_parameters_for_bands.
+    """
+
+    def _decided_g(band):
+        return blend_ratio[band]
+
+    return _flux_parameters_for_bands(magstar, ZP, pyLIMA_model, band_order, _decided_g)

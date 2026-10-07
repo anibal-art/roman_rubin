@@ -5,6 +5,8 @@ from astropy.table import QTable
 from astropy.time import Time
 from astropy.coordinates import SkyCoord
 
+from photometry.constants import SIMULATION_BAND_ZERO_POINTS
+
 def mag(zp, Flux):
     '''
     Transform the flux to magnitude
@@ -19,8 +21,7 @@ def mag(zp, Flux):
 def debug_nsigma_global(pyLIMA_parameters, pyLIMA_telescopes,
                         nsigma=3.0, nmin=6, window="all"):
 
-    ZP = {'W149': 27.615, 'u': 27.03, 'g': 28.38, 'r': 28.16,
-          'i': 27.85, 'z': 27.46, 'y': 26.68}
+    ZP = SIMULATION_BAND_ZERO_POINTS
 
     t0 = pyLIMA_parameters['t0']
     tE = pyLIMA_parameters['tE']
@@ -105,8 +106,7 @@ def debug_nsigma_global(pyLIMA_parameters, pyLIMA_telescopes,
 def deviation_from_constant(pyLIMA_parameters, pyLIMA_telescopes,
                           nsigma=3.0, nmin=6, window="all"):
 
-    ZP = {'W149': 27.615, 'u': 27.03, 'g': 28.38, 'r': 28.16,
-          'i': 27.85, 'z': 27.46, 'y': 26.68}
+    ZP = SIMULATION_BAND_ZERO_POINTS
 
     t0 = pyLIMA_parameters['t0']
     tE = pyLIMA_parameters['tE']

@@ -53,9 +53,6 @@ Sky cells + TRILEGAL source stars + GENULENS lens/source population
 |---|---|
 | [`stellar_population/noise_models/roman_f146.py`](stellar_population/noise_models/roman_f146.py) | RomanF146Noise: load and interpolate the precomputed Pandeia F146 grid, including saturation/validity state; provides sigma_mag_ab(). |
 | [`stellar_population/noise_models/roman_photometry.py`](stellar_population/noise_models/roman_photometry.py) | Apply the F146 instrument model to simulated Roman telescope photometry; used by the simulation pipeline. |
-| [`stellar_population/noise_models/data/roman_f146_pandeia_2026p1.csv`](stellar_population/noise_models/data/roman_f146_pandeia_2026p1.csv) | Precomputed Pandeia F146 grid: per-detector S/N, sigma_mag, saturation flags, and magnitude in AB. |
-| [`stellar_population/noise_models/data/roman_f146_pandeia_2026p1.json`](stellar_population/noise_models/data/roman_f146_pandeia_2026p1.json) | Metadata and configuration associated with the Pandeia F146 grid. |
-| [`stellar_population/noise_models/data/roman_f146_pandeia_2026p1_revh_patch.json`](stellar_population/noise_models/data/roman_f146_pandeia_2026p1_revh_patch.json) | Provenance of local Rev-H IM_66_6_V2 read-pattern configuration. |
 | [`stellar_population/scripts/build_roman_f146_pandeia_grid.py`](stellar_population/scripts/build_roman_f146_pandeia_grid.py) | Rebuild the Pandeia input grid; not required for routine light-curve simulations or plotting. |
 | [`stellar_population/scripts/audit_roman_f146_noise_grid.py`](stellar_population/scripts/audit_roman_f146_noise_grid.py) | Audit computed Pandeia grid and saturation transitions. |
 

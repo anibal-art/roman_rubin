@@ -645,7 +645,7 @@ def event_param(
         "thetas": ulens.thetas().value,
     }
 
-    if system_type in ["FFP", "Binary_stars", "Planets_systems"]:
+    if system_type in ["FFP", "BH", "Binary_stars", "Planets_systems"]:
         params_ulens["rho"] = get_sampled_or_default(
             "rho",
             param_samplers,

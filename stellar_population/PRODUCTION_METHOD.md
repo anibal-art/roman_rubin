@@ -294,3 +294,32 @@ rule, seeds, class-specific priors and output paths.
 Generated Parquet production products are not committed to Git.
 The code, configurations and methodology required to regenerate them
 are version controlled.
+
+## 13. Amax detectability prefilter (experimental, not active)
+
+`catalog/amax.py` implements a closed-form/USBL peak-magnification
+(Amax) estimate intended as a future catalog-level detectability
+prefilter, with the per-band blending and caustic-origin realization
+materialized by `catalog/blending.py` and `catalog/caustic_origin.py`.
+
+This is **experimental and not wired into production** as of this
+writing:
+
+- it is not applied as a filter when building the precomputed event
+  catalogues (no rows are dropped based on it);
+- a validation run (`scripts/validation/validate_catalog_amax.py`)
+  found that the catalog's precomputed blending realization and the
+  live simulation pipeline were not using the same realization — this
+  has since been addressed architecturally (the simulation core can
+  now consume a catalog's precomputed `blend_ratio_<band>` columns
+  instead of always resampling), but Amax itself has not been
+  re-validated end-to-end after that change, and no production
+  catalogue has been regenerated or filtered with it;
+- the two independent implementations of the Roman F146 S/N=5
+  boundary (`catalog/amax.py::roman_f146_5sigma_vega` and
+  `stellar_population/scripts/audit_f146_preproduction.py::roman_limit`)
+  have not been reconciled; it is not yet established which, if
+  either, should be the production authority.
+
+Do not treat Amax as a certified detection criterion until this
+section is updated to say otherwise.

@@ -9,15 +9,10 @@ home_dir = os.path.expanduser("~")
 
 from rubin_sim.phot_utils.photometric_parameters import PhotometricParameters
 from rubin_sim.phot_utils.signaltonoise import calc_mag_error_m5
-# from rubin_sim.phot_utils.bandpass import Bandpass
-# import rubin_sim.maf as maf
-# from rubin_sim.data import get_baseline
 
 # astropy
 import astropy.units as u
 from astropy.table import QTable
-# from astropy.time import Time
-# from astropy.coordinates import SkyCoord
 
 # --- Fix para IERS y sidereal_time de Astropy ---
 from astropy.utils import iers
@@ -25,29 +20,23 @@ iers.conf.auto_max_age = None
 iers.conf.auto_download = False  # No intenta descargar
 iers.conf.iers_degraded_accuracy = 'warn'
 
-# pyLIMA
-# from pyLIMA import event
-# from pyLIMA import telescopes
-# from pyLIMA.toolbox import time_series
 from pyLIMA.simulations import simulator
-# from pyLIMA.models import PSBL_model
-# from pyLIMA.models import USBL_model
-# from pyLIMA.models import FSPLarge_model
-# from pyLIMA.models import PSPL_model
-# from pyLIMA.fits import TRF_fit
-# from pyLIMA.fits import DE_fit
-# from pyLIMA.fits import MCMC_fit
-# from pyLIMA.outputs import pyLIMA_plots
-# from pyLIMA.outputs import file_outputs
-
 from class_analysis import Analysis_Event
 from ulens_params import microlensing_params, event_param, sample_from_spec
 from ulens_params import event_param_from_pair_row
-# import multiprocessing as mul
-# import h5py
-from fit_lc import fit_rubin_roman
+from fit_lc import fit_rubin_roman, parallax_suffix
 from timing_utils import StageTimer
-from stellar_population.noise_models.roman_photometry import apply_roman_f146_photometry
+from photometry.roman_photometry import apply_roman_f146_photometry
+from photometry.constants import (
+    PYLIMA_FIT_ZERO_POINT,
+    SIMULATION_BAND_ZERO_POINTS,
+)
+from simulation.realization import (
+    realization_from_catalog,
+    realization_from_generated_parameters,
+    data_has_materialized_blend_ratio,
+)
+from simulation.core import simulate_light_curve
 # ROMAN_F146_PANDEIA_INTEGRATION_V2
 from detection_criteria import filter5points, deviation_from_constant, has_consecutive_numbers, filter_band, mag, debug_nsigma_global
 from read_save import save_sim, save_fit, read_data
@@ -55,28 +44,14 @@ from set_model_pyLIMA import (
     model_choice,
     parameters_model,
     flux_parameters_model,
+    flux_parameters_from_blend_ratio,
     normalize_model_name,
 )
 
 # # ================================================================
 # #  Guardado a Parquet
 # # ================================================================
-def _save_dict_as_parquet(d: dict, path: str | Path, append: bool = True):
-    """Guarda un dict (valores tipo lista) como Parquet. Si append=True,
-    concatena con el archivo existente (si lo hay) antes de escribir."""
-    import pandas as pd
-    path = Path(path)
-    path.parent.mkdir(parents=True, exist_ok=True)  # crea subdirectorios si no existen
-
-    df_new = pd.DataFrame.from_dict(d)
-
-    if append and path.exists():
-        df_old = pd.read_parquet(path)
-        df_out = pd.concat([df_old, df_new], ignore_index=True)
-    else:
-        df_out = df_new
-
-    df_out.to_parquet(path, engine="pyarrow", index=False)
+from utils.io import save_dict_as_parquet as _save_dict_as_parquet
 
 
 from set_telescopes_pyLIMA import tel_roman_rubin
@@ -622,15 +597,7 @@ def sim_event(
                 "use_rubin=True pero data no contiene magnitud 'Y' ni 'y'."
             )
 
-    ZP = {
-        "W149": 27.615,
-        "u": 27.03,
-        "g": 28.38,
-        "r": 28.16,
-        "i": 27.85,
-        "z": 27.46,
-        "y": 26.68,
-    }
+    ZP = SIMULATION_BAND_ZERO_POINTS
 
     t0 = data["t0"]
 
@@ -645,40 +612,28 @@ def sim_event(
     source_ra = data.get("maf_ra", data.get("ra", None))
     source_dec = data.get("maf_dec", data.get("dec", None))
 
-    if use_roman and use_rubin:
+    if rubin_pointing_mode == "source":
 
-        # Para Roman+Rubin conservamos el campo fijo cacheado.
-        rubin_pointing_mode_use = "fixed"
-        tel_ra = None
-        tel_dec = None
-
-    elif use_rubin and rubin_pointing_mode == "source":
-
-        # Para Rubin-only podemos usar coordenadas fuente por fuente.
         if source_ra is None or source_dec is None:
             raise ValueError(
-                "rubin_pointing_mode='source' pero data no tiene coordenadas. "
-                "Asegurate de que event_params incluya maf_ra/maf_dec "
-                "o ra/dec. En el caso astrodatalab_pairs, esas columnas "
-                "deben venir del pair_row."
+                "rubin_pointing_mode='source' requiere ra/dec "
+                "o maf_ra/maf_dec."
             )
 
         rubin_pointing_mode_use = "source"
         tel_ra = float(source_ra)
         tel_dec = float(source_dec)
 
-        print("=" * 80)
-        print("[sim_event] Rubin-only source coordinates passed to MAF")
-        print(f"[sim_event] source RA  = {tel_ra:.10f} deg")
-        print(f"[sim_event] source Dec = {tel_dec:.10f} deg")
-        print("=" * 80)
+    elif rubin_pointing_mode == "fixed":
 
-    else:
-
-        # Rubin-only fixed, Roman-only, o cualquier caso default.
         rubin_pointing_mode_use = "fixed"
         tel_ra = None
         tel_dec = None
+
+    else:
+        raise ValueError(
+            f"rubin_pointing_mode inválido: {rubin_pointing_mode}"
+        )
 
     _sim_timer.stop("simulation_prep")
     _sim_timer.start("simulation_maf")
@@ -738,16 +693,70 @@ def sim_event(
     else:
         parallax_arg = ["None", 0.0]
 
+    band_order = [
+        tel.name
+        for tel in new_creation.telescopes
+    ]
+
+    # Event realization: blending and caustic_origin are decided here,
+    # from `data`, before any pyLIMA model is built. Two independent
+    # decisions (do not couple them -- see simulation/realization.py):
+    #
+    # 1. Blending: data_has_materialized_blend_ratio is purely about
+    #    whether blend_ratio_<band> is already materialized in `data`
+    #    -- it says nothing about `catalog_mode` or "is this a catalog
+    #    event". `data` without it for every band -- true for every
+    #    caller today -- goes through realization_from_generated_
+    #    parameters, which leaves blending undecided (sampled below,
+    #    exactly as before this refactor).
+    # 2. caustic_origin (USBL only): resolved independently by each
+    #    producer. realization_from_catalog requires it explicit,
+    #    always. realization_from_generated_parameters uses it if
+    #    `data` happens to provide it, and otherwise leaves it None --
+    #    "not yet decided" -- handled right below by falling back to
+    #    the exact historical random-origin mechanism.
+    if data_has_materialized_blend_ratio(data, band_order):
+        realization = realization_from_catalog(
+            data,
+            model,
+            truth_parallax,
+            t0,
+            band_order,
+        )
+    else:
+        realization = realization_from_generated_parameters(
+            data,
+            model,
+            truth_parallax,
+            t0,
+            band_order,
+        )
+
+    if realization.caustic_origin is not None:
+        # Explicit origin (from either producer): never sampled.
+        caustic_origin_arg = [realization.caustic_origin, [0, 0]]
+        bl_random_origin = False
+    else:
+        # Not USBL, or legacy/generated USBL with no explicit origin
+        # in `data`: preserve EXACTLY the historical random-origin
+        # mechanism (np.random.choice inside
+        # set_model_pyLIMA.choose_usbl_origin, via model_choice),
+        # unmoved, at the same point in the RNG sequence it has always
+        # occupied -- before flux_parameters_model's blending draws.
+        caustic_origin_arg = None
+        bl_random_origin = True
+
     my_own_model = model_choice(
         new_creation,
         model,
         parallax=parallax_arg,
-        BL_random_origin=True,
+        BL_random_origin=bl_random_origin,
+        BL_origin=caustic_origin_arg,
     )
 
 
     params, param_order = parameters_model(
-        data,
+        realization.physical_params,
         my_own_model,
     )
 
@@ -756,39 +765,48 @@ def sim_event(
         for key in param_order
     ]
 
-    band_order = [
-        tel.name
-        for tel in new_creation.telescopes
-    ]
-
-    my_own_flux_parameters, fs, G, F = flux_parameters_model(
-        magstar,
-        ZP,
-        my_own_model,
-        band_order=band_order,
-    )
+    if realization.blend_ratio is not None:
+        # Explicit realization path: blend_ratio already decided (by
+        # catalog.blending). Not the LRT monkey-patch point.
+        my_own_flux_parameters, fs, G, F = flux_parameters_from_blend_ratio(
+            magstar,
+            ZP,
+            my_own_model,
+            band_order,
+            realization.blend_ratio,
+        )
+    else:
+        # Legacy/generated/LRT path: EXACT historical signature and
+        # call site. This global is what LRT monkey-patches
+        # (functions_roman_rubin.flux_parameters_model = ...), and its
+        # replacement does not accept blend_ratio or **kwargs -- do
+        # not add any keyword here.
+        my_own_flux_parameters, fs, G, F = flux_parameters_model(
+            magstar,
+            ZP,
+            my_own_model,
+            band_order=band_order,
+        )
 
     my_own_parameters += my_own_flux_parameters
-
-    pyLIMA_parameters = my_own_model.compute_pyLIMA_parameters(
-        my_own_parameters
-    )
     _sim_timer.stop("simulation_model_setup")
 
-
     # ============================================================
-    # Simulación de la curva de luz
+    # Simulación de la curva de luz (núcleo genérico, sin RNG,
+    # sin conocimiento de catálogo ni de la encuesta)
     # ============================================================
 
-    _sim_timer.start("simulation_pylima_lightcurve")
-    simulator.simulate_lightcurve(
+    pyLIMA_parameters = simulate_light_curve(
         my_own_model,
-        pyLIMA_parameters,
-        add_noise=False,
+        my_own_parameters,
+        sim_timer=_sim_timer,
     )
-    _sim_timer.stop("simulation_pylima_lightcurve")
 
-
+    # Roman-specific: reinforce the theoretical flux for non-Roman
+    # (ground) telescopes, since simulate_lightcurve(add_noise=False)
+    # only fills Roman's own lightcurve table by itself. Stays here,
+    # in the adapter, using the existing helper -- not in the generic
+    # core.
     _sim_timer.start("simulation_ground_flux")
     new_creation = inject_model_flux_for_ground_telescopes(
         new_creation,
@@ -797,7 +815,6 @@ def sim_event(
         roman_band_name="W149",
     )
     _sim_timer.stop("simulation_ground_flux")
-
 
     # ============================================================
     # Fotometría Roman + Rubin
@@ -815,6 +832,55 @@ def sim_event(
         roman_saturation_mag=roman_saturation_mag,
     )
     _sim_timer.stop("simulation_photometry")
+
+    # ============================================================
+    # Synchronize pyLIMA after photometric filtering
+    # ============================================================
+    # The lightcurve tables have already been filtered.
+    # pyLIMA's previously computed parallax arrays may still
+    # correspond to the original observation times.
+    #
+    # Keep the same Event and the same noisy photometry.
+    # No event parameters or random numbers are regenerated.
+    # ============================================================
+
+    _sim_timer.start("simulation_parallax_resync")
+
+    # Remove telescopes without usable photometry.
+    # This simulation pipeline contains photometry only.
+    my_own_model.event.telescopes = [
+        tel
+        for tel in my_own_model.event.telescopes
+        if (
+            tel.lightcurve is not None
+            and len(tel.lightcurve) > 0
+        )
+    ]
+
+    if truth_parallax:
+
+        for tel in my_own_model.event.telescopes:
+
+            tel.compute_parallax(
+                my_own_model.parallax_model,
+                my_own_model.event.North,
+                my_own_model.event.East,
+            )
+
+            shifts = np.asarray(
+                tel.deltas_positions["photometry"]
+            )
+
+            expected = (2, len(tel.lightcurve))
+
+            if shifts.shape != expected:
+                raise RuntimeError(
+                    "Parallax/photometry mismatch: "
+                    f"{tel.name}: "
+                    f"{shifts.shape} != {expected}"
+                )
+
+    _sim_timer.stop("simulation_parallax_resync")
 
 
     # ============================================================
@@ -1952,12 +2018,10 @@ def resolve_fit_options(
 def parallax_suffix_for_filename(use_parallax):
     """
     Sufijo explícito para nombres de archivos de fit.
+
+    Wrapper de compatibilidad sobre `fit_lc.parallax_suffix` (misma lógica).
     """
-
-    if bool(use_parallax):
-        return "Parallax"
-
-    return "NoParallax"
+    return parallax_suffix(use_parallax)
 
 
 def expected_fit_results_path(
@@ -2010,138 +2074,6 @@ def fit_results_path_from_fit_object(
         fit_parallax,
     )
 
-
-def run_all_fits(
-    Source,
-    pyLIMA_parameters,
-    path_to_save_fit,
-    path_ephemerides,
-    model,
-    algo,
-    origin,
-    rango,
-    lc_to_fit,
-    use_roman=True,
-    use_rubin=True,
-    fit_model=None,
-    fit_parallax=None,
-    fit_defaults=None,
-    fit_bounds=None,
-    initial_guess=None,
-    event_ra=None,
-    event_dec=None,
-):
-    """
-    Corre los ajustes según los telescopios activos.
-
-    event_ra, event_dec
-        Coordenadas del Event usado en la SIMULACIÓN. Se pasan
-        explícitamente a fit_rubin_roman para que la geometría de paralaje
-        del fit sea idéntica a la de la curva simulada.
-
-        Si son None se conserva el comportamiento histórico de fit_lc.py
-        (campo fijo), pero sim_fit siempre debe pasarlas explícitamente.
-    """
-
-    model, fit_model, fit_parallax = resolve_fit_options(
-        model,
-        fit_model=fit_model,
-        fit_parallax=fit_parallax,
-        default_fit_parallax=True,
-    )
-
-    if (event_ra is None) != (event_dec is None):
-        raise ValueError(
-            "event_ra y event_dec deben pasarse juntos o ambos ser None."
-        )
-
-    lc_W149 = lc_to_fit["W149"] if use_roman else []
-
-    lc_u = lc_to_fit["u"] if use_rubin else []
-    lc_g = lc_to_fit["g"] if use_rubin else []
-    lc_r = lc_to_fit["r"] if use_rubin else []
-    lc_i = lc_to_fit["i"] if use_rubin else []
-    lc_z = lc_to_fit["z"] if use_rubin else []
-    lc_y = lc_to_fit["y"] if use_rubin else []
-
-    print("Start the fit using active telescopes:")
-    print(
-        f"[run_all_fits] sim_model={model}, "
-        f"fit_model={fit_model}, "
-        f"fit_parallax={fit_parallax}, "
-        f"event_ra={event_ra}, event_dec={event_dec}, "
-        f"initial_guess={initial_guess!r}"
-    )
-
-    fit_rr, event_fit_rr, pyLIMAmodel_rr = fit_rubin_roman(
-        Source,
-        pyLIMA_parameters,
-        path_to_save_fit,
-        path_ephemerides,
-        model,
-        algo,
-        origin,
-        rango,
-        lc_W149,
-        lc_u,
-        lc_g,
-        lc_r,
-        lc_i,
-        lc_z,
-        lc_y,
-        fit_model=fit_model,
-        fit_parallax=fit_parallax,
-        fit_defaults=fit_defaults,
-        fit_bounds=fit_bounds,
-        initial_guess=initial_guess,
-        event_ra=event_ra,
-        event_dec=event_dec,
-    )
-
-    fit_roman = None
-    event_fit_roman = None
-    pyLIMAmodel_roman = None
-
-    if use_roman and len(lc_to_fit.get("W149", [])) != 0:
-
-        print("Start the fit using only the Roman data:")
-
-        fit_roman, event_fit_roman, pyLIMAmodel_roman = fit_rubin_roman(
-            Source,
-            pyLIMA_parameters,
-            path_to_save_fit,
-            path_ephemerides,
-            model,
-            algo,
-            origin,
-            rango,
-            lc_to_fit["W149"],
-            [],
-            [],
-            [],
-            [],
-            [],
-            [],
-            fit_model=fit_model,
-            fit_parallax=fit_parallax,
-            fit_defaults=fit_defaults,
-            fit_bounds=fit_bounds,
-            initial_guess=initial_guess,
-            event_ra=event_ra,
-            event_dec=event_dec,
-        )
-
-    else:
-        print("Roman-only fit skipped because Roman is off or has no data.")
-
-    return (
-        fit_rr,
-        event_fit_rr,
-        pyLIMAmodel_rr,
-        fit_roman,
-        event_fit_roman,
-        pyLIMAmodel_roman,
-    )
 
 def extract_nset_string(path_GENULENS_set, default="manual"):
     """
@@ -2633,15 +2565,7 @@ def replace_flux_by_noisy_magnitude_flux_ZP(pyLIMA_model, verbose=False):
 
     import numpy as np
 
-    ZP = {
-        "W149": 27.615,
-        "u": 27.03,
-        "g": 28.38,
-        "r": 28.16,
-        "i": 27.85,
-        "z": 27.46,
-        "y": 26.68,
-    }
+    ZP = SIMULATION_BAND_ZERO_POINTS
 
     for telescope in pyLIMA_model.event.telescopes:
 
@@ -3298,14 +3222,72 @@ def sim_fit(
     # 4. Flujo ruidoso y chi2 verdadero
     # ============================================================
 
-    chi2_true_info = all_telescope_photometric_chi2_robust(
-        my_own_model,
-        pyLIMA_parameters,
-        verbose=False,
+    # ============================================================
+    # True-model chi2 using the official pyLIMA implementation
+    # ============================================================
+
+    from pyLIMA.fits.objective_functions import (
+        all_telescope_photometric_chi2,
     )
 
-    chi2_true = chi2_true_info["chi2_true"]
-    n_data_true = chi2_true_info["n_data_true"]
+    n_data_true = sum(
+        len(tel.lightcurve)
+        for tel in my_own_model.event.telescopes
+        if tel.lightcurve is not None
+    )
+
+    if n_data_true <= 0:
+        raise RuntimeError(
+            "No photometric observations for chi2_true."
+        )
+
+    # Fail explicitly on invalid photometry.
+    for tel in my_own_model.event.telescopes:
+
+        lc = tel.lightcurve
+
+        if lc is None or len(lc) == 0:
+            raise RuntimeError(
+                f"Empty lightcurve in chi2_true: {tel.name}"
+            )
+
+        flux = np.asarray(lc["flux"], dtype=float)
+        err = np.asarray(lc["err_flux"], dtype=float)
+
+        if not (
+            np.all(np.isfinite(flux))
+            and np.all(np.isfinite(err))
+            and np.all(err > 0)
+        ):
+            raise RuntimeError(
+                f"Invalid photometry for {tel.name}"
+            )
+
+    # No custom residual calculation or silent skipping.
+    chi2_true = float(
+        all_telescope_photometric_chi2(
+            my_own_model,
+            pyLIMA_parameters,
+        )
+    )
+
+    if not np.isfinite(chi2_true):
+        raise RuntimeError(
+            "pyLIMA returned non-finite chi2_true."
+        )
+
+    chi2_true_info = {
+        "chi2_true": chi2_true,
+        "n_data_true": int(n_data_true),
+        "chi2_true_by_telescope": {},
+    }
+
+    print(
+        "[pyLIMA chi2_true] "
+        f"chi2={chi2_true:.6f}, "
+        f"N={n_data_true}, "
+        f"chi2/N={chi2_true/n_data_true:.6f}"
+    )
 
     print("chi2_true:", chi2_true)
     print("n_data_true:", n_data_true)
@@ -3661,116 +3643,6 @@ def _as_pylima_parameters_for_stats(pyLIMA_model, model_parameters):
     return model_parameters
 
 
-def compute_pylima_photometric_likelihood_stats(
-    pyLIMA_model,
-    model_parameters,
-    rescaling_photometry_parameters=None,
-):
-    """
-    Compute formal pyLIMA photometric likelihood diagnostics.
-
-    pyLIMA's objective function returns a positive quantity that is used here
-    as a negative log-likelihood:
-
-        nll = -logL
-
-    The returned chi2 is computed from normalized photometric residuals, on the
-    exact light curves attached to ``pyLIMA_model``. Therefore, for likelihood
-    ratio tests all compared models must be built with the same light-curve
-    data.
-    """
-
-    try:
-        from scipy import stats
-    except Exception:
-        stats = None
-
-    from pyLIMA.fits import objective_functions
-
-    if pyLIMA_model is None:
-        out = _empty_likelihood_stats()
-        out["error"] = "pyLIMA_model is None"
-        return out
-
-    try:
-        n_params = int(len(pyLIMA_model.model_dictionnary))
-    except Exception:
-        n_params = np.nan
-
-    try:
-        pyparams = _as_pylima_parameters_for_stats(
-            pyLIMA_model,
-            model_parameters,
-        )
-
-        nll = objective_functions.all_telescope_photometric_likelihood(
-            pyLIMA_model,
-            pyparams,
-            rescaling_photometry_parameters=rescaling_photometry_parameters,
-        )
-
-        nll = float(nll)
-        logL = -nll
-
-        residus, errflux = objective_functions.all_telescope_photometric_residuals(
-            pyLIMA_model,
-            pyparams,
-            norm=True,
-            rescaling_photometry_parameters=rescaling_photometry_parameters,
-        )
-
-        residus = [
-            np.asarray(r, dtype=float)
-            for r in residus
-            if len(r) > 0
-        ]
-
-        if len(residus) == 0:
-            out = _empty_likelihood_stats()
-            out.update({
-                "nll": nll,
-                "logL": logL,
-                "n_params": n_params,
-                "error": "no photometric residuals",
-            })
-            return out
-
-        all_residus = np.concatenate(residus)
-
-        chi2 = float(np.sum(all_residus**2))
-        n_data = int(len(all_residus))
-        dof = int(n_data - n_params) if np.isfinite(n_params) else np.nan
-
-        if np.isfinite(dof) and dof > 0:
-            chi2_red = float(chi2 / dof)
-            p_value_chi2_gof = (
-                float(stats.chi2.sf(chi2, int(dof)))
-                if stats is not None
-                else np.nan
-            )
-        else:
-            chi2_red = np.nan
-            p_value_chi2_gof = np.nan
-
-        return {
-            "nll": nll,
-            "logL": logL,
-            "chi2": chi2,
-            "n_data": n_data,
-            "n_params": n_params,
-            "dof": dof,
-            "chi2_red": chi2_red,
-            "p_value_chi2_gof": p_value_chi2_gof,
-        }
-
-    except Exception as error:
-        out = _empty_likelihood_stats()
-        out["n_params"] = n_params
-        out["error"] = repr(error)
-        out["traceback"] = traceback.format_exc()
-        return out
-
-
 def normalize_fit_specs(
     fit_specs=None,
     fit_model=None,
@@ -3938,10 +3810,9 @@ def run_all_fits(
     """
     Run Roman+Rubin/Rubin-only and optional Roman-only fits.
 
-    This overrides the older definition above by adding:
-      - compatibility filtering for fit_rubin_roman keyword arguments;
-      - deterministic random_state, defaulting to Source;
-      - the same event_ra/event_dec geometry for parallax fits.
+    Adds compatibility filtering for fit_rubin_roman keyword arguments,
+    a deterministic random_state (defaulting to Source), and the same
+    event_ra/event_dec geometry used for parallax fits.
     """
 
     model, fit_model, fit_parallax = resolve_fit_options(
@@ -4359,18 +4230,6 @@ def copy_true_model_on_fit_lightcurves(pyLIMA_model_true, lc_to_fit):
 #  True-generator likelihood on a fresh fit model
 # ================================================================
 
-PYLIMA_FIT_ZERO_POINT = 27.4
-
-SIMULATION_BAND_ZERO_POINTS = {
-    "W149": 27.615,
-    "u": 27.03,
-    "g": 28.38,
-    "r": 28.16,
-    "i": 27.85,
-    "z": 27.46,
-    "y": 26.68,
-}
-
 
 def _ordered_model_parameter_names(pyLIMA_model):
     """
@@ -4714,142 +4573,6 @@ def compute_true_generator_stats_on_fresh_fit_model(
     stats_out["true_flux_debug"] = flux_debug
 
     return stats_out
-
-def compute_lrt_from_multi_fits(
-    multi_fit_results,
-    null_key="H0",
-    alternative_key="H1",
-    delta_k=None,
-):
-    """
-    Compute the likelihood-ratio test statistic:
-
-        LRT = 2 (logL_H1 - logL_H0)
-
-    where H0 and H1 are maximum-likelihood fits on the same data.
-    """
-
-    try:
-        from scipy import stats
-    except Exception:
-        stats = None
-
-    out = {
-        "null_key": null_key,
-        "alternative_key": alternative_key,
-        "logL_H0": np.nan,
-        "logL_H1": np.nan,
-        "nll_H0": np.nan,
-        "nll_H1": np.nan,
-        "chi2_H0": np.nan,
-        "chi2_H1": np.nan,
-        "LRT": np.nan,
-        "LRT_from_nll": np.nan,
-        "delta_chi2_H0_minus_H1": np.nan,
-        "delta_k": np.nan,
-        "p_value_LRT": np.nan,
-        "same_n_data_H0_H1": False,
-        "error": "",
-    }
-
-    try:
-        h0_entry = multi_fit_results[null_key]
-        h1_entry = multi_fit_results[alternative_key]
-
-        if h0_entry.get("status") != "fitted" or h1_entry.get("status") != "fitted":
-            out["error"] = (
-                f"Fits not both fitted: "
-                f"{null_key}={h0_entry.get('status')}, "
-                f"{alternative_key}={h1_entry.get('status')}"
-            )
-            return out
-
-        h0 = h0_entry["likelihood_stats"]
-        h1 = h1_entry["likelihood_stats"]
-
-        logL_H0 = float(h0["logL"])
-        logL_H1 = float(h1["logL"])
-        nll_H0 = float(h0["nll"])
-        nll_H1 = float(h1["nll"])
-        chi2_H0 = float(h0["chi2"])
-        chi2_H1 = float(h1["chi2"])
-
-        if delta_k is None:
-            delta_k_use = int(h1["n_params"] - h0["n_params"])
-        else:
-            delta_k_use = int(delta_k)
-
-        LRT = 2.0 * (logL_H1 - logL_H0)
-        LRT_from_nll = 2.0 * (nll_H0 - nll_H1)
-        delta_chi2 = chi2_H0 - chi2_H1
-
-        if stats is not None and np.isfinite(LRT) and delta_k_use > 0:
-            p_value_LRT = float(stats.chi2.sf(LRT, df=delta_k_use))
-        else:
-            p_value_LRT = np.nan
-
-        out.update({
-            "logL_H0": logL_H0,
-            "logL_H1": logL_H1,
-            "nll_H0": nll_H0,
-            "nll_H1": nll_H1,
-            "chi2_H0": chi2_H0,
-            "chi2_H1": chi2_H1,
-            "LRT": LRT,
-            "LRT_from_nll": LRT_from_nll,
-            "delta_chi2_H0_minus_H1": delta_chi2,
-            "delta_k": delta_k_use,
-            "p_value_LRT": p_value_LRT,
-            "same_n_data_H0_H1": int(h0.get("n_data", -1)) == int(h1.get("n_data", -2)),
-        })
-
-    except Exception as error:
-        out["error"] = repr(error)
-        out["traceback"] = traceback.format_exc()
-
-    return out
-
-
-def add_oracle_lrt_to_results(lrt_results, true_generator_stats, multi_fit_results):
-    """
-    Add simulation-only diagnostics comparing H0 with the known generator.
-
-    These are not a formal real-data LRT because real data do not know the true
-    generator parameters, but they are useful diagnostics in simulations.
-    """
-
-    if lrt_results is None:
-        return None
-
-    out = dict(lrt_results)
-
-    try:
-        null_key = out.get("null_key", "H0")
-        h0_stats = multi_fit_results[null_key]["likelihood_stats"]
-
-        out["true_generator_logL"] = float(true_generator_stats.get("logL", np.nan))
-        out["true_generator_nll"] = float(true_generator_stats.get("nll", np.nan))
-        out["true_generator_chi2"] = float(true_generator_stats.get("chi2", np.nan))
-        out["true_generator_n_data"] = int(true_generator_stats.get("n_data", 0))
-        out["true_generator_n_params"] = true_generator_stats.get("n_params", np.nan)
-        out["true_generator_dof"] = true_generator_stats.get("dof", np.nan)
-
-        out["oracle_LRT_true_vs_H0"] = 2.0 * (
-            out["true_generator_logL"]
-            - float(h0_stats.get("logL", np.nan))
-        )
-
-        out["delta_chi2_H0_minus_true_generator"] = (
-            float(h0_stats.get("chi2", np.nan))
-            - out["true_generator_chi2"]
-        )
-
-    except Exception as error:
-        out["oracle_error"] = repr(error)
-        out["oracle_traceback"] = traceback.format_exc()
-
-    return out
-
 
 def flatten_multi_fit_results_for_parquet(
     i,

@@ -51,10 +51,8 @@ from class_analysis import Analysis_Event
 from ulens_params import microlensing_params, event_param
 # import multiprocessing as mul
 # import h5py
-from fit_lc import fit_rubin_roman
 from detection_criteria import filter5points, deviation_from_constant, has_consecutive_numbers, filter_band, mag, debug_nsigma_global
 from read_save import save_sim, save_fit, read_data
-from set_model_pyLIMA import model_choice, parameters_model,flux_parameters_model
 
 
 
@@ -62,21 +60,7 @@ from set_model_pyLIMA import model_choice, parameters_model,flux_parameters_mode
 # ================================================================
 #  Guardado a Parquet
 # ================================================================
-def _save_dict_as_parquet(d: dict, path: str | Path, append: bool = True):
-    """Guarda un dict (valores tipo lista) como Parquet. Si append=True,
-    concatena con el archivo existente (si lo hay) antes de escribir."""
-    path = Path(path)
-    path.parent.mkdir(parents=True, exist_ok=True)  # crea subdirectorios si no existen
-
-    df_new = pd.DataFrame.from_dict(d)
-
-    if append and path.exists():
-        df_old = pd.read_parquet(path)
-        df_out = pd.concat([df_old, df_new], ignore_index=True)
-    else:
-        df_out = df_new
-
-    df_out.to_parquet(path, engine="pyarrow", index=False)
+from utils.io import save_dict_as_parquet as _save_dict_as_parquet
 
 
 # ================================================================
@@ -1740,8 +1724,8 @@ def tel_roman_rubin(
     # Esto preserva tu simulación principal.
     # ------------------------------------------------------------
 
-    if use_roman and use_rubin:
-        rubin_pointing_mode = "fixed"
+    # El modo "fixed" se conserva por defecto.
+    # El modo "source" también se permite con Roman+Rubin.
 
     # ------------------------------------------------------------
     # Modo campo fijo Roman+Rubin
@@ -1771,11 +1755,6 @@ def tel_roman_rubin(
                 "rubin_pointing_mode='source' requiere Ra y Dec."
             )
 
-        if use_roman:
-            raise ValueError(
-                "rubin_pointing_mode='source' está pensado para Rubin-only. "
-                "Para Roman+Rubin usá el campo fijo."
-            )
 
         event_Ra = float(Ra)
         event_Dec = float(Dec)

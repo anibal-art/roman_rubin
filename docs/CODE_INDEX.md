@@ -8,7 +8,7 @@ Descriptions come only from each module's **own top-level docstring**.
 Missing descriptions are explicitly flagged, not fabricated.
 This index is not an execution/configuration contract: see the root README and production method.
 
-**Indexed Python files:** 106
+**Indexed Python files:** 131
 
 ## `.`
 
@@ -35,6 +35,16 @@ This index is not an execution/configuration contract: see the root README and p
 | [`test_timeseries_long.py`](../test_timeseries_long.py) | **No module docstring: inspect the code before assuming its purpose.** |
 | [`timing_utils.py`](../timing_utils.py) | **No module docstring: inspect the code before assuming its purpose.** |
 | [`ulens_params.py`](../ulens_params.py) | **No module docstring: inspect the code before assuming its purpose.** |
+
+## `catalog`
+
+| File | Top-level module documentation |
+|---|---|
+| [`catalog/__init__.py`](../catalog/__init__.py) | Catalog-realization utilities: blending, caustic origin, Amax prefilter, and event-catalog I/O. |
+| [`catalog/amax.py`](../catalog/amax.py) | Catalog-level Amax detectability prefilter. |
+| [`catalog/blending.py`](../catalog/blending.py) | Deterministic, precomputed blending for Roman-Rubin catalogs. |
+| [`catalog/caustic_origin.py`](../catalog/caustic_origin.py) | Reproducible CROIN-origin realizations. |
+| [`catalog/event_reader.py`](../catalog/event_reader.py) | Reader for the frozen GBTDS 2000-event production catalog. |
 
 ## `legacy`
 
@@ -111,53 +121,98 @@ This index is not an execution/configuration contract: see the root README and p
 | [`notebooks/photutils/utils/__init__.py`](../notebooks/photutils/utils/__init__.py) | **No module docstring: inspect the code before assuming its purpose.** |
 | [`notebooks/photutils/utils/test_utils.py`](../notebooks/photutils/utils/test_utils.py) | This file defines some test catalog and DBObject classes for use with unit tests. |
 
+## `photometry`
+
+| File | Top-level module documentation |
+|---|---|
+| [`photometry/__init__.py`](../photometry/__init__.py) | Photometric noise models and shared photometric constants (Roman F146, Rubin). |
+| [`photometry/constants.py`](../photometry/constants.py) | Shared photometric constants. |
+| [`photometry/roman_f146.py`](../photometry/roman_f146.py) | **No module docstring: inspect the code before assuming its purpose.** |
+| [`photometry/roman_photometry.py`](../photometry/roman_photometry.py) | **No module docstring: inspect the code before assuming its purpose.** |
+
+## `scripts/validation`
+
+| File | Top-level module documentation |
+|---|---|
+| [`scripts/validation/validate_catalog_amax.py`](../scripts/validation/validate_catalog_amax.py) | **No module docstring: inspect the code before assuming its purpose.** |
+
+## `simulation`
+
+| File | Top-level module documentation |
+|---|---|
+| [`simulation/__init__.py`](../simulation/__init__.py) | Event-realization layer: decide WHAT to simulate, before simulating it. |
+| [`simulation/realization.py`](../simulation/realization.py) | EventRealization: an already-decided event, independent of its origin. |
+
 ## `stellar_population`
 
 | File | Top-level module documentation |
 |---|---|
 | [`stellar_population/__init__.py`](../stellar_population/__init__.py) | Stellar-population and survey simulation utilities. |
+| [`stellar_population/catalog_amax.py`](../stellar_population/catalog_amax.py) | Compatibility shim: this module moved to ''catalog.amax''. |
+| [`stellar_population/catalog_blending.py`](../stellar_population/catalog_blending.py) | Compatibility shim: this module moved to ''catalog.blending''. |
+| [`stellar_population/caustic_origin.py`](../stellar_population/caustic_origin.py) | Compatibility shim: this module moved to ''catalog.caustic_origin''. |
 
 ## `stellar_population/noise_models`
 
 | File | Top-level module documentation |
 |---|---|
 | [`stellar_population/noise_models/__init__.py`](../stellar_population/noise_models/__init__.py) | Photometric noise models. |
-| [`stellar_population/noise_models/roman_f146.py`](../stellar_population/noise_models/roman_f146.py) | **No module docstring: inspect the code before assuming its purpose.** |
-| [`stellar_population/noise_models/roman_photometry.py`](../stellar_population/noise_models/roman_photometry.py) | **No module docstring: inspect the code before assuming its purpose.** |
+| [`stellar_population/noise_models/roman_f146.py`](../stellar_population/noise_models/roman_f146.py) | Compatibility shim: this module moved to ''photometry.roman_f146''. |
+| [`stellar_population/noise_models/roman_photometry.py`](../stellar_population/noise_models/roman_photometry.py) | Compatibility shim: this module moved to ''photometry.roman_photometry''. |
 
 ## `stellar_population/scripts`
 
 | File | Top-level module documentation |
 |---|---|
 | [`stellar_population/scripts/analyze_trilegal_depth_pilot.py`](../stellar_population/scripts/analyze_trilegal_depth_pilot.py) | **No module docstring: inspect the code before assuming its purpose.** |
+| [`stellar_population/scripts/audit_f146_preproduction.py`](../stellar_population/scripts/audit_f146_preproduction.py) | Audit source brightness and idealized PSPL peak visibility in F146. |
 | [`stellar_population/scripts/audit_parallax_mask.py`](../stellar_population/scripts/audit_parallax_mask.py) | **No module docstring: inspect the code before assuming its purpose.** |
 | [`stellar_population/scripts/audit_roman_f146_noise_grid.py`](../stellar_population/scripts/audit_roman_f146_noise_grid.py) | **No module docstring: inspect the code before assuming its purpose.** |
+| [`stellar_population/scripts/audit_roman_rubin_baseline.py`](../stellar_population/scripts/audit_roman_rubin_baseline.py) | Roman/Rubin baseline 5-sigma brightness comparison. |
 | [`stellar_population/scripts/build_cached_2000_worker.py`](../stellar_population/scripts/build_cached_2000_worker.py) | **No module docstring: inspect the code before assuming its purpose.** |
 | [`stellar_population/scripts/build_event_production_index.py`](../stellar_population/scripts/build_event_production_index.py) | **No module docstring: inspect the code before assuming its purpose.** |
+| [`stellar_population/scripts/build_expanded_event_index.py`](../stellar_population/scripts/build_expanded_event_index.py) | Build the frozen 12-worker, 12000-draw event-shard index. |
 | [`stellar_population/scripts/build_gbtds_extinction_grid.py`](../stellar_population/scripts/build_gbtds_extinction_grid.py) | **No module docstring: inspect the code before assuming its purpose.** |
 | [`stellar_population/scripts/build_gbtds_pysiaf_footprints.py`](../stellar_population/scripts/build_gbtds_pysiaf_footprints.py) | **No module docstring: inspect the code before assuming its purpose.** |
 | [`stellar_population/scripts/build_gbtds_real_adaptive_cells.py`](../stellar_population/scripts/build_gbtds_real_adaptive_cells.py) | **No module docstring: inspect the code before assuming its purpose.** |
 | [`stellar_population/scripts/build_genulens_trilegal_reservoir.py`](../stellar_population/scripts/build_genulens_trilegal_reservoir.py) | **No module docstring: inspect the code before assuming its purpose.** |
 | [`stellar_population/scripts/build_precomputed_event_catalogs.py`](../stellar_population/scripts/build_precomputed_event_catalogs.py) | **No module docstring: inspect the code before assuming its purpose.** |
 | [`stellar_population/scripts/build_roman_f146_pandeia_grid.py`](../stellar_population/scripts/build_roman_f146_pandeia_grid.py) | **No module docstring: inspect the code before assuming its purpose.** |
-| [`stellar_population/scripts/catalog_event_reader.py`](../stellar_population/scripts/catalog_event_reader.py) | Reader for the frozen GBTDS 2000-event production catalog. |
+| [`stellar_population/scripts/catalog_event_reader.py`](../stellar_population/scripts/catalog_event_reader.py) | Compatibility shim: this module moved to ''catalog.event_reader''. |
 | [`stellar_population/scripts/download_trilegal.py`](../stellar_population/scripts/download_trilegal.py) | **No module docstring: inspect the code before assuming its purpose.** |
 | [`stellar_population/scripts/extract_gbtds_apt_tile_centers.py`](../stellar_population/scripts/extract_gbtds_apt_tile_centers.py) | **No module docstring: inspect the code before assuming its purpose.** |
 | [`stellar_population/scripts/finalize_gbtds_trilegal_cells.py`](../stellar_population/scripts/finalize_gbtds_trilegal_cells.py) | **No module docstring: inspect the code before assuming its purpose.** |
 | [`stellar_population/scripts/inspect_gbtds_apt_pointings.py`](../stellar_population/scripts/inspect_gbtds_apt_pointings.py) | **No module docstring: inspect the code before assuming its purpose.** |
 | [`stellar_population/scripts/inspect_gbtds_special_pointings.py`](../stellar_population/scripts/inspect_gbtds_special_pointings.py) | **No module docstring: inspect the code before assuming its purpose.** |
+| [`stellar_population/scripts/make_draft_figure2.py`](../stellar_population/scripts/make_draft_figure2.py) | **No module docstring: inspect the code before assuming its purpose.** |
+| [`stellar_population/scripts/make_draft_figure2_final.py`](../stellar_population/scripts/make_draft_figure2_final.py) | Paper Fig. |
 | [`stellar_population/scripts/pair_trilegal_genulens.py`](../stellar_population/scripts/pair_trilegal_genulens.py) | **No module docstring: inspect the code before assuming its purpose.** |
-| [`stellar_population/scripts/patch_photometry_flux_sync.py`](../stellar_population/scripts/patch_photometry_flux_sync.py) | **No module docstring: inspect the code before assuming its purpose.** |
-| [`stellar_population/scripts/patch_roman_f146_noise_integration.py`](../stellar_population/scripts/patch_roman_f146_noise_integration.py) | **No module docstring: inspect the code before assuming its purpose.** |
-| [`stellar_population/scripts/patch_roman_f146_noise_integration_v2.py`](../stellar_population/scripts/patch_roman_f146_noise_integration_v2.py) | **No module docstring: inspect the code before assuming its purpose.** |
 | [`stellar_population/scripts/plot_pilot_lightcurves.py`](../stellar_population/scripts/plot_pilot_lightcurves.py) | **No module docstring: inspect the code before assuming its purpose.** |
 | [`stellar_population/scripts/plot_updated_photometric_uncertainties.py`](../stellar_population/scripts/plot_updated_photometric_uncertainties.py) | **No module docstring: inspect the code before assuming its purpose.** |
+| [`stellar_population/scripts/prepare_expanded_catalog.py`](../stellar_population/scripts/prepare_expanded_catalog.py) | Prepare expanded catalog using verified existing TRILEGAL files. |
 | [`stellar_population/scripts/prepare_pandeia_roman_revh.py`](../stellar_population/scripts/prepare_pandeia_roman_revh.py) | **No module docstring: inspect the code before assuming its purpose.** |
 | [`stellar_population/scripts/refine_gbtds_extinction_grid.py`](../stellar_population/scripts/refine_gbtds_extinction_grid.py) | **No module docstring: inspect the code before assuming its purpose.** |
 | [`stellar_population/scripts/refine_roman_f146_saturation_grid.py`](../stellar_population/scripts/refine_roman_f146_saturation_grid.py) | **No module docstring: inspect the code before assuming its purpose.** |
+| [`stellar_population/scripts/repartition_12000_to_12.py`](../stellar_population/scripts/repartition_12000_to_12.py) | **No module docstring: inspect the code before assuming its purpose.** |
 | [`stellar_population/scripts/run_full_event_catalog_production.py`](../stellar_population/scripts/run_full_event_catalog_production.py) | **No module docstring: inspect the code before assuming its purpose.** |
 | [`stellar_population/scripts/run_trilegal_depth_pilot.py`](../stellar_population/scripts/run_trilegal_depth_pilot.py) | **No module docstring: inspect the code before assuming its purpose.** |
 | [`stellar_population/scripts/select_trilegal_depth_pilot.py`](../stellar_population/scripts/select_trilegal_depth_pilot.py) | **No module docstring: inspect the code before assuming its purpose.** |
 | [`stellar_population/scripts/smoke_roman_rubin.py`](../stellar_population/scripts/smoke_roman_rubin.py) | **No module docstring: inspect the code before assuming its purpose.** |
+| [`stellar_population/scripts/test_amax_sampling.py`](../stellar_population/scripts/test_amax_sampling.py) | Test sensitivity of peak predictions to observation-grid phase. |
+| [`stellar_population/scripts/test_fast_amax.py`](../stellar_population/scripts/test_fast_amax.py) | Compare inexpensive peak predictions against dense pyLIMA models. |
 | [`stellar_population/scripts/update_repository_docs.py`](../stellar_population/scripts/update_repository_docs.py) | Maintain root README navigation and exhaustive Python-file index. |
+
+## `tests`
+
+| File | Top-level module documentation |
+|---|---|
+| [`tests/__init__.py`](../tests/__init__.py) | **No module docstring: inspect the code before assuming its purpose.** |
+| [`tests/test_regression_interfaces.py`](../tests/test_regression_interfaces.py) | Regression tests freezing the EventRealization architecture and the LRT-facing compatibility contract introduced by the roman_rubin refactor. |
+
+## `utils`
+
+| File | Top-level module documentation |
+|---|---|
+| [`utils/__init__.py`](../utils/__init__.py) | Leaf utility helpers shared across roman_rubin modules. |
+| [`utils/io.py`](../utils/io.py) | Leaf I/O helpers. |
 <!-- END ROMAN_RUBIN_SOURCE_INDEX -->

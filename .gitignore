@@ -18,6 +18,7 @@ __pycache__/
 resultsDb_sqlite.db
 *.bak
 *.before_*
+*.log
 
 # Large locally generated stellar/event catalogues
 stellar_population/pilots/

@@ -1374,22 +1374,10 @@ def _initial_guess_candidate_keys(parameter_name):
     Esto permite usar indistintamente los nombres físicos cortos
     (t0, u0, s, q) o los nombres internos de pyLIMA para USBL
     (t_center, u_center, separation, mass_ratio).
-    """
-    aliases = {
-        "t0": ["t0", "t_center"],
-        "t_center": ["t_center", "t0"],
-        "u0": ["u0", "u_center"],
-        "u_center": ["u_center", "u0"],
-        "separation": ["separation", "s"],
-        "s": ["s", "separation"],
-        "mass_ratio": ["mass_ratio", "q"],
-        "q": ["q", "mass_ratio"],
-    }
 
-    return aliases.get(
-        parameter_name,
-        [parameter_name],
-    )
+    Mismo mapeo de alias que `_custom_bound_candidate_keys`.
+    """
+    return _custom_bound_candidate_keys(parameter_name)
 
 
 def explicit_guess_values(
