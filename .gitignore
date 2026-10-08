@@ -26,3 +26,6 @@ stellar_population/production/
 stellar_population/trilegal/production/
 stellar_population/genulens/production/
 stellar_population/precomputed_events/production/
+
+# Required Roman F146 noise-model calibration
+!photometry/data/roman_f146_pandeia_2026p1.csv
