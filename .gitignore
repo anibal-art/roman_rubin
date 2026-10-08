@@ -29,3 +29,4 @@ stellar_population/precomputed_events/production/
 
 # Required Roman F146 noise-model calibration
 !photometry/data/roman_f146_pandeia_2026p1.csv
+!photometry/data/roman_f146_pandeia_2026p1.json

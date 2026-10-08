@@ -1,0 +1,46 @@
+{
+  "model_name": "Roman_F146_Pandeia_R2026.1",
+  "pandeia_engine_version": "2026.1",
+  "filter": "F146",
+  "ma_table": "IM_66_6_V2",
+  "exposure_time_nominal_s": 66.0,
+  "nexp": 1,
+  "background": "gbtds_mid_5stripe",
+  "background_levels": [
+    "medium"
+  ],
+  "source_sed": "flat_fnu",
+  "magnitude_grid_system": "AB",
+  "mag_min": 12.0,
+  "mag_max": 30.0,
+  "mag_step": 0.5,
+  "ab_minus_vega_f146": 1.0364436822930514,
+  "ab_minus_vega_error": null,
+  "benchmark_mag_ab": 21.2,
+  "benchmark_snr_median": 106.98196907886583,
+  "benchmark_snr_min": 104.48542856064697,
+  "benchmark_snr_max": 112.75841475177369,
+  "notes": [
+    "Point-source aperture-photometry noise model derived from Pandeia.",
+    "No additional empirical systematic floor has been applied.",
+    "Crowding/confusion from unrelated Bulge stars is not included."
+  ],
+  "grid_mag_min_actual": 12.0,
+  "grid_mag_max_actual": 30.0,
+  "grid_n_rows": 1746,
+  "grid_n_detectors": 18,
+  "grid_n_unique_magnitudes": 97,
+  "grid_sampling": {
+    "coarse": {
+      "mag_min_ab": 12.0,
+      "mag_max_ab": 30.0,
+      "step_mag": 0.5
+    },
+    "saturation_refinement": {
+      "mag_min_ab": 15.5,
+      "mag_max_ab": 18.75,
+      "step_mag": 0.05
+    },
+    "benchmark_extra_ab": 21.2
+  }
+}
