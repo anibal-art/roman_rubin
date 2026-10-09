@@ -42,7 +42,6 @@ Sky cells + TRILEGAL source stars + GENULENS lens/source population
 | [`stellar_population/scripts/build_genulens_trilegal_reservoir.py`](stellar_population/scripts/build_genulens_trilegal_reservoir.py) | Produce GENULENS samples/reservoir for the configured fields. |
 | [`stellar_population/scripts/build_precomputed_event_catalogs.py`](stellar_population/scripts/build_precomputed_event_catalogs.py) | Match Galactic lens/source parameters and construct precomputed FFP, BH and binary-lens event Parquet files. |
 | [`stellar_population/scripts/run_full_event_catalog_production.py`](stellar_population/scripts/run_full_event_catalog_production.py) | Resumable per-cell orchestration of TRILEGAL, GENULENS, event catalogue generation and assembly. |
-| [`stellar_population/scripts/build_event_production_index.py`](stellar_population/scripts/build_event_production_index.py) | Build/audit global event-to-file shard index for production catalogues. |
 | [`stellar_population/scripts/catalog_event_reader.py`](stellar_population/scripts/catalog_event_reader.py) | Load a deterministic catalogue event by population and global index, including simulation seed. |
 | [`stellar_population/PRODUCTION_METHOD.md`](stellar_population/PRODUCTION_METHOD.md) | Detailed production method and assumptions; consult before changing catalogue inputs. |
 | [`stellar_population/config/gbtds_trilegal_cells_production.csv`](stellar_population/config/gbtds_trilegal_cells_production.csv) | Configured sky-cell list; input to stellar-population production. |
@@ -62,8 +61,6 @@ Sky cells + TRILEGAL source stars + GENULENS lens/source population
 |---|---|
 | [`stellar_population/scripts/smoke_roman_rubin.py`](stellar_population/scripts/smoke_roman_rubin.py) | End-to-end catalogue-event simulation and Roman-only/Roman+Rubin fit smoke tests. |
 | [`stellar_population/scripts/audit_parallax_mask.py`](stellar_population/scripts/audit_parallax_mask.py) | Compare masked time-dependent parallax geometry with recomputation after photometry filtering. |
-| [`stellar_population/scripts/plot_pilot_lightcurves.py`](stellar_population/scripts/plot_pilot_lightcurves.py) | Visualize selected pilot-event light curves and empirical observation intervals. |
-| [`stellar_population/scripts/plot_updated_photometric_uncertainties.py`](stellar_population/scripts/plot_updated_photometric_uncertainties.py) | Experimental plotting script: verify it calls RomanF146Noise and the exact Rubin pipeline before publication use. |
 | [`stellar_population/scripts/update_repository_docs.py`](stellar_population/scripts/update_repository_docs.py) | Refresh README's workflow/code map and exhaustive Python source index. |
 
 ### Roman F146: read this before modifying noise or figures
