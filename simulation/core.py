@@ -64,11 +64,98 @@ def simulate_light_curve(
     if sim_timer is not None:
         sim_timer.start("simulation_pylima_lightcurve")
 
-    simulator.simulate_lightcurve(
+    # pyLIMA computes the Full-parallax geometry when the model is
+    # constructed. simulator.simulate_lightcurve() calls
+    # define_pyLIMA_standard_parameters() again, which otherwise
+    # recomputes exactly the same geometry at the same observation
+    # times.
+    #
+    # Reuse is allowed only when the already-computed photometric
+    # shifts are present and aligned with every current lightcurve.
+    parallax_model = getattr(
         pyLIMA_model,
-        pyLIMA_parameters,
-        add_noise=False,
+        "parallax_model",
+        ["None", 0.0],
     )
+
+    reuse_existing_parallax = (
+        parallax_model[0] != "None"
+    )
+
+    if reuse_existing_parallax:
+
+        for tel in pyLIMA_model.event.telescopes:
+
+            if tel.lightcurve is None:
+                continue
+
+            shifts = getattr(
+                tel,
+                "deltas_positions",
+                {},
+            ).get(
+                "photometry",
+                None,
+            )
+
+            expected = (
+                2,
+                len(tel.lightcurve),
+            )
+
+            if (
+                shifts is None
+                or getattr(shifts, "shape", None) != expected
+            ):
+                raise RuntimeError(
+                    "Cannot reuse precomputed parallax geometry: "
+                    f"{tel.name}: "
+                    f"shape={getattr(shifts, 'shape', None)}, "
+                    f"expected={expected}"
+                )
+
+        event = pyLIMA_model.event
+
+        original_compute_parallax = (
+            event.compute_parallax_all_telescopes
+        )
+
+        skipped_calls = 0
+
+        def _reuse_precomputed_parallax(*args, **kwargs):
+            nonlocal skipped_calls
+            skipped_calls += 1
+            return None
+
+        event.compute_parallax_all_telescopes = (
+            _reuse_precomputed_parallax
+        )
+
+        try:
+            simulator.simulate_lightcurve(
+                pyLIMA_model,
+                pyLIMA_parameters,
+                add_noise=False,
+            )
+        finally:
+            event.compute_parallax_all_telescopes = (
+                original_compute_parallax
+            )
+
+        if skipped_calls != 1:
+            raise RuntimeError(
+                "Unexpected pyLIMA parallax call count inside "
+                "simulate_lightcurve: "
+                f"{skipped_calls}; expected exactly 1"
+            )
+
+    else:
+
+        simulator.simulate_lightcurve(
+            pyLIMA_model,
+            pyLIMA_parameters,
+            add_noise=False,
+        )
 
     if sim_timer is not None:
         sim_timer.stop("simulation_pylima_lightcurve")

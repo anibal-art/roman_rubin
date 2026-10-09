@@ -8,7 +8,7 @@ script_dir = Path(__file__).parent
 home_dir = os.path.expanduser("~")
 
 from rubin_sim.phot_utils.photometric_parameters import PhotometricParameters
-from rubin_sim.phot_utils.signaltonoise import calc_mag_error_m5
+from rubin_sim.phot_utils.signaltonoise import calc_gamma, calc_mag_error_m5
 
 # astropy
 import astropy.units as u
@@ -35,6 +35,9 @@ from simulation.realization import (
     realization_from_catalog,
     realization_from_generated_parameters,
     data_has_materialized_blend_ratio,
+)
+from simulation.parallax_cache import (
+    install_earth_ephemerides_cache,
 )
 from simulation.core import simulate_light_curve
 # ROMAN_F146_PANDEIA_INTEGRATION_V2
@@ -65,6 +68,210 @@ def set_photometric_parameters(exptime, nexp, readnoise=None):
     return photParams
 
 
+
+
+
+# ================================================================
+# Rubin photometric gamma cache
+# ================================================================
+#
+# calc_gamma() is expensive because Rubin Sim constructs and
+# normalizes an SED and integrates it through the bandpass.
+#
+# For a fixed Rubin observing schedule, bandpass and photometric
+# configuration, the m5 vector is identical between microlensing
+# events. Therefore the corresponding gamma vector can be computed
+# once per process and reused.
+#
+# The scientific calculation remains Rubin Sim's own calc_gamma()
+# and calc_mag_error_m5().  This cache only avoids recomputing gamma
+# for identical inputs.
+# ================================================================
+
+_RUBIN_GAMMA_VECTOR_CACHE = {}
+
+_RUBIN_GAMMA_VECTOR_CACHE_STATS = {
+    "vector_hits": 0,
+    "vector_misses": 0,
+    "gamma_values_computed": 0,
+}
+
+
+def _rubin_photometric_parameters_signature(
+    phot_params,
+):
+    """
+    Stable process-local signature of PhotometricParameters state.
+
+    A new PhotometricParameters object is created by sim_event()
+    for each event, so object identity cannot be used for caching.
+    """
+
+    return tuple(
+        sorted(
+            (
+                str(name),
+                type(value).__module__,
+                type(value).__qualname__,
+                repr(value),
+            )
+            for name, value
+            in vars(phot_params).items()
+        )
+    )
+
+
+def _rubin_m5_vector_signature(
+    m5_values,
+):
+    """
+    Exact float64 signature of a Rubin m5 vector.
+    """
+
+    values = np.ascontiguousarray(
+        np.asarray(
+            m5_values,
+            dtype=np.float64,
+        )
+    )
+
+    return (
+        values.shape,
+        values.tobytes(),
+    )
+
+
+def _get_cached_rubin_gamma_vector(
+    band_name,
+    bandpass,
+    m5_values,
+    phot_params,
+):
+    """
+    Return the exact Rubin-Sim gamma vector for one band/schedule.
+
+    On a cache miss, every gamma value is calculated with the
+    official rubin_sim.phot_utils.signaltonoise.calc_gamma().
+    Subsequent events with exactly the same inputs reuse that vector.
+
+    The cached value retains a strong reference to the Bandpass
+    object, so Python object-id reuse cannot produce a false hit.
+    """
+
+    m5_array = np.asarray(
+        m5_values,
+        dtype=np.float64,
+    )
+
+    key = (
+        str(band_name),
+        id(bandpass),
+        _rubin_photometric_parameters_signature(
+            phot_params
+        ),
+        _rubin_m5_vector_signature(
+            m5_array
+        ),
+    )
+
+    cached = (
+        _RUBIN_GAMMA_VECTOR_CACHE.get(
+            key
+        )
+    )
+
+    if cached is not None:
+
+        cached_bandpass, gamma_values = (
+            cached
+        )
+
+        if cached_bandpass is bandpass:
+
+            _RUBIN_GAMMA_VECTOR_CACHE_STATS[
+                "vector_hits"
+            ] += 1
+
+            return gamma_values
+
+    gamma_values = np.empty(
+        len(m5_array),
+        dtype=float,
+    )
+
+    for index, m5_value in enumerate(
+        m5_array
+    ):
+
+        gamma_values[index] = calc_gamma(
+            bandpass,
+            float(m5_value),
+            phot_params,
+        )
+
+    # Protect cached data against accidental mutation.
+    gamma_values.setflags(
+        write=False
+    )
+
+    _RUBIN_GAMMA_VECTOR_CACHE[
+        key
+    ] = (
+        bandpass,
+        gamma_values,
+    )
+
+    _RUBIN_GAMMA_VECTOR_CACHE_STATS[
+        "vector_misses"
+    ] += 1
+
+    _RUBIN_GAMMA_VECTOR_CACHE_STATS[
+        "gamma_values_computed"
+    ] += len(
+        gamma_values
+    )
+
+    return gamma_values
+
+
+def get_rubin_gamma_vector_cache_stats():
+    """
+    Return process-local Rubin gamma-cache diagnostics.
+    """
+
+    return {
+        **_RUBIN_GAMMA_VECTOR_CACHE_STATS,
+        "cached_vectors":
+            len(
+                _RUBIN_GAMMA_VECTOR_CACHE
+            ),
+        "cached_gamma_values":
+            sum(
+                len(value[1])
+                for value
+                in _RUBIN_GAMMA_VECTOR_CACHE.values()
+            ),
+    }
+
+
+def reset_rubin_gamma_vector_cache():
+    """
+    Clear the process-local Rubin gamma-vector cache.
+    """
+
+    _RUBIN_GAMMA_VECTOR_CACHE.clear()
+
+    _RUBIN_GAMMA_VECTOR_CACHE_STATS[
+        "vector_hits"
+    ] = 0
+
+    _RUBIN_GAMMA_VECTOR_CACHE_STATS[
+        "vector_misses"
+    ] = 0
+
+    _RUBIN_GAMMA_VECTOR_CACHE_STATS[
+        "gamma_values_computed"
+    ] = 0
 
 
 def _plain_array(x, dtype=None):
@@ -380,6 +587,13 @@ def apply_roman_rubin_photometry(
             n_m5 = len(m5_all)
             n_sat = len(sat_all) if sat_all is not None else 0
 
+            gamma_all = _get_cached_rubin_gamma_vector(
+                band_name,
+                LSST_BandPass[band_name],
+                m5_all,
+                photParams,
+            )
+
             saturation_fallback = _as_band_limit_array(
                 rubin_saturation_mag,
                 band_name,
@@ -403,6 +617,7 @@ def apply_roman_rubin_photometry(
                     LSST_BandPass[band_name],
                     m5_k,
                     photParams,
+                    gamma=float(gamma_all[idx_m5]),
                 )[0]
 
                 err_mag.append(magerr_k)
@@ -502,6 +717,202 @@ def inject_model_flux_for_ground_telescopes(
         tel.lightcurve["flux"] = model_flux
 
     return new_creation
+
+
+# ============================================================
+# Fast synchronization of pyLIMA time-indexed geometry
+# after photometric filtering.
+#
+# Photometric filtering only removes observation rows; it does not
+# alter their times. Therefore already-computed parallax geometry can
+# be restricted to the surviving rows instead of recomputed.
+# ============================================================
+
+_PARALLAX_TIME_ARRAY_AXES = {
+    "Earth_positions": 0,
+    "Earth_speeds": 0,
+    "sidereal_times": 0,
+    "telescope_positions": 0,
+    "Earth_positions_projected": 1,
+    "Earth_speeds_projected": 1,
+    "deltas_positions": 1,
+}
+
+
+def _lightcurve_time_values(telescope):
+    times = telescope.lightcurve["time"]
+
+    if hasattr(times, "value"):
+        times = times.value
+
+    return np.asarray(times, dtype=float)
+
+
+def _capture_prefilter_telescope_times(event):
+    """Save only observation times needed to reconstruct filter masks."""
+
+    out = {}
+
+    for tel in event.telescopes:
+
+        if tel.lightcurve is None:
+            continue
+
+        out[tel.name] = _lightcurve_time_values(
+            tel
+        ).copy()
+
+    return out
+
+
+def _mask_time_indexed_telescope_arrays(
+    event,
+    prefilter_times,
+):
+    """
+    Restrict already-computed pyLIMA time-indexed arrays to the
+    photometric rows that survived filtering.
+
+    This is mathematically equivalent to recomputing parallax at the
+    surviving times, but avoids the expensive ephemeris calculation.
+
+    Fail loudly if filtering changed times rather than only removing
+    rows.
+    """
+
+    for tel in event.telescopes:
+
+        if tel.lightcurve is None or len(tel.lightcurve) == 0:
+            continue
+
+        if tel.name not in prefilter_times:
+            raise RuntimeError(
+                "Missing pre-filter telescope times: "
+                f"{tel.name}"
+            )
+
+        before = np.asarray(
+            prefilter_times[tel.name],
+            dtype=float,
+        )
+
+        after = _lightcurve_time_values(tel)
+
+        n_before = len(before)
+        n_after = len(after)
+
+        if n_after > n_before:
+            raise RuntimeError(
+                "Photometric filtering increased point count: "
+                f"{tel.name}: {n_before} -> {n_after}"
+            )
+
+        # Fast no-op when nothing was removed.
+        if (
+            n_before == n_after
+            and np.array_equal(before, after)
+        ):
+            continue
+
+        # Filtering preserves order, so surviving rows are recovered
+        # exactly by indexing into the original sorted timestamps.
+        idx = np.searchsorted(before, after)
+
+        if np.any(idx < 0) or np.any(idx >= n_before):
+            raise RuntimeError(
+                "Filtered times are not a subset of original times: "
+                f"{tel.name}"
+            )
+
+        if not np.array_equal(before[idx], after):
+            max_diff = float(
+                np.max(np.abs(before[idx] - after))
+            )
+
+            raise RuntimeError(
+                "Photometric filtering modified observation times "
+                f"for {tel.name}; max difference={max_diff}"
+            )
+
+        for attr, axis in _PARALLAX_TIME_ARRAY_AXES.items():
+
+            if not hasattr(tel, attr):
+                continue
+
+            value = getattr(tel, attr)
+
+            if value is None:
+                continue
+
+            if isinstance(value, dict):
+
+                for key, item in list(value.items()):
+
+                    if item is None:
+                        continue
+
+                    shape = np.shape(item)
+
+                    if len(shape) <= axis:
+                        continue
+
+                    n_axis = shape[axis]
+
+                    if n_axis == n_before:
+                        value[key] = np.take(
+                            item,
+                            idx,
+                            axis=axis,
+                        )
+
+                    elif n_axis == n_after:
+                        # Already synchronized by another operation.
+                        continue
+
+                    else:
+                        raise RuntimeError(
+                            "Unexpected time-axis length: "
+                            f"{tel.name}.{attr}[{key!r}] "
+                            f"has {n_axis}; expected "
+                            f"{n_before} or {n_after}"
+                        )
+
+            else:
+
+                shape = np.shape(value)
+
+                if len(shape) <= axis:
+                    continue
+
+                n_axis = shape[axis]
+
+                if n_axis == n_before:
+                    setattr(
+                        tel,
+                        attr,
+                        np.take(
+                            value,
+                            idx,
+                            axis=axis,
+                        ),
+                    )
+
+                elif n_axis == n_after:
+                    continue
+
+                else:
+                    raise RuntimeError(
+                        "Unexpected time-axis length: "
+                        f"{tel.name}.{attr} has {n_axis}; "
+                        f"expected {n_before} or {n_after}"
+                    )
+
+
+
+# Exact cache of Earth barycentric ephemerides used by pyLIMA.
+# Unknown time arrays still fall back to the original Astropy-backed
+# implementation. This touches no RNG state.
+install_earth_ephemerides_cache()
 
 def sim_event(
     i,
@@ -715,6 +1126,8 @@ def sim_event(
     #    `data` happens to provide it, and otherwise leaves it None --
     #    "not yet decided" -- handled right below by falling back to
     #    the exact historical random-origin mechanism.
+    _sim_timer.start("simulation_model_realization")
+
     if data_has_materialized_blend_ratio(data, band_order):
         realization = realization_from_catalog(
             data,
@@ -732,6 +1145,8 @@ def sim_event(
             band_order,
         )
 
+    _sim_timer.stop("simulation_model_realization")
+
     if realization.caustic_origin is not None:
         # Explicit origin (from either producer): never sampled.
         caustic_origin_arg = [realization.caustic_origin, [0, 0]]
@@ -746,6 +1161,8 @@ def sim_event(
         caustic_origin_arg = None
         bl_random_origin = True
 
+    _sim_timer.start("simulation_model_choice")
+
     my_own_model = model_choice(
         new_creation,
         model,
@@ -754,6 +1171,9 @@ def sim_event(
         BL_origin=caustic_origin_arg,
     )
 
+    _sim_timer.stop("simulation_model_choice")
+
+    _sim_timer.start("simulation_model_parameters")
 
     params, param_order = parameters_model(
         realization.physical_params,
@@ -764,6 +1184,10 @@ def sim_event(
         params[key]
         for key in param_order
     ]
+
+    _sim_timer.stop("simulation_model_parameters")
+
+    _sim_timer.start("simulation_model_flux")
 
     if realization.blend_ratio is not None:
         # Explicit realization path: blend_ratio already decided (by
@@ -789,6 +1213,8 @@ def sim_event(
         )
 
     my_own_parameters += my_own_flux_parameters
+
+    _sim_timer.stop("simulation_model_flux")
     _sim_timer.stop("simulation_model_setup")
 
     # ============================================================
@@ -820,6 +1246,19 @@ def sim_event(
     # Fotometría Roman + Rubin
     # ============================================================
     
+    _sim_timer.start("simulation_parallax_snapshot")
+
+    if truth_parallax:
+        _parallax_prefilter_times = (
+            _capture_prefilter_telescope_times(
+                my_own_model.event
+            )
+        )
+    else:
+        _parallax_prefilter_times = None
+
+    _sim_timer.stop("simulation_parallax_snapshot")
+
     _sim_timer.start("simulation_photometry")
     new_creation, Roman_band, Rubin_band = apply_roman_rubin_photometry(
         new_creation,
@@ -859,13 +1298,17 @@ def sim_event(
 
     if truth_parallax:
 
-        for tel in my_own_model.event.telescopes:
+        # Parallax geometry was already calculated at the original
+        # observation times. Photometric filtering only removes rows,
+        # so synchronize all time-indexed pyLIMA arrays by applying
+        # exactly the same surviving-time mask instead of recomputing
+        # the ephemeris geometry.
+        _mask_time_indexed_telescope_arrays(
+            my_own_model.event,
+            _parallax_prefilter_times,
+        )
 
-            tel.compute_parallax(
-                my_own_model.parallax_model,
-                my_own_model.event.North,
-                my_own_model.event.East,
-            )
+        for tel in my_own_model.event.telescopes:
 
             shifts = np.asarray(
                 tel.deltas_positions["photometry"]
@@ -875,7 +1318,7 @@ def sim_event(
 
             if shifts.shape != expected:
                 raise RuntimeError(
-                    "Parallax/photometry mismatch: "
+                    "Parallax/photometry mismatch after masking: "
                     f"{tel.name}: "
                     f"{shifts.shape} != {expected}"
                 )

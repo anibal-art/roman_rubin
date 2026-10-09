@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import warnings
+
 import numpy as np
 import pandas as pd
 
@@ -60,6 +62,129 @@ def _restore_scalar(value, scalar):
         return arr.reshape(-1)[0].item()
 
     return arr
+
+
+
+def _nanmedian_18sca_axis0_exact(
+    values,
+):
+    """
+    Exact fast nanmedian for the Roman median-SCA 18 x N stacks.
+
+    The Roman median-detector approximation combines the 18 real
+    SCAs independently at every epoch. NumPy's generic nanmedian()
+    has substantial overhead for this small fixed detector axis.
+
+    For the validated 18 x N floating-point case, sort the 18
+    detector values explicitly and select the middle finite value(s).
+    Outside that exact case, fall back to NumPy's implementation.
+
+    The all-NaN RuntimeWarning is preserved.
+    """
+
+    arr = np.asarray(
+        values
+    )
+
+    if (
+        arr.ndim != 2
+        or arr.shape[0] != 18
+        or arr.dtype.kind != "f"
+    ):
+        return np.nanmedian(
+            arr,
+            axis=0,
+        )
+
+    # Put the fixed 18-SCA detector axis last, then sort it.
+    # NaNs sort to the end, so the first `counts` entries are
+    # exactly the finite values used by nanmedian.
+    ordered = np.sort(
+        arr.T,
+        axis=1,
+    )
+
+    counts = np.sum(
+        ~np.isnan(
+            ordered
+        ),
+        axis=1,
+    )
+
+    result = np.full(
+        arr.shape[1],
+        np.nan,
+        dtype=arr.dtype,
+    )
+
+    columns = np.arange(
+        arr.shape[1]
+    )
+
+    nonzero = (
+        counts > 0
+    )
+
+    odd = (
+        nonzero
+        & ((counts % 2) == 1)
+    )
+
+    even = (
+        nonzero
+        & ((counts % 2) == 0)
+    )
+
+    middle = (
+        counts // 2
+    )
+
+    if np.any(
+        odd
+    ):
+        result[
+            odd
+        ] = ordered[
+            columns[odd],
+            middle[odd],
+        ]
+
+    if np.any(
+        even
+    ):
+        lower = ordered[
+            columns[even],
+            middle[even] - 1,
+        ]
+
+        upper = ordered[
+            columns[even],
+            middle[even],
+        ]
+
+        result[
+            even
+        ] = (
+            lower
+            + upper
+        ) / 2.0
+
+    n_all_nan = int(
+        np.count_nonzero(
+            counts == 0
+        )
+    )
+
+    for _ in range(
+        n_all_nan
+    ):
+        warnings.warn(
+            "All-NaN slice encountered",
+            RuntimeWarning,
+            stacklevel=2,
+        )
+
+    return result
 
 
 class RomanF146Noise:
@@ -477,6 +602,16 @@ class RomanF146Noise:
         mag_ab,
         detector,
     ):
+        """
+        Evaluate one Roman detector using the precomputed Pandeia grid.
+
+        Static detector-table information is converted to NumPy arrays
+        once per process and then reused. Only the event-dependent
+        magnitude lookup and piecewise interpolation are repeated.
+
+        This preserves the original regime classification,
+        interpolation rules, saturation policy, and returned values.
+        """
 
         scalar = (
             np.asarray(
@@ -496,12 +631,125 @@ class RomanF146Noise:
             detector
         ]
 
+        # ====================================================
+        # Static detector preprocessing
+        #
+        # The Pandeia grid and segment definitions never change
+        # between events. Avoid rebuilding pandas objects,
+        # converting strings, and extracting interpolation arrays
+        # for every simulated light curve.
+        # ====================================================
+
+        cache = data.get(
+            "_roman_fast_eval_cache"
+        )
+
+        if cache is None:
+
+            table = data[
+                "table"
+            ]
+
+            row_segment = (
+                table[
+                    "segment"
+                ]
+                .astype(str)
+                .to_numpy()
+            )
+
+            row_nres = (
+                table[
+                    "sat_nresultants"
+                ]
+                .to_numpy(
+                    dtype=float
+                )
+            )
+
+            row_full = (
+                row_segment
+                == "full"
+            )
+
+            row_partial = (
+                np.char.startswith(
+                    row_segment.astype(str),
+                    "partial_",
+                )
+            )
+
+            row_unsaturated = (
+                row_segment
+                == "unsaturated"
+            )
+
+            segment_arrays = {}
+
+            for key in sorted(
+                data[
+                    "segments"
+                ].keys()
+            ):
+
+                segment_table = (
+                    data[
+                        "segments"
+                    ][key]
+                )
+
+                segment_arrays[
+                    str(key)
+                ] = (
+                    segment_table[
+                        "mag_ab"
+                    ].to_numpy(
+                        dtype=float
+                    ),
+                    segment_table[
+                        "snr"
+                    ].to_numpy(
+                        dtype=float
+                    ),
+                )
+
+            cache = {
+                "row_segment":
+                    row_segment,
+
+                "row_nres":
+                    row_nres,
+
+                "row_full":
+                    row_full,
+
+                "row_partial":
+                    row_partial,
+
+                "row_unsaturated":
+                    row_unsaturated,
+
+                "segment_arrays":
+                    segment_arrays,
+            }
+
+            data[
+                "_roman_fast_eval_cache"
+            ] = cache
+
+        # ====================================================
+        # Event-dependent evaluation
+        # ====================================================
+
         faint = (
             mag
-            > data["mag_max"]
+            > data[
+                "mag_max"
+            ]
         )
 
         if np.any(faint):
+
             raise ValueError(
                 "Magnitude fainter than the "
                 "precomputed Pandeia grid "
@@ -512,70 +760,90 @@ class RomanF146Noise:
                 f"{mag.max():.3f} AB."
             )
 
-        # Anything brighter than our grid minimum is safely
-        # treated as fully saturated because the bright edge
-        # itself is already fully saturated for every SCA.
+        # Anything brighter than the grid minimum retains the
+        # exact historical full-saturation policy.
         bright = (
             mag
-            < data["mag_min"]
+            < data[
+                "mag_min"
+            ]
         )
 
-        # For in-range points, assign the regime of the nearest
-        # sampled Pandeia magnitude. This places each transition
-        # halfway between adjacent grid points and prevents
-        # interpolation across a discontinuity.
         clipped = np.clip(
             mag,
-            data["mag_min"],
-            data["mag_max"],
-        )
-
-        nearest_index = np.searchsorted(
             data[
-                "boundaries"
+                "mag_min"
             ],
-            clipped,
-            side="right",
+            data[
+                "mag_max"
+            ],
         )
 
-        nearest_rows = (
-            data["table"]
-            .iloc[
-                nearest_index
-            ]
-            .reset_index(
-                drop=True
+        nearest_index = (
+            np.searchsorted(
+                data[
+                    "boundaries"
+                ],
+                clipped,
+                side="right",
             )
         )
 
         segment = (
-            nearest_rows[
-                "segment"
+            cache[
+                "row_segment"
+            ][
+                nearest_index
             ]
-            .astype(str)
-            .to_numpy()
+            .copy()
+        )
+
+        full = (
+            cache[
+                "row_full"
+            ][
+                nearest_index
+            ]
+            .copy()
+        )
+
+        partial = (
+            cache[
+                "row_partial"
+            ][
+                nearest_index
+            ]
+            .copy()
+        )
+
+        unsaturated = (
+            cache[
+                "row_unsaturated"
+            ][
+                nearest_index
+            ]
+            .copy()
         )
 
         segment[
             bright
         ] = "full"
 
-        full = (
-            segment
-            == "full"
-        )
+        full[
+            bright
+        ] = True
 
-        partial = np.char.startswith(
-            segment.astype(str),
-            "partial_",
-        )
+        partial[
+            bright
+        ] = False
 
-        unsaturated = (
-            segment
-            == "unsaturated"
-        )
+        unsaturated[
+            bright
+        ] = False
 
-        valid = ~full
+        valid = (
+            ~full
+        )
 
         nres = np.full(
             len(mag),
@@ -583,23 +851,20 @@ class RomanF146Noise:
             dtype=float,
         )
 
-        partial_or_unsat = (
-            valid
-        )
-
         if np.any(
-            partial_or_unsat
+            valid
         ):
+
             nres[
-                partial_or_unsat
+                valid
             ] = (
-                nearest_rows.loc[
-                    partial_or_unsat,
-                    "sat_nresultants",
+                cache[
+                    "row_nres"
+                ][
+                    nearest_index[
+                        valid
+                    ]
                 ]
-                .to_numpy(
-                    dtype=float
-                )
             )
 
         snr = np.zeros(
@@ -607,63 +872,54 @@ class RomanF146Noise:
             dtype=float,
         )
 
-        # ----------------------------------------
-        # Piecewise interpolation.
+        # ====================================================
+        # Piecewise interpolation
         #
-        # Each segment is independent. In
-        # particular, partial_3 never interpolates
-        # toward partial_4, etc.
-        # ----------------------------------------
+        # Preserve the original rule that each instrumental
+        # segment is interpolated independently.
+        # ====================================================
 
-        for key in np.unique(
-            segment[
-                valid
-            ]
+        for key, (
+            x,
+            y,
+        ) in (
+            cache[
+                "segment_arrays"
+            ].items()
         ):
 
             mask = (
-                segment
-                == key
-            )
-
-            table = (
-                data[
-                    "segments"
-                ][key]
-            )
-
-            x = (
-                table[
-                    "mag_ab"
-                ]
-                .to_numpy(
-                    dtype=float
+                valid
+                &
+                (
+                    segment
+                    == key
                 )
             )
 
-            y = (
-                table[
-                    "snr"
-                ]
-                .to_numpy(
-                    dtype=float
-                )
-            )
+            if not np.any(
+                mask
+            ):
+                continue
 
-            if len(x) == 1:
+            if len(
+                x
+            ) == 1:
+
                 snr[
                     mask
-                ] = y[0]
+                ] = y[
+                    0
+                ]
 
             else:
-                # Interpolate log S/N. Endpoint clamping is
-                # intentional inside the half-grid transition
-                # interval, never across different regimes.
+
                 snr[
                     mask
                 ] = (
                     10.0
-                    ** np.interp(
+                    **
+                    np.interp(
                         mag[
                             mask
                         ],
@@ -709,11 +965,6 @@ class RomanF146Noise:
             for key, value
             in result.items()
         }
-
-
-    # ========================================================
-    # Public evaluation
-    # ========================================================
 
     def evaluate_ab(
         self,
@@ -927,9 +1178,8 @@ class RomanF146Noise:
         with np.errstate(
             all="ignore"
         ):
-            snr = np.nanmedian(
-                masked_snr,
-                axis=0,
+            snr = _nanmedian_18sca_axis0_exact(
+                masked_snr
             )
 
         snr[
@@ -939,13 +1189,12 @@ class RomanF146Noise:
         with np.errstate(
             all="ignore"
         ):
-            nres = np.nanmedian(
+            nres = _nanmedian_18sca_axis0_exact(
                 np.where(
                     valid_stack,
                     nres_stack,
                     np.nan,
-                ),
-                axis=0,
+                )
             )
 
         full = (
