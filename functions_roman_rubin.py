@@ -3246,7 +3246,10 @@ def build_event_params_from_custom_system(
     numerical_keys.update(
         key
         for key in optional_numerical_keys
-        if key in event_params
+        if (
+            key in event_params
+            and event_params[key] is not None
+        )
     )
 
     for key in numerical_keys:
