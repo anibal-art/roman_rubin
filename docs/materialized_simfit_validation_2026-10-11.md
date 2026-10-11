@@ -154,3 +154,11 @@ The controlled validation configuration used `initial_guess="truth"` and
 explicit local bounds.  Pilot configuration files under the run directory are
 not part of this source-code commit.  The final production configuration must
 be frozen separately before the full catalog run.
+
+## Configuration usage example
+
+The active materialized-catalog launcher, safe test procedure, deterministic
+population slicing, output structure, and fit-configuration example are
+documented in:
+
+`docs/materialized_catalog_simfit_usage.md`
