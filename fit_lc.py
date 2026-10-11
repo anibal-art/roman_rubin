@@ -413,11 +413,49 @@ def event_creation(
 # Parámetros iniciales para el modelo de ajuste
 # ============================================================
 
+def fit_trajectory_parameter_names(
+    fit_model,
+    Origin=None,
+):
+    """
+    Return the trajectory parameter names used by pyLIMA.
+
+    PSPL/FSPL use t0/u0.
+
+    For USBL, pyLIMA uses t0/u0 only for center_of_mass.
+    For any shifted origin (central_caustic, second_caustic,
+    third_caustic, primary, secondary, etc.) pyLIMA replaces them
+    with t_center/u_center.
+
+    Origin=None preserves the historical USBL fit convention
+    t_center/u_center. The production simulation-fit path passes
+    the explicit realized Origin.
+    """
+    fit_model = normalize_model_name(fit_model)
+
+    if fit_model != "USBL":
+        return "t0", "u0"
+
+    if Origin is None:
+        return "t_center", "u_center"
+
+    if isinstance(Origin, str):
+        origin_name = Origin
+    else:
+        origin_name = Origin[0]
+
+    if origin_name == "center_of_mass":
+        return "t0", "u0"
+
+    return "t_center", "u_center"
+
+
 def initial_params_for_fit_model(
     event_params,
     fit_model,
     fit_parallax=True,
     fit_defaults=None,
+    Origin=None,
 ):
     """
     Construye los parámetros iniciales para el modelo de ajuste.
@@ -434,19 +472,42 @@ def initial_params_for_fit_model(
 
     fit_model = normalize_model_name(fit_model)
 
+    time_key, impact_key = fit_trajectory_parameter_names(
+        fit_model,
+        Origin=Origin,
+    )
+
+    time_alias = (
+        "t0"
+        if time_key == "t_center"
+        else "t_center"
+    )
+
+    impact_alias = (
+        "u0"
+        if impact_key == "u_center"
+        else "u_center"
+    )
+
+    # Keep t0/u0 as internal generic storage names in fit_params.
+    # Their VALUES are the active trajectory coordinates used by
+    # the fit:
+    #
+    #   center_of_mass -> t0, u0
+    #   shifted USBL origin -> t_center, u_center
     t0 = float(
         get_param(
             event_params,
-            "t0",
-            aliases=["t_center"],
+            time_key,
+            aliases=[time_alias],
         )
     )
 
     u0 = float(
         get_param(
             event_params,
-            "u0",
-            aliases=["u_center"],
+            impact_key,
+            aliases=[impact_alias],
         )
     )
 
@@ -530,6 +591,7 @@ def initial_params_for_fit_model(
 def fit_parameter_order(
     fit_model,
     fit_parallax=True,
+    Origin=None,
 ):
     """
     Orden explícito de los parámetros físicos para pyLIMA.
@@ -554,9 +616,15 @@ def fit_parameter_order(
         ]
 
     elif fit_model == "USBL":
+
+        time_key, impact_key = fit_trajectory_parameter_names(
+            fit_model,
+            Origin=Origin,
+        )
+
         order = [
-            "t_center",
-            "u_center",
+            time_key,
+            impact_key,
             "tE",
             "rho",
             "separation",
@@ -580,6 +648,7 @@ def fit_guess_values(
     fit_params,
     fit_model,
     fit_parallax=True,
+    Origin=None,
 ):
     """
     Devuelve los valores iniciales en el orden esperado por pyLIMA.
@@ -609,6 +678,7 @@ def fit_guess_values(
     order = fit_parameter_order(
         fit_model,
         fit_parallax=fit_parallax,
+        Origin=Origin,
     )
 
     return [
@@ -977,6 +1047,7 @@ def apply_custom_bounds(
     fit_model,
     fit_parallax=True,
     fit_bounds=None,
+    Origin=None,
 ):
     """
     Sobreescribe bounds usando un diccionario definido por el usuario.
@@ -989,6 +1060,7 @@ def apply_custom_bounds(
     param_order = fit_parameter_order(
         fit_model,
         fit_parallax=fit_parallax,
+        Origin=Origin,
     )
 
     for par in param_order:
@@ -1025,18 +1097,17 @@ def apply_narrow_bounds(
     fit_model,
     fit_parallax=True,
     rango=1,
+    Origin=None,
 ):
     """
     Bounds angostos, equivalentes al caso rango != 0.
     """
     fit_model = normalize_model_name(fit_model)
 
-    if fit_model == "USBL":
-        t0_key = "t_center"
-        u0_key = "u_center"
-    else:
-        t0_key = "t0"
-        u0_key = "u0"
+    t0_key, u0_key = fit_trajectory_parameter_names(
+        fit_model,
+        Origin=Origin,
+    )
 
     set_fit_bound(
         fit,
@@ -1143,18 +1214,17 @@ def apply_wide_bounds(
     fit_params,
     fit_model,
     fit_parallax=True,
+    Origin=None,
 ):
     """
     Bounds amplios, equivalentes al caso rango == 0.
     """
     fit_model = normalize_model_name(fit_model)
 
-    if fit_model == "USBL":
-        t0_key = "t_center"
-        u0_key = "u_center"
-    else:
-        t0_key = "t0"
-        u0_key = "u0"
+    t0_key, u0_key = fit_trajectory_parameter_names(
+        fit_model,
+        Origin=Origin,
+    )
 
     set_fit_bound(
         fit,
@@ -1273,6 +1343,7 @@ def apply_fit_bounds(
     rango,
     fit_parallax=True,
     fit_bounds=None,
+    Origin=None,
 ):
     """
     Aplica bounds según rango y, opcionalmente, sobreescribe
@@ -1288,6 +1359,7 @@ def apply_fit_bounds(
             fit_model,
             fit_parallax=fit_parallax,
             rango=rango_used,
+            Origin=Origin,
         )
 
     else:
@@ -1299,6 +1371,7 @@ def apply_fit_bounds(
             fit_params,
             fit_model,
             fit_parallax=fit_parallax,
+            Origin=Origin,
         )
 
     if fit_bounds is not None:
@@ -1309,6 +1382,7 @@ def apply_fit_bounds(
             fit_model,
             fit_parallax=fit_parallax,
             fit_bounds=fit_bounds,
+            Origin=Origin,
         )
 
     return rango_used
@@ -1510,6 +1584,7 @@ def resolve_initial_guess(
     param_order,
     initial_guess=None,
     rng=None,
+    Origin=None,
 ):
     """
     Resuelve qué guess inicial usar.
@@ -1568,6 +1643,7 @@ def resolve_initial_guess(
             fit_params,
             fit_model,
             fit_parallax=fit_parallax,
+            Origin=Origin,
         )
 
         source = "fit_params"
@@ -2259,6 +2335,7 @@ def fit_rubin_roman(
         fit_model_base,
         fit_parallax=fit_parallax,
         fit_defaults=fit_defaults,
+        Origin=Origin,
     )
 
     pyLIMAmodel = build_fit_pyLIMA_model(
@@ -2281,11 +2358,13 @@ def fit_rubin_roman(
         rango,
         fit_parallax=fit_parallax,
         fit_bounds=fit_bounds,
+        Origin=Origin,
     )
 
     param_order = fit_parameter_order(
         fit_model_base,
         fit_parallax=fit_parallax,
+        Origin=Origin,
     )
 
     initial_guess_used, initial_guess_source = resolve_initial_guess(
@@ -2296,6 +2375,7 @@ def fit_rubin_roman(
         param_order,
         initial_guess=initial_guess,
         rng=rng,
+        Origin=Origin,
     )
 
     fit.model_parameters_guess = initial_guess_used

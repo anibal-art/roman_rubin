@@ -1418,7 +1418,64 @@ def sim_event(
 # ================================================================
 #  new_data y extract_data_event (sin cambios de lógica)
 # ================================================================
-def new_data(Event, nset, nevent, cols_fit, data):
+def fit_chi2_dof_from_n_data(data, n_data):
+    """
+    Compute chi2 and degrees of freedom for the exact fitted dataset.
+
+    dof = N_data - N_fit_parameters
+
+    N_fit_parameters is the size of pyLIMA's best_model vector, which
+    contains the fitted physical parameters plus the fitted photometric
+    flux parameters for the telescopes active in that fit.
+    """
+    if n_data is None:
+        raise ValueError("n_data must be provided.")
+
+    n_data_float = float(n_data)
+
+    if not np.isfinite(n_data_float):
+        raise ValueError(
+            f"n_data must be finite, got {n_data!r}."
+        )
+
+    n_data_int = int(n_data_float)
+
+    if n_data_int != n_data_float:
+        raise ValueError(
+            f"n_data must be integer-valued, got {n_data!r}."
+        )
+
+    best_model = np.asarray(
+        data["best_model"],
+        dtype=float,
+    ).reshape(-1)
+
+    n_fit_parameters = int(best_model.size)
+    dof = n_data_int - n_fit_parameters
+
+    if dof < 0:
+        raise ValueError(
+            "Negative degrees of freedom: "
+            f"N_data={n_data_int}, "
+            f"N_fit_parameters={n_fit_parameters}."
+        )
+
+    return {
+        "chi2": float(data.get("chi2", np.nan)),
+        "dof": int(dof),
+        "n_data": n_data_int,
+        "n_fit_parameters": n_fit_parameters,
+    }
+
+
+def new_data(
+    Event,
+    nset,
+    nevent,
+    cols_fit,
+    data,
+    n_data=None,
+):
     """
     Extrae parámetros del fit de forma robusta.
 
@@ -1474,14 +1531,26 @@ def new_data(Event, nset, nevent, cols_fit, data):
     # ------------------------------------------------------------
 
     try:
-        chichidof = Event.chichi_dof(data)
+        if n_data is not None:
+            chichidof = fit_chi2_dof_from_n_data(
+                data,
+                n_data,
+            )
+        else:
+            # Legacy fallback for callers that do not provide the
+            # exact number of data points used by the fit.
+            chichidof = Event.chichi_dof(data)
 
-        new_row["chichi"] = [chichidof.get("chi2", np.nan)]
-        new_row["dof"] = [chichidof.get("dof", np.nan)]
+        new_row["chichi"] = [
+            chichidof.get("chi2", np.nan)
+        ]
+        new_row["dof"] = [
+            chichidof.get("dof", np.nan)
+        ]
 
     except Exception as error:
         print(
-            "[warning] Event.chichi_dof failed "
+            "[warning] chi2/dof extraction failed "
             f"for Source={nevent}, Set={nset}: {repr(error)}"
         )
 
@@ -1711,6 +1780,8 @@ def extract_data_event(Event, model, nevent, system_type, nset):
             + [
                 "chi2_true",
                 "n_data_true",
+                "chi2_true_roman",
+                "n_data_true_roman",
             ]
             + cols_spatial
             + cols_photometry
@@ -1816,6 +1887,23 @@ def extract_data_event(Event, model, nevent, system_type, nset):
             n_data_true
         ]
 
+        if isinstance(Event.info, dict):
+            new_data_true["chi2_true_roman"] = [
+                Event.info.get(
+                    "chi2_true_roman",
+                    np.nan,
+                )
+            ]
+            new_data_true["n_data_true_roman"] = [
+                Event.info.get(
+                    "n_data_true_roman",
+                    np.nan,
+                )
+            ]
+        else:
+            new_data_true["chi2_true_roman"] = [np.nan]
+            new_data_true["n_data_true_roman"] = [np.nan]
+
         # ========================================================
         # Coordenadas y metadata espacial
         # ========================================================
@@ -1902,6 +1990,7 @@ def extract_data_event(Event, model, nevent, system_type, nset):
         nevent,
         cols_fit,
         Event.fit_rr_data,
+        n_data=n_data_true,
     )
 
     new_data_rr["chi2_true"] = [
@@ -1927,25 +2016,37 @@ def extract_data_event(Event, model, nevent, system_type, nset):
     if Event.fit_roman_data is not None:
         try:
 
+            chi2_true_roman = Event.info.get(
+                "chi2_true_roman",
+                np.nan,
+            )
+
+            n_data_true_roman = Event.info.get(
+                "n_data_true_roman",
+                np.nan,
+            )
+
             new_data_roman = new_data(
                 Event,
                 nset,
                 nevent,
                 cols_fit,
                 Event.fit_roman_data,
+                n_data=n_data_true_roman,
             )
 
             new_data_roman["chi2_true"] = [
-                chi2_true
+                chi2_true_roman
             ]
 
             new_data_roman["n_data_true"] = [
-                n_data_true
+                n_data_true_roman
             ]
 
             try:
                 new_data_roman["delta_chi2_true"] = [
-                    new_data_roman["chichi"][0] - chi2_true
+                    new_data_roman["chichi"][0]
+                    - chi2_true_roman
                 ]
             except Exception:
                 new_data_roman["delta_chi2_true"] = [
@@ -2597,6 +2698,22 @@ def build_analysis_event(
     else:
         path_fit_roman = None
 
+    chi2_true_roman = np.nan
+    n_data_true_roman = np.nan
+
+    if fit_roman is not None:
+        try:
+            chi2_true_roman = fit_roman.fit_results.get(
+                "chi2_true_roman",
+                np.nan,
+            )
+            n_data_true_roman = fit_roman.fit_results.get(
+                "n_data_true_roman",
+                np.nan,
+            )
+        except Exception:
+            pass
+
     Event = Analysis_Event(
         model,
         path_model=str(path_model),
@@ -2622,6 +2739,8 @@ def build_analysis_event(
             "fit_parallax": fit_parallax,
             "chi2_true": chi2_true["chi2_true"],
             "n_data_true": chi2_true["n_data_true"],
+            "chi2_true_roman": chi2_true_roman,
+            "n_data_true_roman": n_data_true_roman,
             "chi2_true_by_telescope": chi2_true["chi2_true_by_telescope"],
             "truth_parallax": bool(truth_parallax),
             "fit_time_window": fit_time_window,
@@ -3837,6 +3956,7 @@ def sim_fit(
         optimizer_options=optimizer_options,
         event_ra=simulation_event_ra,
         event_dec=simulation_event_dec,
+        true_model=my_own_model,
     )
 
     # ============================================================
@@ -4231,6 +4351,65 @@ def _call_fit_rubin_roman_compatible(*args, **kwargs):
 
 # Redefinition compatible with multi-fit runs.  Since Python resolves globals at
 # call time, the existing sim_fit() defined above will also use this new version.
+def true_photometric_chi2_for_telescope(
+    pyLIMA_model,
+    pyLIMA_parameters,
+    telescope_name,
+):
+    """
+    Evaluate the true-model chi2 on one existing telescope only.
+
+    Uses pyLIMA's official all_telescope_photometric_chi2 unchanged.
+    A shallow model/event view exposes only the requested telescope;
+    the original simulation model and lightcurve are not modified.
+    """
+    from pyLIMA.fits.objective_functions import (
+        all_telescope_photometric_chi2,
+    )
+
+    matches = [
+        telescope
+        for telescope in pyLIMA_model.event.telescopes
+        if str(telescope.name) == str(telescope_name)
+    ]
+
+    if len(matches) != 1:
+        raise RuntimeError(
+            f"Expected exactly one telescope named "
+            f"{telescope_name!r}; found {len(matches)}."
+        )
+
+    telescope = matches[0]
+
+    if telescope.lightcurve is None or len(telescope.lightcurve) == 0:
+        raise RuntimeError(
+            f"Telescope {telescope_name!r} has no data."
+        )
+
+    model_view = copy.copy(pyLIMA_model)
+    event_view = copy.copy(pyLIMA_model.event)
+
+    event_view.telescopes = [telescope]
+    model_view.event = event_view
+
+    chi2 = float(
+        all_telescope_photometric_chi2(
+            model_view,
+            pyLIMA_parameters,
+        )
+    )
+
+    if not np.isfinite(chi2):
+        raise RuntimeError(
+            f"Non-finite true chi2 for {telescope_name!r}."
+        )
+
+    return {
+        "chi2_true": chi2,
+        "n_data_true": int(len(telescope.lightcurve)),
+    }
+
+
 def run_all_fits(
     Source,
     pyLIMA_parameters,
@@ -4252,6 +4431,7 @@ def run_all_fits(
     event_dec=None,
     random_state=None,
     optimizer_options=None,
+    true_model=None,
 ):
     """
     Run Roman+Rubin/Rubin-only and optional Roman-only fits.
@@ -4331,6 +4511,39 @@ def run_all_fits(
 
     if use_roman and len(lc_to_fit.get("W149", [])) != 0:
 
+        # ========================================================
+        # True-model chi2 on exactly the Roman data
+        # ========================================================
+
+        roman_true_info = None
+
+        if true_model is not None:
+
+            roman_true_info = true_photometric_chi2_for_telescope(
+                true_model,
+                pyLIMA_parameters,
+                telescope_name="W149",
+            )
+
+            if (
+                roman_true_info["n_data_true"]
+                != len(lc_to_fit["W149"])
+            ):
+                raise RuntimeError(
+                    "Roman true-chi2 data count does not match "
+                    "Roman fit data count: "
+                    f'{roman_true_info["n_data_true"]} vs '
+                    f'{len(lc_to_fit["W149"])}'
+                )
+
+            print(
+                "[pyLIMA chi2_true Roman] "
+                f'chi2={roman_true_info["chi2_true"]:.6f}, '
+                f'N={roman_true_info["n_data_true"]}, '
+                f'chi2/N='
+                f'{roman_true_info["chi2_true"] / roman_true_info["n_data_true"]:.6f}'
+            )
+
         print("Start the fit using only the Roman data:")
 
         roman_random_state = None
@@ -4366,6 +4579,14 @@ def run_all_fits(
             random_state=roman_random_state,
             optimizer_options=optimizer_options,
         )
+
+        if roman_true_info is not None:
+            fit_roman.fit_results["chi2_true_roman"] = (
+                roman_true_info["chi2_true"]
+            )
+            fit_roman.fit_results["n_data_true_roman"] = (
+                roman_true_info["n_data_true"]
+            )
 
     else:
         print("Roman-only fit skipped because Roman is off or has no data.")
