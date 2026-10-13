@@ -1,0 +1,62 @@
+
+============================================================================================
+S1: 2027-02-11 -> 2027-04-24
+============================================================================================
+N requested epochs = 73
+Earth-Roman distance [AU]          min=0.01050364 median=0.01130757 max=0.01139786
+angle Roman vs antisolar [deg]     min=7.32577858 median=16.42028571 max=29.48513648
+D_perp Horizons [AU]               min=0.01045155 median=0.01106569 max=0.01121648
+D_perp antisolar same-r [AU]       min=0.00862075 median=0.01070528 max=0.01139725
+D_perp ideal 0.01 AU [AU]          min=0.00805625 median=0.00949425 max=0.00999976
+frac diff vs same-r                min=-0.01792806 median=0.03614566 max=0.21237127
+frac diff vs 0.01 AU               min=0.11832181 median=0.16518226 max=0.32354328
+
+============================================================================================
+S2: 2027-08-16 -> 2027-10-27
+============================================================================================
+N requested epochs = 73
+Earth-Roman distance [AU]          min=0.01022015 median=0.01145834 max=0.01154852
+angle Roman vs antisolar [deg]     min=7.19771656 median=16.15491115 max=29.83991578
+D_perp Horizons [AU]               min=0.01018351 median=0.01103497 max=0.01113897
+D_perp antisolar same-r [AU]       min=0.00841546 median=0.01080160 max=0.01147718
+D_perp ideal 0.01 AU [AU]          min=0.00814855 median=0.00952095 max=0.00999994
+frac diff vs same-r                min=-0.02965806 median=0.02115091 max=0.21009420
+frac diff vs 0.01 AU               min=0.11100976 median=0.15708305 max=0.33442062
+
+============================================================================================
+S3: 2028-02-11 -> 2028-04-24
+============================================================================================
+N requested epochs = 74
+Earth-Roman distance [AU]          min=0.01021404 median=0.01128627 max=0.01139767
+angle Roman vs antisolar [deg]     min=7.19129415 median=16.81541289 max=29.80954442
+D_perp Horizons [AU]               min=0.01016009 median=0.01093398 max=0.01104286
+D_perp antisolar same-r [AU]       min=0.00830923 median=0.01064295 max=0.01135288
+D_perp ideal 0.01 AU [AU]          min=0.00802932 median=0.00949405 max=0.00999983
+frac diff vs same-r                min=-0.02740251 median=0.02803585 max=0.22274661
+frac diff vs 0.01 AU               min=0.10335332 median=0.15301017 max=0.32477848
+
+============================================================================================
+ALL THREE SEASONS
+============================================================================================
+Earth-Roman distance [AU]          min=0.01021404 median=0.01130193 max=0.01154852
+angle Roman vs antisolar [deg]     min=7.19129415 median=16.50608166 max=29.83991578
+D_perp Horizons [AU]               min=0.01016009 median=0.01102116 max=0.01121648
+D_perp ideal 0.01 AU [AU]          min=0.00802932 median=0.00950437 max=0.00999994
+frac diff vs same-r                min=-0.02965806 median=0.02862705 max=0.22274661
+frac diff vs 0.01 AU               min=0.10335332 median=0.15805035 max=0.33442062
+
+saved = decision_tests/horizons_vs_ideal_l2.csv
+
+============================================================================================
+DECISION NUMBERS
+============================================================================================
+
+same radial distance
+  median |fractional difference| = 0.029753856607006468
+  90th percentile             = 0.15471167387371226
+  max                         = 0.2227466141673784
+
+fixed 0.01 AU
+  median |fractional difference| = 0.1580503501941416
+  90th percentile             = 0.2594157847613675
+  max                         = 0.3344206213975438

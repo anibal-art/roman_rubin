@@ -1,0 +1,39 @@
+{
+  "best_period_days": 181.20999999999435,
+  "candidate_cadence_days": 1.0,
+  "candidate_rows": 1827,
+  "candidate_start_iso": "2027-01-01T00:00:00",
+  "candidate_stop_iso": "2032-01-01T00:00:00",
+  "coefficients_AU": {
+    "X_antisolar": {
+      "C": 0.009522451934720988,
+      "cos": -0.0016455391775675504,
+      "sin": 0.0002543368910739652
+    },
+    "Y_tangent": {
+      "C": 1.8932391621433983e-05,
+      "cos": 0.0007448404687489195,
+      "sin": 0.005152210453101444
+    },
+    "Z_ecliptic": {
+      "C": -0.000247131541320816,
+      "cos": 0.0012397075961306204,
+      "sin": -0.00017320431474191243
+    }
+  },
+  "columns": [
+    "JD_UTC",
+    "RA_deg_geocentric",
+    "Dec_deg_geocentric",
+    "Earth_Roman_distance_AU"
+  ],
+  "fit_reference_jd": 2461747.5,
+  "fit_rows": 601,
+  "fit_start_jd": 2461447.5,
+  "fit_stop_jd": 2462047.5,
+  "model": "first harmonic in Sun-Earth rotating frame",
+  "source": "decision_tests/oem_phase_fit_validation.csv",
+  "source_sha256": "b795aaedfe6bb9095ef398547b604f94c6256501796706fbac060a9dcea09a38",
+  "status": "candidate_not_production",
+  "validation_note": "Model class was selected after blind 2028 validation using a fit performed only on 2027 data. This final candidate refits the validated model class using all available Horizons support."
+}

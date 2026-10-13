@@ -1,0 +1,99 @@
+
+================================================================================================
+CANDIDATE
+================================================================================================
+shape = (1827, 4)
+first JD = 2461406.5
+last JD  = 2463232.5
+cadence min/median/max = 1.0 1.0 1.0
+all finite = True
+Earth-Roman distance [AU]                  min=0.007921357 median=0.010836843 p90=0.011354209 max=0.01138839
+
+================================================================================================
+CANDIDATE vs ALL AVAILABLE HORIZONS
+================================================================================================
+Horizons rows = 601
+Horizons first JD = 2461447.5
+Horizons last JD  = 2462047.5
+
+3D position error [AU]                     min=4.7653092e-05 median=0.00024831382 p90=0.00038030037 max=0.00044353163
+relative 3D position error                 min=0.0041973997 median=0.023366158 p90=0.039139549 max=0.052650703
+3D direction error [deg]                   min=0.074444157 median=0.92665604 p90=1.5544859 max=2.2365521
+relative projected-vector error            min=0.00030879694 median=0.019624511 p90=0.055075647 max=0.41828212
+|Dperp fractional error|                   min=9.8715799e-06 median=0.015692027 p90=0.044311629 max=0.39029186
+projected direction error [deg]            min=6.5030527e-05 median=0.37890397 p90=1.3959739 max=22.191682
+
+================================================================================================
+FULL CANDIDATE GEOMETRY
+================================================================================================
+/home/anibalvarela/.conda/envs/pyLIMA_test/lib/python3.11/site-packages/erfa/core.py:133: ErfaWarning: ERFA function "utctai" yielded 1097 of "dubious year (Note 3)"
+  warn(f'ERFA function "{func_name}" yielded {wmsg}', ErfaWarning)
+/home/anibalvarela/.conda/envs/pyLIMA_test/lib/python3.11/site-packages/erfa/core.py:133: ErfaWarning: ERFA function "taiutc" yielded 1097 of "dubious year (Note 4)"
+  warn(f'ERFA function "{func_name}" yielded {wmsg}', ErfaWarning)
+Earth-Roman distance [AU]                  min=0.007921357 median=0.010836843 p90=0.011354209 max=0.01138839
+angle from antisolar [deg]                 min=7.2857574 median=21.951148 p90=28.757424 max=29.088357
+D_perp toward source [AU]                  min=0.00011201775 median=0.0098687773 p90=0.010950874 max=0.011264408
+
+================================================================================================
+CONFIGURED ROMAN SEASONS
+================================================================================================
+
+S1 2027-02-11 -> 2027-04-24
+supported = True
+rows = 73
+distance [AU]                              min=0.010685433 median=0.011310632 p90=0.011369385 max=0.011388387
+angle from antisolar [deg]                 min=7.6320482 median=16.946018 p90=27.761346 max=28.915864
+D_perp [AU]                                min=0.010623389 median=0.011078011 p90=0.011250948 max=0.011264408
+
+S2 2027-08-16 -> 2027-10-27
+supported = True
+rows = 73
+distance [AU]                              min=0.010374361 median=0.011301172 p90=0.011354462 max=0.011380722
+angle from antisolar [deg]                 min=7.6373899 median=17.083268 p90=28.677144 max=28.99078
+D_perp [AU]                                min=0.010319923 median=0.010811981 p90=0.011073491 max=0.011092218
+
+S3 2028-02-11 -> 2028-04-24
+supported = True
+rows = 74
+distance [AU]                              min=0.010458258 median=0.011305331 p90=0.011355363 max=0.011387031
+angle from antisolar [deg]                 min=7.6409091 median=17.179681 p90=28.483658 max=28.992803
+D_perp [AU]                                min=0.010385741 median=0.010971044 p90=0.01117916 max=0.011194979
+/home/anibalvarela/.conda/envs/pyLIMA_test/lib/python3.11/site-packages/erfa/core.py:133: ErfaWarning: ERFA function "dtf2d" yielded 1 of "dubious year (Note 6)"
+  warn(f'ERFA function "{func_name}" yielded {wmsg}', ErfaWarning)
+
+S4 2030-02-11 -> 2030-04-24
+supported = True
+rows = 73
+distance [AU]                              min=0.010078437 median=0.01129685 p90=0.01135094 max=0.011360561
+angle from antisolar [deg]                 min=7.6393307 median=18.525312 p90=28.791302 max=28.991377
+D_perp [AU]                                min=0.010008795 median=0.010716331 p90=0.010985499 max=0.011004004
+
+S5 2030-08-16 -> 2030-10-27
+supported = True
+rows = 73
+distance [AU]                              min=0.0096840594 median=0.011289494 p90=0.011347611 max=0.011355351
+angle from antisolar [deg]                 min=7.6387808 median=21.395378 p90=28.779425 max=28.993099
+D_perp [AU]                                min=0.0095844622 median=0.01035153 p90=0.010721681 max=0.01074256
+
+S6 2031-02-11 -> 2031-04-24
+supported = True
+rows = 73
+distance [AU]                              min=0.0098698372 median=0.011292282 p90=0.011347954 max=0.01135543
+angle from antisolar [deg]                 min=7.6326502 median=20.11115 p90=28.766335 max=28.993556
+D_perp [AU]                                min=0.0097948002 median=0.010564239 p90=0.010866487 max=0.010885339
+
+================================================================================================
+FILES
+================================================================================================
+comparison = /export/storage3/rubin/microlensing/romanrubin/roman_rubin/decision_tests/roman_periodic_candidate_vs_horizons.csv
+seasons    = /export/storage3/rubin/microlensing/romanrubin/roman_rubin/decision_tests/roman_periodic_candidate_seasons.csv
+
+================================================================================================
+FINAL CHECKS
+================================================================================================
+all six seasons supported = True
+candidate all finite = True
+
+No fitting was performed.
+No file under ephemerides/ was modified.
+No production config was modified.

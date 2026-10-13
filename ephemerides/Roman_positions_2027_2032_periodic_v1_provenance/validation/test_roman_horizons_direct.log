@@ -1,0 +1,160 @@
+
+============================================================================================
+QUERY CONFIGURATION
+============================================================================================
+Roman Horizons ID = -211
+observer center    = 500@399
+meaning            = Earth geocenter
+
+============================================================================================
+PYLIMA WRAPPER MAPPING
+============================================================================================
+
+horizons_obscodes
+  value = 'V37'
+  type  = str
+
+horizons_obstimes
+  value = '14400m'
+  type  = str
+
+============================================================================================
+DIRECT ASTROQUERY TEST
+============================================================================================
+
+--------------------------------------------------------------------------------------------
+DATE = 2026-09-15T00:00:00
+JD   = 2461298.5
+--------------------------------------------------------------------------------------------
+STATUS = SUCCESS
+rows   = 1
+columns = ['targetname', 'datetime_str', 'datetime_jd', 'solar_presence', 'flags', 'RA', 'DEC', 'RA_app', 'DEC_app', 'RA_rate', 'DEC_rate', 'AZ', 'EL', 'AZ_rate', 'EL_rate', 'sat_X', 'sat_Y', 'sat_PANG', 'siderealtime', 'airmass', 'magextinct', 'V', 'surfbright', 'illumination', 'illum_defect', 'sat_sep', 'sat_vis', 'ang_width', 'PDObsLon', 'PDObsLat', 'PDSunLon', 'PDSunLat', 'SubSol_ang', 'SubSol_dist', 'NPole_ang', 'NPole_dist', 'EclLon', 'EclLat', 'r', 'r_rate', 'delta', 'delta_rate', 'lighttime', 'vel_sun', 'vel_obs', 'elong', 'elongFlag', 'alpha', 'lunar_elong', 'lunar_illum', 'sat_alpha', 'sunTargetPA', 'velocityPA', 'OrbPlaneAng', 'constellation', 'TDB-UT', 'ObsEclLon', 'ObsEclLat', 'NPole_RA', 'NPole_DEC', 'GlxLon', 'GlxLat', 'solartime', 'earth_lighttime', 'RA_3sigma', 'DEC_3sigma', 'SMAA_3sigma', 'SMIA_3sigma', 'Theta_3sigma', 'Area_3sigma', 'RSS_3sigma', 'r_3sigma', 'r_rate_3sigma', 'SBand_3sigma', 'XBand_3sigma', 'DoppDelay_3sigma', 'true_anom', 'hour_angle', 'alpha_true', 'PABLon', 'PABLat']
+
+targetname     = Roman Space Telescope (spacecraf
+datetime_str   = 2026-Sep-15 00:00:00.000
+datetime_jd    = 2461298.5
+RA             = 341.89807
+DEC            = -18.49883
+delta          = 0.00726976896146
+
+--------------------------------------------------------------------------------------------
+DATE = 2026-10-10T00:00:00
+JD   = 2461323.5
+--------------------------------------------------------------------------------------------
+STATUS = SUCCESS
+rows   = 1
+columns = ['targetname', 'datetime_str', 'datetime_jd', 'solar_presence', 'flags', 'RA', 'DEC', 'RA_app', 'DEC_app', 'RA_rate', 'DEC_rate', 'AZ', 'EL', 'AZ_rate', 'EL_rate', 'sat_X', 'sat_Y', 'sat_PANG', 'siderealtime', 'airmass', 'magextinct', 'V', 'surfbright', 'illumination', 'illum_defect', 'sat_sep', 'sat_vis', 'ang_width', 'PDObsLon', 'PDObsLat', 'PDSunLon', 'PDSunLat', 'SubSol_ang', 'SubSol_dist', 'NPole_ang', 'NPole_dist', 'EclLon', 'EclLat', 'r', 'r_rate', 'delta', 'delta_rate', 'lighttime', 'vel_sun', 'vel_obs', 'elong', 'elongFlag', 'alpha', 'lunar_elong', 'lunar_illum', 'sat_alpha', 'sunTargetPA', 'velocityPA', 'OrbPlaneAng', 'constellation', 'TDB-UT', 'ObsEclLon', 'ObsEclLat', 'NPole_RA', 'NPole_DEC', 'GlxLon', 'GlxLat', 'solartime', 'earth_lighttime', 'RA_3sigma', 'DEC_3sigma', 'SMAA_3sigma', 'SMIA_3sigma', 'Theta_3sigma', 'Area_3sigma', 'RSS_3sigma', 'r_3sigma', 'r_rate_3sigma', 'SBand_3sigma', 'XBand_3sigma', 'DoppDelay_3sigma', 'true_anom', 'hour_angle', 'alpha_true', 'PABLon', 'PABLat']
+
+targetname     = Roman Space Telescope (spacecraf
+datetime_str   = 2026-Oct-10 00:00:00.000
+datetime_jd    = 2461323.5
+RA             = 350.84806
+DEC            = -10.93303
+delta          = 0.00986048993481
+
+--------------------------------------------------------------------------------------------
+DATE = 2027-02-11T00:00:00
+JD   = 2461447.5
+--------------------------------------------------------------------------------------------
+STATUS = SUCCESS
+rows   = 1
+columns = ['targetname', 'datetime_str', 'datetime_jd', 'solar_presence', 'flags', 'RA', 'DEC', 'RA_app', 'DEC_app', 'RA_rate', 'DEC_rate', 'AZ', 'EL', 'AZ_rate', 'EL_rate', 'sat_X', 'sat_Y', 'sat_PANG', 'siderealtime', 'airmass', 'magextinct', 'V', 'surfbright', 'illumination', 'illum_defect', 'sat_sep', 'sat_vis', 'ang_width', 'PDObsLon', 'PDObsLat', 'PDSunLon', 'PDSunLat', 'SubSol_ang', 'SubSol_dist', 'NPole_ang', 'NPole_dist', 'EclLon', 'EclLat', 'r', 'r_rate', 'delta', 'delta_rate', 'lighttime', 'vel_sun', 'vel_obs', 'elong', 'elongFlag', 'alpha', 'lunar_elong', 'lunar_illum', 'sat_alpha', 'sunTargetPA', 'velocityPA', 'OrbPlaneAng', 'constellation', 'TDB-UT', 'ObsEclLon', 'ObsEclLat', 'NPole_RA', 'NPole_DEC', 'GlxLon', 'GlxLat', 'solartime', 'earth_lighttime', 'RA_3sigma', 'DEC_3sigma', 'SMAA_3sigma', 'SMIA_3sigma', 'Theta_3sigma', 'Area_3sigma', 'RSS_3sigma', 'r_3sigma', 'r_rate_3sigma', 'SBand_3sigma', 'XBand_3sigma', 'DoppDelay_3sigma', 'true_anom', 'hour_angle', 'alpha_true', 'PABLon', 'PABLat']
+
+targetname     = Roman Space Telescope (spacecraf
+datetime_str   = 2027-Feb-11 00:00:00.000
+datetime_jd    = 2461447.5
+RA             = 160.22093
+DEC            = 2.68418
+delta          = 0.01113491611594
+
+--------------------------------------------------------------------------------------------
+DATE = 2027-04-24T00:00:00
+JD   = 2461519.5
+--------------------------------------------------------------------------------------------
+STATUS = SUCCESS
+rows   = 1
+columns = ['targetname', 'datetime_str', 'datetime_jd', 'solar_presence', 'flags', 'RA', 'DEC', 'RA_app', 'DEC_app', 'RA_rate', 'DEC_rate', 'AZ', 'EL', 'AZ_rate', 'EL_rate', 'sat_X', 'sat_Y', 'sat_PANG', 'siderealtime', 'airmass', 'magextinct', 'V', 'surfbright', 'illumination', 'illum_defect', 'sat_sep', 'sat_vis', 'ang_width', 'PDObsLon', 'PDObsLat', 'PDSunLon', 'PDSunLat', 'SubSol_ang', 'SubSol_dist', 'NPole_ang', 'NPole_dist', 'EclLon', 'EclLat', 'r', 'r_rate', 'delta', 'delta_rate', 'lighttime', 'vel_sun', 'vel_obs', 'elong', 'elongFlag', 'alpha', 'lunar_elong', 'lunar_illum', 'sat_alpha', 'sunTargetPA', 'velocityPA', 'OrbPlaneAng', 'constellation', 'TDB-UT', 'ObsEclLon', 'ObsEclLat', 'NPole_RA', 'NPole_DEC', 'GlxLon', 'GlxLat', 'solartime', 'earth_lighttime', 'RA_3sigma', 'DEC_3sigma', 'SMAA_3sigma', 'SMIA_3sigma', 'Theta_3sigma', 'Area_3sigma', 'RSS_3sigma', 'r_3sigma', 'r_rate_3sigma', 'SBand_3sigma', 'XBand_3sigma', 'DoppDelay_3sigma', 'true_anom', 'hour_angle', 'alpha_true', 'PABLon', 'PABLat']
+
+targetname     = Roman Space Telescope (spacecraf
+datetime_str   = 2027-Apr-24 00:00:00.000
+datetime_jd    = 2461519.5
+RA             = 182.87181
+DEC            = -2.85391
+delta          = 0.01050363758276
+
+--------------------------------------------------------------------------------------------
+DATE = 2027-08-16T00:00:00
+JD   = 2461633.5
+--------------------------------------------------------------------------------------------
+STATUS = SUCCESS
+rows   = 1
+columns = ['targetname', 'datetime_str', 'datetime_jd', 'solar_presence', 'flags', 'RA', 'DEC', 'RA_app', 'DEC_app', 'RA_rate', 'DEC_rate', 'AZ', 'EL', 'AZ_rate', 'EL_rate', 'sat_X', 'sat_Y', 'sat_PANG', 'siderealtime', 'airmass', 'magextinct', 'V', 'surfbright', 'illumination', 'illum_defect', 'sat_sep', 'sat_vis', 'ang_width', 'PDObsLon', 'PDObsLat', 'PDSunLon', 'PDSunLat', 'SubSol_ang', 'SubSol_dist', 'NPole_ang', 'NPole_dist', 'EclLon', 'EclLat', 'r', 'r_rate', 'delta', 'delta_rate', 'lighttime', 'vel_sun', 'vel_obs', 'elong', 'elongFlag', 'alpha', 'lunar_elong', 'lunar_illum', 'sat_alpha', 'sunTargetPA', 'velocityPA', 'OrbPlaneAng', 'constellation', 'TDB-UT', 'ObsEclLon', 'ObsEclLat', 'NPole_RA', 'NPole_DEC', 'GlxLon', 'GlxLat', 'solartime', 'earth_lighttime', 'RA_3sigma', 'DEC_3sigma', 'SMAA_3sigma', 'SMIA_3sigma', 'Theta_3sigma', 'Area_3sigma', 'RSS_3sigma', 'r_3sigma', 'r_rate_3sigma', 'SBand_3sigma', 'XBand_3sigma', 'DoppDelay_3sigma', 'true_anom', 'hour_angle', 'alpha_true', 'PABLon', 'PABLat']
+
+targetname     = Roman Space Telescope (spacecraf
+datetime_str   = 2027-Aug-16 00:00:00.000
+datetime_jd    = 2461633.5
+RA             = 343.22374
+DEC            = -13.36258
+delta          = 0.01151128477196
+
+--------------------------------------------------------------------------------------------
+DATE = 2028-02-11T00:00:00
+JD   = 2461812.5
+--------------------------------------------------------------------------------------------
+STATUS = SUCCESS
+rows   = 1
+columns = ['targetname', 'datetime_str', 'datetime_jd', 'solar_presence', 'flags', 'RA', 'DEC', 'RA_app', 'DEC_app', 'RA_rate', 'DEC_rate', 'AZ', 'EL', 'AZ_rate', 'EL_rate', 'sat_X', 'sat_Y', 'sat_PANG', 'siderealtime', 'airmass', 'magextinct', 'V', 'surfbright', 'illumination', 'illum_defect', 'sat_sep', 'sat_vis', 'ang_width', 'PDObsLon', 'PDObsLat', 'PDSunLon', 'PDSunLat', 'SubSol_ang', 'SubSol_dist', 'NPole_ang', 'NPole_dist', 'EclLon', 'EclLat', 'r', 'r_rate', 'delta', 'delta_rate', 'lighttime', 'vel_sun', 'vel_obs', 'elong', 'elongFlag', 'alpha', 'lunar_elong', 'lunar_illum', 'sat_alpha', 'sunTargetPA', 'velocityPA', 'OrbPlaneAng', 'constellation', 'TDB-UT', 'ObsEclLon', 'ObsEclLat', 'NPole_RA', 'NPole_DEC', 'GlxLon', 'GlxLat', 'solartime', 'earth_lighttime', 'RA_3sigma', 'DEC_3sigma', 'SMAA_3sigma', 'SMIA_3sigma', 'Theta_3sigma', 'Area_3sigma', 'RSS_3sigma', 'r_3sigma', 'r_rate_3sigma', 'SBand_3sigma', 'XBand_3sigma', 'DoppDelay_3sigma', 'true_anom', 'hour_angle', 'alpha_true', 'PABLon', 'PABLat']
+
+targetname     = Roman Space Telescope (spacecraf
+datetime_str   = 2028-Feb-11 00:00:00.000
+datetime_jd    = 2461812.5
+RA             = 157.72883
+DEC            = 2.85053
+delta          = 0.01124912272125
+/home/anibalvarela/.conda/envs/pyLIMA_test/lib/python3.11/site-packages/erfa/core.py:133: ErfaWarning: ERFA function "dtf2d" yielded 1 of "dubious year (Note 6)"
+  warn(f'ERFA function "{func_name}" yielded {wmsg}', ErfaWarning)
+
+--------------------------------------------------------------------------------------------
+DATE = 2030-02-11T00:00:00
+JD   = 2462543.5
+--------------------------------------------------------------------------------------------
+STATUS = FAILED
+TYPE   = ValueError
+ERROR  = ValueError('Horizons Error: No ephemeris for target "Roman Space Telescope (spacecraft)" after A.D. 2028-OCT-04 13:00:00.0000 U')
+
+--------------------------------------------------------------------------------------------
+DATE = 2031-04-24T00:00:00
+JD   = 2462980.5
+--------------------------------------------------------------------------------------------
+STATUS = FAILED
+TYPE   = ValueError
+ERROR  = ValueError('Horizons Error: No ephemeris for target "Roman Space Telescope (spacecraft)" after A.D. 2028-OCT-04 13:00:00.0000 U')
+
+============================================================================================
+SUMMARY
+============================================================================================
+2026-09-15T00:00:00  SUCCESS
+2026-10-10T00:00:00  SUCCESS
+2027-02-11T00:00:00  SUCCESS
+2027-04-24T00:00:00  SUCCESS
+2027-08-16T00:00:00  SUCCESS
+2028-02-11T00:00:00  SUCCESS
+2030-02-11T00:00:00  FAILED
+2031-04-24T00:00:00  FAILED
+
+N success = 6
+N failed  = 2
+
+successful Earth-Roman distances [AU]:
+  min    = 0.00726976896146
+  median = 0.01081927684935
+  max    = 0.01151128477196
+
+============================================================================================
+DECISION
+============================================================================================
+all campaign epochs available = False
+
+RESULT: Roman target -211 does NOT currently provide all epochs required by the simulation.
+Do not extrapolate the spacecraft trajectory.
+Next step would be to identify a documented future Roman/L2 trajectory source for the missing epochs.

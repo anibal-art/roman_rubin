@@ -1,0 +1,100 @@
+{
+  "artifact_identity": {
+    "dtype": "float64",
+    "name": "Roman_positions_2027_2032_periodic_v1",
+    "production_path": "ephemerides/Roman_positions_2027_2032_periodic_v1.npy",
+    "sha256": "eeb7bcf5300d2f3d4be3595898170975b9da20b5d47a26791af0c5258f307d58",
+    "shape": [
+      1827,
+      4
+    ],
+    "status": "production_ephemeris"
+  },
+  "construction": {
+    "best_period_days": 181.20999999999435,
+    "coefficients_AU": {
+      "X_antisolar": {
+        "C": 0.009522451934720988,
+        "cos": -0.0016455391775675504,
+        "sin": 0.0002543368910739652
+      },
+      "Y_tangent": {
+        "C": 1.8932391621433983e-05,
+        "cos": 0.0007448404687489195,
+        "sin": 0.005152210453101444
+      },
+      "Z_ecliptic": {
+        "C": -0.000247131541320816,
+        "cos": 0.0012397075961306204,
+        "sin": -0.00017320431474191243
+      }
+    },
+    "fit_method": "Independent linear least-squares fit in each of the three Sun-Earth rotating-frame axes.",
+    "fit_reference_jd": 2461747.5,
+    "fit_rows": 601,
+    "fit_start_jd": 2461447.5,
+    "fit_stop_jd": 2462047.5,
+    "frame": {
+      "X": "anti-solar direction",
+      "Y": "normalized cross product of ecliptic north with X",
+      "Z": "normalized cross product of X with Y",
+      "obliquity_deg": 23.439291111
+    },
+    "harmonic_form": "axis(t) = C + A*cos(2*pi*(JD-t_ref)/P) + B*sin(2*pi*(JD-t_ref)/P)",
+    "model": "first harmonic in Sun-Earth rotating frame",
+    "model_selection_note": "Model class was selected after blind 2028 validation using a fit performed only on 2027 data. This final candidate refits the validated model class using all available Horizons support.",
+    "period_search_days": {
+      "max": 190.0,
+      "min": 175.0,
+      "step": 0.01
+    }
+  },
+  "direct_dependencies": {
+    "candidate_metadata_sha256": "0137bd16e4f8def771996748b271c244835ebd6d5f00a155b76f32b29d343b89",
+    "fit_input": {
+      "path": "construction/oem_phase_fit_validation.csv",
+      "sha256": "b795aaedfe6bb9095ef398547b604f94c6256501796706fbac060a9dcea09a38"
+    },
+    "generator": {
+      "path": "construction/build_roman_periodic_ephemeris_candidate.py",
+      "sha256": "ba555d81a49ab3d93a9d9ca19e806b68c261b3750e48d51c4ff8739c769aa49a"
+    }
+  },
+  "environment": {
+    "astropy": "5.3.4",
+    "important_note": "decision_tests was untracked at promotion time; therefore reproducibility relies on the frozen generator/input/audit copies and their hashes, not on the repository commit alone.",
+    "numpy": "1.26.3",
+    "pandas": "2.1.4",
+    "platform": "Linux-5.14.0-362.24.1.el9_3.0.1.x86_64-x86_64-with-glibc2.34",
+    "pyLIMA": "1.9.8",
+    "pyerfa": "2.0.1.5",
+    "python": "3.11.9 (main, Apr 19 2024, 16:48:06) [GCC 11.2.0]",
+    "repository_commit_at_promotion": "a742dc566b60e1f3cc9b992ffb24b85a14b6f5e0"
+  },
+  "semantics": {
+    "cadence_days": 1.0,
+    "columns": [
+      "JD_UTC",
+      "RA_deg_geocentric",
+      "Dec_deg_geocentric",
+      "Earth_Roman_distance_AU"
+    ],
+    "rows": 1827,
+    "start_iso": "2027-01-01T00:00:00",
+    "stop_iso": "2032-01-01T00:00:00",
+    "vector_meaning": "Geocentric Earth-to-Roman position encoded as RA, Dec, and distance. pyLIMA 1.9.8 internally uses the opposite Cartesian sign; this convention was explicitly validated."
+  },
+  "validation": {
+    "pylima_audit": {
+      "log": "validation/audit_pylima_periodic_candidate.log",
+      "log_sha256": "8a8791c5c33a919a0e1622c4f2ae290627430c1587fd039d114a32e6a184d32c",
+      "max_cartesian_error_AU": 9.341771812940338e-18,
+      "max_norm_error_AU": 3.469446951953614e-18,
+      "pylima_distance_reproduced": true,
+      "pylima_sign_convention_reproduced": true,
+      "result": "PASS",
+      "script": "validation/audit_pylima_periodic_candidate.py",
+      "script_sha256": "b5293f1161ed2fc7ad44dedcbd7db29167eb5ca4a2e17c059caf387859bcfa12"
+    }
+  }
+}
