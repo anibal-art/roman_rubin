@@ -1,0 +1,8 @@
+python_version = 3.11.9 (main, Apr 19 2024, 16:48:06) [GCC 11.2.0]
+python_executable = /home/anibalvarela/.conda/envs/pyLIMA_test/bin/python
+platform = Linux-5.14.0-362.24.1.el9_3.0.1.x86_64-x86_64-with-glibc2.34
+numpy = 1.26.3
+pandas = 2.1.4
+astropy = 5.3.4
+pyerfa = 2.0.1.5
+pyLIMA = 1.9.8
