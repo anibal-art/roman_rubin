@@ -1520,8 +1520,61 @@ def sim_event(
     )
     _sim_timer.stop("simulation_validation")
 
+    # Roman-only Delta-chi2 diagnostic.
+    #
+    # This is computed after photometric filtering, parallax resync,
+    # and magnitude/flux synchronization, on the final surviving W149
+    # data. It is deliberately diagnostic-only at this stage:
+    # it MUST NOT affect the detection decision below.
+    setattr(
+        my_own_model,
+        "roman_detection_statistics",
+        None,
+    )
 
     if has_required_data:
+
+        if use_roman:
+
+            _sim_timer.start(
+                "simulation_detection_chi2"
+            )
+
+            roman_chi2_stats = (
+                roman_detection_chi2_statistics(
+                    my_own_model,
+                    pyLIMA_parameters,
+                    roman_band_name="W149",
+                )
+            )
+
+            roman_n3sigma_stats = (
+                roman_detection_n3sigma_statistics(
+                    my_own_model,
+                    pyLIMA_parameters,
+                    roman_band_name="W149",
+                    nsigma=3.0,
+                )
+            )
+
+            roman_detection_stats = (
+                combine_roman_detection_statistics(
+                    roman_chi2_stats,
+                    roman_n3sigma_stats,
+                    delta_chi2_min=300.0,
+                    n3sigma_min=6,
+                )
+            )
+
+            _sim_timer.stop(
+                "simulation_detection_chi2"
+            )
+
+            setattr(
+                my_own_model,
+                "roman_detection_statistics",
+                dict(roman_detection_stats),
+            )
 
         # --------------------------------------------------------
         # Opción para ignorar el criterio de detección
@@ -1535,31 +1588,87 @@ def sim_event(
             return _finish_sim_event(my_own_model, pyLIMA_parameters, True)
 
         # --------------------------------------------------------
-        # Criterio de detección original
+        # Detection decision
         # --------------------------------------------------------
         _sim_timer.start("simulation_detection")
-        decision, res = deviation_from_constant(
-            pyLIMA_parameters,
-            detection_telescopes,
-            nsigma=3.0,
-            nmin=6,
-            window="all",
-        )
+
+        if use_roman:
+
+            if roman_detection_stats is None:
+                raise RuntimeError(
+                    "Roman detection statistics were not computed "
+                    "despite use_roman=True."
+                )
+
+            decision = bool(
+                roman_detection_stats[
+                    "roman_detected"
+                ]
+            )
+
+            res = int(
+                roman_detection_stats[
+                    "n3sigma_max_run"
+                ]
+            )
+
+        else:
+            # Preserve the historical Rubin-only behavior. The
+            # production Roman-selected campaign does not use this
+            # branch.
+            decision, res = deviation_from_constant(
+                pyLIMA_parameters,
+                detection_telescopes,
+                nsigma=3.0,
+                nmin=6,
+                window="all",
+            )
+
         _sim_timer.stop("simulation_detection")
 
 
         if decision:
-            print("A good event to fit")
 
-            return _finish_sim_event(my_own_model, pyLIMA_parameters, True)
+            if use_roman:
+                print(
+                    "A good Roman-detected event to fit: "
+                    f"Delta_chi2="
+                    f'{roman_detection_stats["delta_chi2"]:.6f}, '
+                    f'n3sigma_max_run='
+                    f'{roman_detection_stats["n3sigma_max_run"]}'
+                )
+            else:
+                print("A good event to fit")
 
-        else:
-            print(
-                "Not a good event to fit.\n"
-                "Fail deviation-from-constant criterion."
+            return _finish_sim_event(
+                my_own_model,
+                pyLIMA_parameters,
+                True,
             )
 
-            return _finish_sim_event(my_own_model, pyLIMA_parameters, False)
+        else:
+
+            if use_roman:
+                print(
+                    "Not a good Roman-detected event to fit. "
+                    f"Delta_chi2="
+                    f'{roman_detection_stats["delta_chi2"]:.6f} '
+                    f'(pass={roman_detection_stats["pass_delta_chi2"]}), '
+                    f'n3sigma_max_run='
+                    f'{roman_detection_stats["n3sigma_max_run"]} '
+                    f'(pass={roman_detection_stats["pass_n3sigma"]}).'
+                )
+            else:
+                print(
+                    "Not a good event to fit.\n"
+                    "Fail deviation-from-constant criterion."
+                )
+
+            return _finish_sim_event(
+                my_own_model,
+                pyLIMA_parameters,
+                False,
+            )
 
     else:
 
@@ -3364,6 +3473,302 @@ def roman_detection_chi2_statistics(
     }
 
 
+def roman_detection_n3sigma_statistics(
+    pyLIMA_model,
+    pyLIMA_parameters,
+    *,
+    roman_band_name="W149",
+    nsigma=3.0,
+):
+    """
+    Compute the Roman-only consecutive-nsigma detection statistic.
+
+    A point is above threshold when
+
+        F_obs >= F_baseline + nsigma * sigma_F
+
+    where F_baseline is ftotal_<roman_band_name> from the true pyLIMA
+    parameter realization.
+
+    Only the requested Roman telescope is used. Points are ordered by
+    observation time before the maximum consecutive run is computed.
+
+    Invalid/non-finite inputs are pipeline-integrity errors and raise;
+    points are never silently masked.
+    """
+
+    nsigma = float(nsigma)
+
+    if not np.isfinite(nsigma) or nsigma <= 0.0:
+        raise ValueError(
+            f"nsigma must be finite and positive; got {nsigma!r}."
+        )
+
+    matches = [
+        telescope
+        for telescope in pyLIMA_model.event.telescopes
+        if str(telescope.name) == str(roman_band_name)
+    ]
+
+    if len(matches) != 1:
+        raise RuntimeError(
+            "Roman n3sigma statistic requires exactly one telescope "
+            f"named {roman_band_name!r}; found {len(matches)}."
+        )
+
+    telescope = matches[0]
+
+    if telescope.lightcurve is None:
+        raise RuntimeError(
+            f"Roman telescope {roman_band_name!r} has no lightcurve."
+        )
+
+    if len(telescope.lightcurve) == 0:
+        raise RuntimeError(
+            f"Roman telescope {roman_band_name!r} has zero data points."
+        )
+
+    lightcurve = telescope.lightcurve
+
+    required = (
+        "time",
+        "flux",
+        "err_flux",
+    )
+
+    missing = [
+        name
+        for name in required
+        if name not in lightcurve.colnames
+    ]
+
+    if missing:
+        raise RuntimeError(
+            "Roman n3sigma statistic is missing required columns: "
+            f"{missing}"
+        )
+
+    times = np.asarray(
+        lightcurve["time"].value,
+        dtype=float,
+    )
+
+    observed_flux = np.asarray(
+        lightcurve["flux"].value,
+        dtype=float,
+    )
+
+    err_flux = np.asarray(
+        lightcurve["err_flux"].value,
+        dtype=float,
+    )
+
+    if (
+        times.ndim != 1
+        or observed_flux.ndim != 1
+        or err_flux.ndim != 1
+    ):
+        raise RuntimeError(
+            "Roman n3sigma inputs must be one-dimensional."
+        )
+
+    n_data = int(times.size)
+
+    if n_data == 0:
+        raise RuntimeError(
+            "Roman n3sigma statistic has zero data points."
+        )
+
+    if (
+        observed_flux.size != n_data
+        or err_flux.size != n_data
+    ):
+        raise RuntimeError(
+            "Roman n3sigma input-length mismatch."
+        )
+
+    if not np.all(np.isfinite(times)):
+        raise RuntimeError(
+            "Roman times contain non-finite values."
+        )
+
+    if not np.all(np.isfinite(observed_flux)):
+        raise RuntimeError(
+            "Roman observed flux contains non-finite values."
+        )
+
+    if not np.all(np.isfinite(err_flux)):
+        raise RuntimeError(
+            "Roman flux uncertainty contains non-finite values."
+        )
+
+    if not np.all(err_flux > 0.0):
+        raise RuntimeError(
+            "Roman flux uncertainty must be strictly positive."
+        )
+
+    baseline_key = f"ftotal_{roman_band_name}"
+
+    if baseline_key not in pyLIMA_parameters:
+        raise RuntimeError(
+            "Roman n3sigma statistic is missing baseline parameter "
+            f"{baseline_key!r}."
+        )
+
+    baseline_flux = float(
+        pyLIMA_parameters[baseline_key]
+    )
+
+    if not np.isfinite(baseline_flux):
+        raise RuntimeError(
+            "Roman baseline flux is non-finite."
+        )
+
+    # Stable sort so the definition is explicitly chronological.
+    order = np.argsort(
+        times,
+        kind="mergesort",
+    )
+
+    flux_sorted = observed_flux[order]
+    err_sorted = err_flux[order]
+
+    above = (
+        flux_sorted
+        >= baseline_flux + nsigma * err_sorted
+    )
+
+    max_run = 0
+    current_run = 0
+
+    for flag in above:
+
+        if bool(flag):
+            current_run += 1
+            max_run = max(
+                max_run,
+                current_run,
+            )
+
+        else:
+            current_run = 0
+
+    return {
+        "roman_band_name": str(roman_band_name),
+        "n_data": n_data,
+        "baseline_flux": baseline_flux,
+        "n3sigma_nsigma": nsigma,
+        "n3sigma_n_above": int(
+            np.count_nonzero(above)
+        ),
+        "n3sigma_max_run": int(max_run),
+    }
+
+
+def combine_roman_detection_statistics(
+    chi2_stats,
+    n3sigma_stats,
+    *,
+    delta_chi2_min=300.0,
+    n3sigma_min=6,
+):
+    """
+    Combine the two Roman-only forecast detection criteria.
+
+    Detection requires BOTH:
+
+        Delta chi2 >= delta_chi2_min
+        max consecutive n-sigma points >= n3sigma_min
+
+    Boundaries are inclusive ("at least"), following the survey
+    forecast definition.
+    """
+
+    delta_chi2_min = float(
+        delta_chi2_min
+    )
+
+    n3sigma_min = int(
+        n3sigma_min
+    )
+
+    if (
+        not np.isfinite(delta_chi2_min)
+        or delta_chi2_min < 0.0
+    ):
+        raise ValueError(
+            "delta_chi2_min must be finite and non-negative."
+        )
+
+    if n3sigma_min < 1:
+        raise ValueError(
+            "n3sigma_min must be >= 1."
+        )
+
+    if (
+        chi2_stats["roman_band_name"]
+        != n3sigma_stats["roman_band_name"]
+    ):
+        raise RuntimeError(
+            "Roman chi2/n3sigma band mismatch."
+        )
+
+    if (
+        int(chi2_stats["n_data"])
+        != int(n3sigma_stats["n_data"])
+    ):
+        raise RuntimeError(
+            "Roman chi2/n3sigma data-count mismatch."
+        )
+
+    if (
+        float(chi2_stats["baseline_flux"])
+        != float(n3sigma_stats["baseline_flux"])
+    ):
+        raise RuntimeError(
+            "Roman chi2/n3sigma baseline mismatch."
+        )
+
+    delta_chi2 = float(
+        chi2_stats["delta_chi2"]
+    )
+
+    max_run = int(
+        n3sigma_stats["n3sigma_max_run"]
+    )
+
+    pass_delta_chi2 = bool(
+        delta_chi2 >= delta_chi2_min
+    )
+
+    pass_n3sigma = bool(
+        max_run >= n3sigma_min
+    )
+
+    result = dict(
+        chi2_stats
+    )
+
+    result.update(
+        n3sigma_stats
+    )
+
+    result.update(
+        {
+            "delta_chi2_min": delta_chi2_min,
+            "n3sigma_min": n3sigma_min,
+            "pass_delta_chi2": pass_delta_chi2,
+            "pass_n3sigma": pass_n3sigma,
+            "roman_detected": bool(
+                pass_delta_chi2
+                and pass_n3sigma
+            ),
+        }
+    )
+
+    return result
+
+
 def all_telescope_photometric_chi2_robust(
     model,
     pyLIMA_parameters,
@@ -4152,6 +4557,119 @@ def sim_fit(
         print(
             "[warning] No pude guardar LAST_DATASLICE_INFO:",
             repr(error),
+        )
+
+    # ============================================================
+    # Guardar estadísticas continuas de detección Roman
+    # ============================================================
+    #
+    # Preserve the raw Roman-only detection statistics in
+    # event_params BEFORE any rejection return.  This makes the
+    # selection auditable offline and permits threshold studies
+    # without re-simulating the event.
+    #
+    # The names are explicitly prefixed to avoid collisions with
+    # later fit/all-telescope chi2 diagnostics.
+    # ============================================================
+
+    roman_detection_stats = None
+
+    if my_own_model is not None:
+        roman_detection_stats = getattr(
+            my_own_model,
+            "roman_detection_statistics",
+            None,
+        )
+
+    event_params[
+        "roman_detection_statistics_available"
+    ] = bool(
+        roman_detection_stats is not None
+    )
+
+    if roman_detection_stats is not None:
+
+        event_params.update(
+            {
+                "roman_detection_n_data":
+                    int(
+                        roman_detection_stats[
+                            "n_data"
+                        ]
+                    ),
+                "roman_detection_baseline_flux":
+                    float(
+                        roman_detection_stats[
+                            "baseline_flux"
+                        ]
+                    ),
+                "roman_detection_chi2_true":
+                    float(
+                        roman_detection_stats[
+                            "chi2_true"
+                        ]
+                    ),
+                "roman_detection_chi2_flat":
+                    float(
+                        roman_detection_stats[
+                            "chi2_flat"
+                        ]
+                    ),
+                "roman_detection_delta_chi2":
+                    float(
+                        roman_detection_stats[
+                            "delta_chi2"
+                        ]
+                    ),
+                "roman_detection_n3sigma_nsigma":
+                    float(
+                        roman_detection_stats[
+                            "n3sigma_nsigma"
+                        ]
+                    ),
+                "roman_detection_n3sigma_n_above":
+                    int(
+                        roman_detection_stats[
+                            "n3sigma_n_above"
+                        ]
+                    ),
+                "roman_detection_n3sigma_max_run":
+                    int(
+                        roman_detection_stats[
+                            "n3sigma_max_run"
+                        ]
+                    ),
+                "roman_detection_delta_chi2_min":
+                    float(
+                        roman_detection_stats[
+                            "delta_chi2_min"
+                        ]
+                    ),
+                "roman_detection_n3sigma_min":
+                    int(
+                        roman_detection_stats[
+                            "n3sigma_min"
+                        ]
+                    ),
+                "roman_detection_pass_delta_chi2":
+                    bool(
+                        roman_detection_stats[
+                            "pass_delta_chi2"
+                        ]
+                    ),
+                "roman_detection_pass_n3sigma":
+                    bool(
+                        roman_detection_stats[
+                            "pass_n3sigma"
+                        ]
+                    ),
+                "roman_detected":
+                    bool(
+                        roman_detection_stats[
+                            "roman_detected"
+                        ]
+                    ),
+            }
         )
 
     # ============================================================
