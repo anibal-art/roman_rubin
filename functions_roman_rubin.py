@@ -3122,6 +3122,248 @@ def load_pair_catalog_row(
 
     return pair_row
 
+def roman_detection_chi2_statistics(
+    pyLIMA_model,
+    pyLIMA_parameters,
+    *,
+    roman_band_name="W149",
+):
+    """
+    Compute the Roman-only detection Delta-chi2 on one telescope.
+
+    Definition:
+
+        chi2_true =
+            sum_i [
+                (F_obs,i - F_true,i) / sigma_F,i
+            ]**2
+
+        chi2_flat =
+            sum_i [
+                (F_obs,i - F_baseline) / sigma_F,i
+            ]**2
+
+        delta_chi2 =
+            chi2_flat - chi2_true
+
+    where every sum uses EXACTLY the same surviving Roman points.
+
+    The baseline is the already-materialized total baseline flux
+    carried by the true pyLIMA parameter realization:
+
+        pyLIMA_parameters[f"ftotal_{roman_band_name}"]
+
+    This helper deliberately:
+
+    - evaluates only the requested Roman telescope;
+    - never includes Rubin data;
+    - never fits either hypothesis;
+    - never applies a t0/tE time window;
+    - never masks or silently drops invalid points;
+    - never reads ftotal from a catalog row;
+    - never calls LRT/oracle machinery.
+
+    Any malformed/non-finite Roman data are pipeline-integrity errors
+    and raise rather than being silently ignored.
+    """
+
+    telescope_matches = [
+        telescope
+        for telescope in pyLIMA_model.event.telescopes
+        if str(telescope.name) == str(roman_band_name)
+    ]
+
+    if len(telescope_matches) != 1:
+        raise RuntimeError(
+            "Roman detection chi2 requires exactly one telescope "
+            f"named {roman_band_name!r}; found "
+            f"{len(telescope_matches)}."
+        )
+
+    telescope = telescope_matches[0]
+
+    if telescope.lightcurve is None:
+        raise RuntimeError(
+            f"Roman telescope {roman_band_name!r} has no lightcurve."
+        )
+
+    if len(telescope.lightcurve) == 0:
+        raise RuntimeError(
+            f"Roman telescope {roman_band_name!r} has zero data points."
+        )
+
+    lightcurve = telescope.lightcurve
+
+    required_columns = (
+        "flux",
+        "err_flux",
+    )
+
+    missing_columns = [
+        name
+        for name in required_columns
+        if name not in lightcurve.colnames
+    ]
+
+    if missing_columns:
+        raise RuntimeError(
+            "Roman detection chi2 is missing required lightcurve "
+            f"columns for {roman_band_name!r}: {missing_columns}"
+        )
+
+    observed_flux = np.asarray(
+        lightcurve["flux"].value,
+        dtype=float,
+    )
+
+    err_flux = np.asarray(
+        lightcurve["err_flux"].value,
+        dtype=float,
+    )
+
+    if observed_flux.ndim != 1:
+        raise RuntimeError(
+            "Roman observed flux must be one-dimensional; "
+            f"shape={observed_flux.shape}."
+        )
+
+    if err_flux.ndim != 1:
+        raise RuntimeError(
+            "Roman flux uncertainty must be one-dimensional; "
+            f"shape={err_flux.shape}."
+        )
+
+    n_data = int(observed_flux.size)
+
+    if n_data == 0:
+        raise RuntimeError(
+            f"Roman telescope {roman_band_name!r} has zero flux points."
+        )
+
+    if err_flux.size != n_data:
+        raise RuntimeError(
+            "Roman observed-flux/error length mismatch: "
+            f"{n_data} vs {err_flux.size}."
+        )
+
+    if not np.all(np.isfinite(observed_flux)):
+        raise RuntimeError(
+            "Roman observed flux contains non-finite values."
+        )
+
+    if not np.all(np.isfinite(err_flux)):
+        raise RuntimeError(
+            "Roman flux uncertainty contains non-finite values."
+        )
+
+    if not np.all(err_flux > 0.0):
+        raise RuntimeError(
+            "Roman flux uncertainty must be strictly positive."
+        )
+
+    baseline_key = f"ftotal_{roman_band_name}"
+
+    if baseline_key not in pyLIMA_parameters:
+        raise RuntimeError(
+            "Roman detection chi2 is missing baseline parameter "
+            f"{baseline_key!r}."
+        )
+
+    baseline_flux = float(
+        pyLIMA_parameters[baseline_key]
+    )
+
+    if not np.isfinite(baseline_flux):
+        raise RuntimeError(
+            f"Roman baseline flux {baseline_key!r} is non-finite."
+        )
+
+    microlensing_model = (
+        pyLIMA_model.compute_the_microlensing_model(
+            telescope,
+            pyLIMA_parameters,
+        )
+    )
+
+    if "photometry" not in microlensing_model:
+        raise RuntimeError(
+            "True microlensing model did not return "
+            "'photometry'."
+        )
+
+    true_flux = np.asarray(
+        microlensing_model["photometry"],
+        dtype=float,
+    )
+
+    if true_flux.ndim != 1:
+        raise RuntimeError(
+            "Roman true-model flux must be one-dimensional; "
+            f"shape={true_flux.shape}."
+        )
+
+    if true_flux.size != n_data:
+        raise RuntimeError(
+            "Roman observed/true-model length mismatch: "
+            f"{n_data} vs {true_flux.size}."
+        )
+
+    if not np.all(np.isfinite(true_flux)):
+        raise RuntimeError(
+            "Roman true-model flux contains non-finite values."
+        )
+
+    residual_true = (
+        observed_flux - true_flux
+    ) / err_flux
+
+    residual_flat = (
+        observed_flux - baseline_flux
+    ) / err_flux
+
+    chi2_true = float(
+        np.sum(
+            residual_true * residual_true,
+            dtype=np.float64,
+        )
+    )
+
+    chi2_flat = float(
+        np.sum(
+            residual_flat * residual_flat,
+            dtype=np.float64,
+        )
+    )
+
+    delta_chi2 = float(
+        chi2_flat - chi2_true
+    )
+
+    if not np.isfinite(chi2_true):
+        raise RuntimeError(
+            "Roman true-model chi2 is non-finite."
+        )
+
+    if not np.isfinite(chi2_flat):
+        raise RuntimeError(
+            "Roman flat-model chi2 is non-finite."
+        )
+
+    if not np.isfinite(delta_chi2):
+        raise RuntimeError(
+            "Roman detection Delta-chi2 is non-finite."
+        )
+
+    return {
+        "roman_band_name": str(roman_band_name),
+        "n_data": n_data,
+        "baseline_flux": baseline_flux,
+        "chi2_true": chi2_true,
+        "chi2_flat": chi2_flat,
+        "delta_chi2": delta_chi2,
+    }
+
+
 def all_telescope_photometric_chi2_robust(
     model,
     pyLIMA_parameters,
