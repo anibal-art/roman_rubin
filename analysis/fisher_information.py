@@ -1175,6 +1175,31 @@ def expected_fisher_flux_error(
     return expected_err_flux
 
 
+def _resolve_physical_derivative_method(
+    model,
+    requested_method,
+):
+    """
+    Resolve the physical-derivative engine.
+
+    The VBM chain-rule implementation is valid specifically for
+    pyLIMA FSPLarge. Other model families, including the Yoo FSPL
+    implementation, retain the validated five-point fallback.
+    """
+
+    if requested_method != "auto":
+        return requested_method
+
+    model_type = str(
+        model.model_type()
+    ).strip()
+
+    if model_type.lower() == "fsplarge":
+        return "fspl_chain_rule"
+
+    return "five_point_stable_pair"
+
+
 def weighted_jacobian(
     model,
     pyparams,
@@ -1270,13 +1295,12 @@ def weighted_jacobian(
         phys
     )
 
-    if physical_derivative_method == "auto":
-        if "FSPL" in str(model.model_type()).upper():
-            resolved_derivative_method = "fspl_chain_rule"
-        else:
-            resolved_derivative_method = "five_point_stable_pair"
-    else:
-        resolved_derivative_method = physical_derivative_method
+    resolved_derivative_method = (
+        _resolve_physical_derivative_method(
+            model,
+            physical_derivative_method,
+        )
+    )
 
     blocks = []
 
