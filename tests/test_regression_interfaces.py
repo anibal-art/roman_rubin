@@ -43,6 +43,7 @@ from simulation.realization import (
     realization_from_catalog,
     realization_from_generated_parameters,
     data_has_materialized_blend_ratio,
+    data_has_materialized_fluxes,
 )
 
 
@@ -103,12 +104,24 @@ FIXED_PHYSICAL = dict(
 BANDS = ("W149",)
 FIXED_G = 0.37
 
+# Materialized catalog flux realization.
+#
+# These values are deliberately independent of any magnitude used by
+# generated/manual tests below. A catalog row already carries its flux
+# realization; simulation must consume it exactly, not reconstruct it.
+FIXED_FSOURCE = 123.0
+FIXED_FTOTAL = FIXED_FSOURCE * (1.0 + FIXED_G)
+
 
 def _catalog_row(caustic_origin="central_caustic"):
     row = dict(FIXED_PHYSICAL)
     row["caustic_origin"] = caustic_origin
+
     for band in BANDS:
         row[f"blend_ratio_{band}"] = FIXED_G
+        row[f"fsource_{band}"] = FIXED_FSOURCE
+        row[f"ftotal_{band}"] = FIXED_FTOTAL
+
     return row
 
 
@@ -116,6 +129,32 @@ def _generated_data(caustic_origin="central_caustic"):
     row = dict(FIXED_PHYSICAL)
     row["caustic_origin"] = caustic_origin
     return row
+
+
+def test_catalog_realization_requires_materialized_fluxes():
+    """
+    A row presented to realization_from_catalog must already contain
+    its flux realization. Missing catalog fluxes are an integrity
+    error, never a request to reconstruct them from magnitude/blending.
+    """
+
+    row = _catalog_row()
+    del row["fsource_W149"]
+
+    try:
+        realization_from_catalog(
+            row,
+            "USBL",
+            use_parallax=True,
+            t0_parallax=FIXED_PHYSICAL["t0"],
+            band_order=BANDS,
+        )
+        raise AssertionError(
+            "Expected missing materialized catalog flux to raise."
+        )
+
+    except KeyError as exc:
+        assert "fsource_W149" in str(exc)
 
 
 def test_realization_from_catalog_and_generated_agree_on_shared_fields():
@@ -134,6 +173,15 @@ def test_realization_from_catalog_and_generated_agree_on_shared_fields():
     assert r_catalog.t0_parallax == r_generated.t0_parallax
     assert r_catalog.caustic_origin == r_generated.caustic_origin == "central_caustic"
     assert r_catalog.blend_ratio == r_generated.blend_ratio == {"W149": FIXED_G}
+
+    assert r_catalog.materialized_fluxes == {
+        "W149": {
+            "fsource": FIXED_FSOURCE,
+            "ftotal": FIXED_FTOTAL,
+        }
+    }
+
+    assert r_generated.materialized_fluxes is None
 
     for key, value in FIXED_PHYSICAL.items():
         assert r_catalog.physical_params[key] == value
@@ -154,6 +202,88 @@ def test_data_has_materialized_blend_ratio_decision():
 
     with raises(ValueError):
         data_has_materialized_blend_ratio(partial, two_bands)
+
+
+def test_data_has_materialized_fluxes_decision():
+
+    assert data_has_materialized_fluxes(
+        _catalog_row(),
+        BANDS,
+    ) is True
+
+    assert data_has_materialized_fluxes(
+        _generated_data(),
+        BANDS,
+    ) is False
+
+    incomplete_pair = _catalog_row()
+    del incomplete_pair["ftotal_W149"]
+
+    try:
+        data_has_materialized_fluxes(
+            incomplete_pair,
+            BANDS,
+        )
+        raise AssertionError(
+            "Expected incomplete flux pair to raise."
+        )
+    except ValueError:
+        pass
+
+    two_bands = BANDS + ("u",)
+
+    partial_bands = _catalog_row()
+
+    try:
+        data_has_materialized_fluxes(
+            partial_bands,
+            two_bands,
+        )
+        raise AssertionError(
+            "Expected partially-materialized bands to raise."
+        )
+    except ValueError:
+        pass
+
+
+def test_explicit_blend_without_fluxes_remains_generated():
+
+    data = _generated_data()
+
+    for band in BANDS:
+        data[f"blend_ratio_{band}"] = FIXED_G
+
+    assert data_has_materialized_blend_ratio(
+        data,
+        BANDS,
+    ) is True
+
+    assert data_has_materialized_fluxes(
+        data,
+        BANDS,
+    ) is False
+
+    explicit_blend_ratio = {
+        band: float(
+            data[f"blend_ratio_{band}"]
+        )
+        for band in BANDS
+    }
+
+    r = realization_from_generated_parameters(
+        data,
+        "USBL",
+        use_parallax=True,
+        t0_parallax=FIXED_PHYSICAL["t0"],
+        band_order=BANDS,
+        blend_ratio=explicit_blend_ratio,
+    )
+
+    assert r.blend_ratio == {
+        "W149": FIXED_G,
+    }
+
+    assert r.materialized_fluxes is None
 
 
 def test_realization_from_catalog_requires_precomputed_blend_ratio():
@@ -320,45 +450,138 @@ def _build_model_and_flux(realization, band_order, magstar):
     params, param_order = smp.parameters_model(realization.physical_params, model)
     physical_values = [params[key] for key in param_order]
 
-    # Mirrors sim_event's actual branch: explicit path (blend_ratio
-    # decided) uses the non-monkey-patched flux_parameters_from_blend_ratio;
-    # legacy path uses flux_parameters_model with its historical,
-    # patchable signature -- never a blend_ratio keyword.
-    if realization.blend_ratio is not None:
-        flux_values, fs, g, ftot = smp.flux_parameters_from_blend_ratio(
-            magstar, SIMULATION_BAND_ZERO_POINTS, model,
-            band_order, realization.blend_ratio,
+    # Mirrors sim_event's actual three-state flux branch:
+    #
+    # 1. catalog materialized fsource/ftotal -> pass through exactly;
+    # 2. explicit generated/manual blend ratio -> construct fluxes;
+    # 3. legacy generated -> sample blending via historical function.
+    if realization.materialized_fluxes is not None:
+
+        if model.blend_flux_parameter != "ftotal":
+            raise RuntimeError(
+                "Test catalog passthrough requires "
+                "blend_flux_parameter='ftotal'."
+            )
+
+        flux_values = []
+        fs = {}
+        g = {}
+        ftot = {}
+
+        for band in band_order:
+
+            fsource = realization.materialized_fluxes[
+                band
+            ]["fsource"]
+
+            ftotal = realization.materialized_fluxes[
+                band
+            ]["ftotal"]
+
+            flux_values.extend(
+                [
+                    fsource,
+                    ftotal,
+                ]
+            )
+
+            fs[band] = fsource
+            ftot[band] = ftotal
+
+            g[band] = (
+                ftotal - fsource
+            ) / fsource
+
+    elif realization.blend_ratio is not None:
+
+        flux_values, fs, g, ftot = (
+            smp.flux_parameters_from_blend_ratio(
+                magstar,
+                SIMULATION_BAND_ZERO_POINTS,
+                model,
+                band_order,
+                realization.blend_ratio,
+            )
         )
+
     else:
-        flux_values, fs, g, ftot = smp.flux_parameters_model(
-            magstar, SIMULATION_BAND_ZERO_POINTS, model,
-            band_order=band_order,
+
+        flux_values, fs, g, ftot = (
+            smp.flux_parameters_model(
+                magstar,
+                SIMULATION_BAND_ZERO_POINTS,
+                model,
+                band_order=band_order,
+            )
         )
 
     return model, physical_values + flux_values, fs, g, ftot
 
 
-def test_catalog_and_generated_realizations_build_identical_model_and_flux():
+def test_catalog_and_generated_realizations_have_distinct_flux_authority():
+    """
+    Catalog and generated realizations may share the same physical
+    parameters and blend ratio, but their flux authority is different.
+
+    Catalog:
+        fsource/ftotal are already materialized inputs.
+
+    Generated/manual:
+        fluxes are constructed later from its own magnitude/blending
+        mechanism.
+    """
+
     magstar = {"W149": 20.0}
 
     r_catalog = realization_from_catalog(
         _catalog_row(), "USBL", use_parallax=False,
         t0_parallax=FIXED_PHYSICAL["t0"], band_order=BANDS,
     )
+
     r_generated = realization_from_generated_parameters(
         _generated_data(), "USBL", use_parallax=False,
         t0_parallax=FIXED_PHYSICAL["t0"], band_order=BANDS,
         blend_ratio={"W149": FIXED_G},
     )
 
-    model_a, vector_a, fs_a, g_a, ft_a = _build_model_and_flux(r_catalog, BANDS, magstar)
-    model_b, vector_b, fs_b, g_b, ft_b = _build_model_and_flux(r_generated, BANDS, magstar)
+    # Same event physics/origin/blending realization.
+    assert r_catalog.caustic_origin == r_generated.caustic_origin
+    assert r_catalog.blend_ratio == r_generated.blend_ratio
 
-    assert model_a.origin == model_b.origin
-    assert np.array_equal(np.asarray(vector_a, dtype=float), np.asarray(vector_b, dtype=float))
-    assert fs_a == fs_b
-    assert g_a == g_b == {"W149": FIXED_G}
-    assert ft_a == ft_b
+    for key in FIXED_PHYSICAL:
+        assert (
+            r_catalog.physical_params[key]
+            == r_generated.physical_params[key]
+        )
+
+    # But only the catalog owns an already-materialized flux
+    # realization.
+    assert r_catalog.materialized_fluxes == {
+        "W149": {
+            "fsource": FIXED_FSOURCE,
+            "ftotal": FIXED_FTOTAL,
+        }
+    }
+
+    assert r_generated.materialized_fluxes is None
+
+    # The generated/manual path remains independently functional and
+    # keeps its historical explicit-blend-ratio construction.
+    model_generated, _, fs_generated, g_generated, ft_generated = (
+        _build_model_and_flux(
+            r_generated,
+            BANDS,
+            magstar,
+        )
+    )
+
+    assert model_generated.origin[0] == "central_caustic"
+    assert g_generated == {"W149": FIXED_G}
+
+    # Deliberately prove that the catalog flux realization is NOT
+    # required to equal a reconstruction from this unrelated magstar.
+    assert fs_generated["W149"] != FIXED_FSOURCE
+    assert ft_generated["W149"] != FIXED_FTOTAL
 
 
 # ---------------------------------------------------------------
@@ -381,6 +604,12 @@ def test_explicit_usbl_realization_never_samples_origin_or_blending():
         )
         assert r.caustic_origin == "third_caustic"
         assert r.blend_ratio == {"W149": FIXED_G}
+        assert r.materialized_fluxes == {
+            "W149": {
+                "fsource": FIXED_FSOURCE,
+                "ftotal": FIXED_FTOTAL,
+            }
+        }
 
         model, vector, fs, g, ftot = _build_model_and_flux(r, BANDS, magstar)
         results.append((model.origin, tuple(vector), g))
@@ -390,7 +619,18 @@ def test_explicit_usbl_realization_never_samples_origin_or_blending():
         "different seeds -- something was sampled"
     )
     assert results[0][0][0] == "third_caustic"
-    assert results[0][2] == {"W149": FIXED_G}
+
+    # For a materialized catalog realization, g reported by the test
+    # adapter is derived from the authoritative fsource/ftotal pair.
+    # Floating-point roundoff can therefore differ from the separately
+    # stored blend_ratio at ~machine precision.
+    assert set(results[0][2]) == {"W149"}
+    assert np.isclose(
+        results[0][2]["W149"],
+        FIXED_G,
+        rtol=0.0,
+        atol=1e-15,
+    )
 
     # Stronger proof than matching across two seeds: for ONE fixed
     # seed, confirm zero numbers were drawn from the global RNG at
@@ -642,10 +882,27 @@ def test_blend_ratio_validation_rejects_negative_and_non_finite():
 def test_blend_ratio_validation_allows_g_greater_than_one():
     # No upper bound is imposed on g = Fblend/Fsource.
     row = _catalog_row()
-    row[f"blend_ratio_{BANDS[0]}"] = 5.0
 
-    r = realization_from_catalog(row, "USBL", True, FIXED_PHYSICAL["t0"], BANDS)
-    assert r.blend_ratio[BANDS[0]] == 5.0
+    g = 5.0
+    band = BANDS[0]
+
+    row[f"blend_ratio_{band}"] = g
+    row[f"ftotal_{band}"] = (
+        row[f"fsource_{band}"]
+        * (1.0 + g)
+    )
+
+    r = realization_from_catalog(
+        row,
+        "USBL",
+        True,
+        FIXED_PHYSICAL["t0"],
+        BANDS,
+    )
+
+    assert r.blend_ratio[band] == g
+    assert r.materialized_fluxes[band]["fsource"] == FIXED_FSOURCE
+    assert r.materialized_fluxes[band]["ftotal"] == FIXED_FSOURCE * 6.0
 
 
 # ---------------------------------------------------------------
