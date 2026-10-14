@@ -46,6 +46,10 @@ from typing import Mapping
 
 import numpy as np
 
+from analysis.fspl_chain_rule import (
+    fspl_chain_rule_flux_derivatives,
+)
+
 from set_model_pyLIMA import (
     build_pyLIMA_model,
     normalize_model_name,
@@ -295,12 +299,28 @@ def rebuild_model(
         ):
             telescope.location = "Earth"
 
+            # pyLIMA represents the Earth centre by using
+            # an altitude equal to minus its Earth radius.
+            # Set it explicitly rather than relying on the
+            # Telescope default.
+            telescope.altitude = -6378100.0
+
             telescope.spacecraft_name = None
 
             telescope.spacecraft_positions = {
                 "astrometry": [],
                 "photometry": [],
             }
+
+    if roman_at_earth:
+        # Earth-centred Roman requires sidereal-time machinery.
+        # Configure Astropy locally so this module can be run
+        # independently of functions_roman_rubin imports.
+        from astropy.utils import iers
+
+        iers.conf.auto_max_age = None
+        iers.conf.auto_download = False
+        iers.conf.iers_degraded_accuracy = "warn"
 
     event.check_event()
 
@@ -1037,12 +1057,132 @@ def _flux_derivatives(
 # ======================================================================
 
 
+
+def expected_fisher_flux_error(
+    model,
+    telescope,
+    pyparams,
+):
+    """
+    Expected local flux uncertainty used by E1 Fisher.
+
+    The simulated light curve stores err_mag from the
+    instrumental noise model evaluated before the random
+    magnitude draw.
+
+    The observed err_flux, however, is reconstructed using
+    the noisy realized flux. That makes the Fisher weights
+    realization-dependent.
+
+    E1 instead uses
+
+        sigma_F =
+            F_model
+            * ln(10) / 2.5
+            * sigma_mag
+
+    where F_model is evaluated at the truth for the current
+    Fisher configuration.
+
+    This changes only the Fisher weights. It does not mutate
+    the simulated photometry or the uncertainties used by
+    the fitting pipeline.
+    """
+
+    lightcurve = telescope.lightcurve
+
+    if lightcurve is None or len(lightcurve) == 0:
+        raise ValueError(
+            f"{telescope.name}: empty light curve."
+        )
+
+    if "err_mag" not in lightcurve.colnames:
+        raise KeyError(
+            f"{telescope.name}: missing err_mag."
+        )
+
+    err_mag = _array(
+        lightcurve["err_mag"]
+    )
+
+    model_result = (
+        model.compute_the_microlensing_model(
+            telescope,
+            pyparams,
+        )
+    )
+
+    model_flux = _array(
+        model_result["photometry"]
+    )
+
+    n = len(lightcurve)
+
+    if model_flux.shape != (n,):
+        raise RuntimeError(
+            f"{telescope.name}: "
+            f"model flux shape={model_flux.shape}, "
+            f"expected {(n,)}."
+        )
+
+    if err_mag.shape != (n,):
+        raise RuntimeError(
+            f"{telescope.name}: "
+            f"err_mag shape={err_mag.shape}, "
+            f"expected {(n,)}."
+        )
+
+    if (
+        not np.all(np.isfinite(model_flux))
+        or np.any(model_flux <= 0.0)
+    ):
+        raise RuntimeError(
+            f"{telescope.name}: "
+            "invalid model flux for Fisher weights."
+        )
+
+    if (
+        not np.all(np.isfinite(err_mag))
+        or np.any(err_mag <= 0.0)
+    ):
+        raise RuntimeError(
+            f"{telescope.name}: "
+            "invalid err_mag for Fisher weights."
+        )
+
+    expected_err_flux = (
+        model_flux
+        * np.log(10.0)
+        / 2.5
+        * err_mag
+    )
+
+    if (
+        not np.all(
+            np.isfinite(
+                expected_err_flux
+            )
+        )
+        or np.any(
+            expected_err_flux <= 0.0
+        )
+    ):
+        raise RuntimeError(
+            f"{telescope.name}: "
+            "invalid expected Fisher flux error."
+        )
+
+    return expected_err_flux
+
+
 def weighted_jacobian(
     model,
     pyparams,
     *,
     step_multipliers=
         DEFAULT_STEP_MULTIPLIERS,
+    physical_derivative_method=
+        "auto",
 ):
     """
     Build the global normalized Jacobian.
@@ -1053,8 +1193,16 @@ def weighted_jacobian(
     Flux columns:
         exact analytical derivatives.
 
-    Every row is divided by the fixed observational err_flux,
-    therefore F = J.T @ J.
+    Every row is divided by the expected local flux error
+
+        F_model * ln(10) / 2.5 * err_mag,
+
+    so Fisher information is independent of the random
+    photometric realization.
+
+    The simulated light curve itself is never mutated.
+
+    Therefore F = J.T @ J.
     """
 
     phys = physical_names(
@@ -1122,6 +1270,14 @@ def weighted_jacobian(
         phys
     )
 
+    if physical_derivative_method == "auto":
+        if "FSPL" in str(model.model_type()).upper():
+            resolved_derivative_method = "fspl_chain_rule"
+        else:
+            resolved_derivative_method = "five_point_stable_pair"
+    else:
+        resolved_derivative_method = physical_derivative_method
+
     blocks = []
 
     alternate_blocks = []
@@ -1129,6 +1285,8 @@ def weighted_jacobian(
     telescope_contributions = {}
 
     telescope_n_points = {}
+
+    telescope_weight_diagnostics = {}
 
     derivative_diagnostics = {}
 
@@ -1138,10 +1296,16 @@ def weighted_jacobian(
             telescope.lightcurve
         )
 
-        err = _array(
+        observed_err = _array(
             telescope.lightcurve[
                 "err_flux"
             ]
+        )
+
+        err = expected_fisher_flux_error(
+            model,
+            telescope,
+            pyparams,
         )
 
         if err.shape != (
@@ -1168,56 +1332,147 @@ def weighted_jacobian(
                 "invalid err_flux."
             )
 
-        physical_rows = []
+        observed_valid = (
+            np.isfinite(observed_err)
+            & (observed_err > 0.0)
+        )
 
-        alternate_physical_rows = []
+        if np.any(observed_valid):
+            ratio = (
+                err[observed_valid]
+                / observed_err[observed_valid]
+            )
 
-        telescope_diag = {}
+            fractional_difference = (
+                ratio - 1.0
+            )
 
-        for name in phys:
+            telescope_weight_diagnostics[
+                telescope.name
+            ] = {
+                "weight_mode":
+                    "model_flux_x_stored_err_mag",
 
-            index = parameter_index[
-                name
-            ]
+                "median_expected_over_observed":
+                    float(
+                        np.median(
+                            ratio
+                        )
+                    ),
+
+                "max_abs_fractional_difference":
+                    float(
+                        np.max(
+                            np.abs(
+                                fractional_difference
+                            )
+                        )
+                    ),
+
+                "n_compared":
+                    int(
+                        np.sum(
+                            observed_valid
+                        )
+                    ),
+            }
+
+        else:
+            telescope_weight_diagnostics[
+                telescope.name
+            ] = {
+                "weight_mode":
+                    "model_flux_x_stored_err_mag",
+
+                "median_expected_over_observed":
+                    np.nan,
+
+                "max_abs_fractional_difference":
+                    np.nan,
+
+                "n_compared":
+                    0,
+            }
+
+        if (
+            resolved_derivative_method
+            == "five_point_stable_pair"
+        ):
+
+            physical_rows = []
+
+            alternate_physical_rows = []
+
+            telescope_diag = {}
+
+            for name in phys:
+
+                index = parameter_index[
+                    name
+                ]
+
+                (
+                    derivative,
+                    alternate_derivative,
+                    diagnostic,
+                ) = (
+                    stable_five_point_derivative(
+                        model,
+                        telescope,
+                        vector,
+                        index,
+                        name,
+                        pyparams,
+                        step_multipliers=
+                            step_multipliers,
+                    )
+                )
+
+                physical_rows.append(
+                    derivative
+                )
+
+                alternate_physical_rows.append(
+                    alternate_derivative
+                )
+
+                telescope_diag[
+                    name
+                ] = diagnostic
+
+            physical_rows = np.asarray(
+                physical_rows,
+                dtype=float,
+            )
+
+            alternate_physical_rows = np.asarray(
+                alternate_physical_rows,
+                dtype=float,
+            )
+
+        elif (
+            resolved_derivative_method
+            == "fspl_chain_rule"
+        ):
 
             (
-                derivative,
-                alternate_derivative,
-                diagnostic,
+                physical_rows,
+                alternate_physical_rows,
+                telescope_diag,
             ) = (
-                stable_five_point_derivative(
+                fspl_chain_rule_flux_derivatives(
                     model,
                     telescope,
-                    vector,
-                    index,
-                    name,
                     pyparams,
-                    step_multipliers=
-                        step_multipliers,
+                    phys,
                 )
             )
 
-            physical_rows.append(
-                derivative
+        else:
+            raise ValueError(
+                "Unknown physical_derivative_method: "
+                f"{resolved_derivative_method!r}"
             )
-
-            alternate_physical_rows.append(
-                alternate_derivative
-            )
-
-            telescope_diag[
-                name
-            ] = diagnostic
-
-        physical_rows = np.asarray(
-            physical_rows,
-            dtype=float,
-        )
-
-        alternate_physical_rows = np.asarray(
-            alternate_physical_rows,
-            dtype=float,
-        )
 
         flux_names = local_flux_names(
             model,
@@ -1401,6 +1656,9 @@ def weighted_jacobian(
                 )
 
     return {
+        "physical_derivative_method":
+            resolved_derivative_method,
+
         "jacobian":
             J,
 
@@ -1424,6 +1682,12 @@ def weighted_jacobian(
 
         "telescope_n_points":
             telescope_n_points,
+
+        "telescope_weight_diagnostics":
+            telescope_weight_diagnostics,
+
+        "weight_mode":
+            "model_flux_x_stored_err_mag",
 
         "derivative_diagnostics":
             derivative_diagnostics,
@@ -2399,6 +2663,8 @@ def compute_fisher(
     rcond=None,
     step_multipliers=
         DEFAULT_STEP_MULTIPLIERS,
+    physical_derivative_method=
+        "auto",
 ):
     """
     Compute local Fisher information at the supplied truth point.
@@ -2416,6 +2682,8 @@ def compute_fisher(
         pyparams,
         step_multipliers=
             step_multipliers,
+        physical_derivative_method=
+            physical_derivative_method,
     )
 
     names = out[
@@ -2747,10 +3015,23 @@ def compute_fisher(
 
     return {
         "method":
-            "five_point_stable_pair"
-            "+analytic_flux"
-            "+nuisance_projection"
-            "+svd",
+            (
+                "five_point_stable_pair"
+                if out[
+                    "physical_derivative_method"
+                ]
+                == "five_point_stable_pair"
+                else
+                "fspl_chain_rule_local_five_point"
+            )
+            + "+analytic_flux"
+            + "+nuisance_projection"
+            + "+svd",
+
+        "physical_derivative_method":
+            out[
+                "physical_derivative_method"
+            ],
 
         "physical_names":
             names,
@@ -2884,6 +3165,16 @@ def compute_fisher(
         "telescope_n_points":
             out[
                 "telescope_n_points"
+            ],
+
+        "weight_mode":
+            out[
+                "weight_mode"
+            ],
+
+        "telescope_weight_diagnostics":
+            out[
+                "telescope_weight_diagnostics"
             ],
 
         "telescope_contributions":
@@ -3020,6 +3311,8 @@ def compute_e1_suite(
     rcond=None,
     step_multipliers=
         DEFAULT_STEP_MULTIPLIERS,
+    physical_derivative_method=
+        "auto",
 ):
     """
     Compute E1 for:
@@ -3090,6 +3383,8 @@ def compute_e1_suite(
             rcond=rcond,
             step_multipliers=
                 step_multipliers,
+            physical_derivative_method=
+                physical_derivative_method,
         )
 
         result[
@@ -3258,10 +3553,13 @@ def compact_summary(
 ):
     row = {
         "fisher_method":
-            "five_point_stable_pair"
-            "+analytic_flux"
-            "+nuisance_projection"
-            "+svd",
+            suite[
+                "configurations"
+            ][
+                "R"
+            ][
+                "method"
+            ],
 
         "min_rubin_points":
             suite[
@@ -3313,6 +3611,43 @@ def compact_summary(
         ] = result[
             "full_rank"
         ]
+
+        row[
+            f"{prefix}_weight_mode"
+        ] = result[
+            "weight_mode"
+        ]
+
+        for (
+            telescope_name,
+            weight_diag,
+        ) in result[
+            "telescope_weight_diagnostics"
+        ].items():
+
+            safe_telescope_name = "".join(
+                character
+                if character.isalnum()
+                else "_"
+                for character in str(
+                    telescope_name
+                )
+            )
+
+            for diagnostic_name in (
+                "median_expected_over_observed",
+                "max_abs_fractional_difference",
+                "n_compared",
+            ):
+                row[
+                    (
+                        f"{prefix}_weight_"
+                        f"{safe_telescope_name}_"
+                        f"{diagnostic_name}"
+                    )
+                ] = weight_diag[
+                    diagnostic_name
+                ]
 
         row[
             f"{prefix}_condition_number"
