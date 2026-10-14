@@ -690,6 +690,67 @@ def observation_mode_passed(
     return False
 
 
+def selection_data_available(
+    Roman_band,
+    Rubin_band,
+    use_roman=True,
+    use_rubin=True,
+):
+    """
+    Data-availability gate for scientific event selection.
+
+    Whenever Roman is active, the scientific sample is defined by
+    Roman alone. Rubin availability must not determine whether the
+    event enters the Roman-selected sample.
+
+    Rubin-only workflows retain the historical generic behavior.
+    """
+
+    if use_roman:
+        return bool(Roman_band)
+
+    return observation_mode_passed(
+        Roman_band,
+        Rubin_band,
+        use_roman=use_roman,
+        use_rubin=use_rubin,
+    )
+
+
+def selection_telescopes(
+    pyLIMA_telescopes,
+    use_roman=True,
+    use_rubin=True,
+    roman_band_name="W149",
+):
+    """
+    Telescopes allowed to contribute to the event-selection criterion.
+
+    If Roman is active, selection uses W149 only.
+    Rubin cannot strengthen or rescue Roman detectability.
+
+    Rubin-only workflows use the non-Roman telescopes.
+    """
+
+    telescopes = list(pyLIMA_telescopes)
+
+    if use_roman:
+        return [
+            tel
+            for tel in telescopes
+            if tel.name == roman_band_name
+        ]
+
+    if use_rubin:
+        return [
+            tel
+            for tel in telescopes
+            if tel.name != roman_band_name
+        ]
+
+    return []
+
+
 def inject_model_flux_for_ground_telescopes(
     new_creation,
     pyLIMA_model,
@@ -1345,11 +1406,17 @@ def sim_event(
     # Criterios de detección
     # ============================================================
     _sim_timer.start("simulation_validation")
-    has_required_data = observation_mode_passed(
+    has_required_data = selection_data_available(
         Roman_band,
         Rubin_band,
         use_roman=use_roman,
         use_rubin=use_rubin,
+    )
+    detection_telescopes = selection_telescopes(
+        new_creation.telescopes,
+        use_roman=use_roman,
+        use_rubin=use_rubin,
+        roman_band_name="W149",
     )
     _sim_timer.stop("simulation_validation")
 
@@ -1373,7 +1440,7 @@ def sim_event(
         _sim_timer.start("simulation_detection")
         decision, res = deviation_from_constant(
             pyLIMA_parameters,
-            new_creation.telescopes,
+            detection_telescopes,
             nsigma=3.0,
             nmin=6,
             window="all",
