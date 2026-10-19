@@ -507,6 +507,7 @@ def apply_roman_rubin_photometry(
     apply_photometric_filter=True,
     rubin_saturation_mag=None,
     roman_saturation_mag=None,
+    add_photometric_noise=True,
 ):
     """
     Aplica fotometría simulada a los telescopios activos.
@@ -540,6 +541,7 @@ def apply_roman_rubin_photometry(
                 telescope=telo,
                 zero_point=ZP[telo.name],
                 apply_photometric_filter=apply_photometric_filter,
+                add_noise=add_photometric_noise,
             )
 
             if len(telo.lightcurve["mag"]) != 0:
@@ -622,7 +624,11 @@ def apply_roman_rubin_photometry(
                 )[0]
 
                 err_mag.append(magerr_k)
-                obs_mag.append(np.random.normal(ym[k], magerr_k))
+                obs_mag.append(
+                    np.random.normal(ym[k], magerr_k)
+                    if add_photometric_noise
+                    else float(ym[k])
+                )
                 obs_time.append(X[k])
                 M5.append(m5_k)
                 SAT.append(sat_k)
@@ -991,6 +997,8 @@ def sim_event(
     apply_photometric_filter=True,
     rubin_saturation_mag=None,
     roman_saturation_mag=None,
+    truth_double_source=False,
+    add_photometric_noise=True,
 ):
     """
     i (int): índice del evento
@@ -1263,10 +1271,22 @@ def sim_event(
 
     _sim_timer.start("simulation_model_choice")
 
+    if truth_double_source:
+        double_source_arg = [
+            "Circular",
+            float(t0),
+        ]
+    else:
+        double_source_arg = [
+            "None",
+            0.0,
+        ]
+
     my_own_model = model_choice(
         new_creation,
         model,
         parallax=parallax_arg,
+        double_source=double_source_arg,
         BL_random_origin=bl_random_origin,
         BL_origin=caustic_origin_arg,
     )
@@ -1428,6 +1448,7 @@ def sim_event(
         LSST_BandPass,
         photParams,
         apply_photometric_filter=apply_photometric_filter,
+        add_photometric_noise=add_photometric_noise,
         rubin_saturation_mag=rubin_saturation_mag,
         roman_saturation_mag=roman_saturation_mag,
     )
@@ -2544,6 +2565,8 @@ def simulate_event_for_fit(
     apply_photometric_filter=True,
     rubin_saturation_mag=None,
     roman_saturation_mag=None,
+    truth_double_source=False,
+    add_photometric_noise=True,
 ):
     my_own_model, pyLIMA_parameters, decision = sim_event(
         i,
@@ -2554,6 +2577,8 @@ def simulate_event_for_fit(
         use_roman=use_roman,
         use_rubin=use_rubin,
         truth_parallax=truth_parallax,
+        truth_double_source=truth_double_source,
+        add_photometric_noise=add_photometric_noise,
         rubin_pointing_mode=rubin_pointing_mode,
         rubin_cache_cell_deg=rubin_cache_cell_deg,
         apply_detection_criteria=apply_detection_criteria,
@@ -4248,6 +4273,8 @@ def sim_fit(
     apply_photometric_filter=True,
     rubin_saturation_mag=None,
     roman_saturation_mag=None,
+    truth_double_source=False,
+    add_photometric_noise=True,
 ):
     """
     Simula un evento, aplica criterios de detección, guarda la simulación,
@@ -4476,6 +4503,8 @@ def sim_fit(
         use_roman=use_roman,
         use_rubin=use_rubin,
         truth_parallax=truth_parallax,
+        truth_double_source=truth_double_source,
+        add_photometric_noise=add_photometric_noise,
         rubin_pointing_mode=rubin_pointing_mode,
         rubin_cache_cell_deg=rubin_cache_cell_deg,
         apply_detection_criteria=apply_detection_criteria,
@@ -6442,6 +6471,8 @@ def sim_fit_multi_fits(
     apply_photometric_filter=True,
     rubin_saturation_mag=None,
     roman_saturation_mag=None,
+    truth_double_source=False,
+    add_photometric_noise=True,
 ):
     """
     Generalization of sim_fit: simulate once, then run multiple fits.
@@ -6518,6 +6549,8 @@ def sim_fit_multi_fits(
         use_roman=use_roman,
         use_rubin=use_rubin,
         truth_parallax=truth_parallax,
+        truth_double_source=truth_double_source,
+        add_photometric_noise=add_photometric_noise,
         fit_time_window=fit_time_window,
         return_data=True,
         fit_model=primary_spec.get("model", fit_model),
