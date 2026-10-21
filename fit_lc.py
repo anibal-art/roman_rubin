@@ -17,6 +17,8 @@ from contextlib import contextmanager
 import multiprocessing as mul
 import numpy as np
 
+from set_model_pyLIMA import parameters_model
+
 from timing_utils import StageTimer
 
 from pyLIMA import event
@@ -649,6 +651,7 @@ def fit_guess_values(
     fit_model,
     fit_parallax=True,
     Origin=None,
+    param_order_override=None,
 ):
     """
     Devuelve los valores iniciales en el orden esperado por pyLIMA.
@@ -675,6 +678,17 @@ def fit_guess_values(
         values["piEN"] = fit_params["piEN"]
         values["piEE"] = fit_params["piEE"]
 
+    # Make additional physical parameters available to an
+    # explicit canonical order (e.g. circular double source).
+    for key, value in fit_params.items():
+        values.setdefault(key, value)
+
+    if param_order_override is not None:
+        return [
+            values[p]
+            for p in param_order_override
+        ]
+
     order = fit_parameter_order(
         fit_model,
         fit_parallax=fit_parallax,
@@ -697,6 +711,7 @@ def build_fit_pyLIMA_model(
     fit_params,
     Origin=None,
     fit_parallax=True,
+    fit_double_source=False,
 ):
     """
     Construye el modelo pyLIMA que se va a ajustar.
@@ -711,11 +726,18 @@ def build_fit_pyLIMA_model(
     if fit_parallax:
         t0_parallax = fit_params["t0"]
 
+    t0_double_source = None
+
+    if fit_double_source:
+        t0_double_source = fit_params["t0"]
+
     return build_pyLIMA_model(
         pyLIMA_event=e,
         model=fit_model,
         use_parallax=bool(fit_parallax),
         t0_parallax=t0_parallax,
+        use_double_source=bool(fit_double_source),
+        t0_double_source=t0_double_source,
         origin=Origin,
         random_origin=False,
         blend_flux_parameter="ftotal",
@@ -885,6 +907,9 @@ def _center_for_parameter(parameter_name, fit_params):
     if parameter_name == "piEE":
         return fit_params["piEE"]
 
+    if parameter_name in fit_params:
+        return fit_params[parameter_name]
+
     raise KeyError(
         f"No sé cómo obtener centro para {parameter_name}"
     )
@@ -1048,6 +1073,7 @@ def apply_custom_bounds(
     fit_parallax=True,
     fit_bounds=None,
     Origin=None,
+    param_order_override=None,
 ):
     """
     Sobreescribe bounds usando un diccionario definido por el usuario.
@@ -1062,6 +1088,9 @@ def apply_custom_bounds(
         fit_parallax=fit_parallax,
         Origin=Origin,
     )
+
+    if param_order_override is not None:
+        param_order = list(param_order_override)
 
     for par in param_order:
 
@@ -1344,6 +1373,7 @@ def apply_fit_bounds(
     fit_parallax=True,
     fit_bounds=None,
     Origin=None,
+    param_order_override=None,
 ):
     """
     Aplica bounds según rango y, opcionalmente, sobreescribe
@@ -1382,6 +1412,7 @@ def apply_fit_bounds(
             fit_model,
             fit_parallax=fit_parallax,
             fit_bounds=fit_bounds,
+            param_order_override=param_order_override,
             Origin=Origin,
         )
 
@@ -1643,6 +1674,7 @@ def resolve_initial_guess(
             fit_params,
             fit_model,
             fit_parallax=fit_parallax,
+            param_order_override=param_order,
             Origin=Origin,
         )
 
@@ -2119,6 +2151,7 @@ def finalize_fit_results(
     fit_model,
     fit_parallax,
     fit_bounds=None,
+    fit_double_source=False,
 ):
     """
     Agrega metadatos al fit_results.
@@ -2127,6 +2160,7 @@ def finalize_fit_results(
     fit.fit_results["sim_model"] = normalize_model_name(sim_model)
     fit.fit_results["fit_model"] = normalize_model_name(fit_model)
     fit.fit_results["fit_parallax"] = bool(fit_parallax)
+    fit.fit_results["fit_double_source"] = bool(fit_double_source)
     fit.fit_results["rango"] = rango_used
     fit.fit_results["method"] = algo
     fit.fit_results["name"] = event_name
@@ -2153,6 +2187,7 @@ def save_fit_results(
     fit_model,
     fit_parallax,
     fit_results,
+    fit_double_source=False,
 ):
     """
     Guarda fit_results como .npy.
@@ -2168,6 +2203,9 @@ def save_fit_results(
 
     suffix = normalize_model_name(fit_model)
     suffix += f"_{parallax_suffix(fit_parallax)}"
+
+    if fit_double_source:
+        suffix += "_DoubleSourceCircular"
 
     output_path = path_save / f"{event_name}_{algo}_{suffix}.npy"
 
@@ -2208,6 +2246,7 @@ def fit_rubin_roman(
     optimizer_options=None,
     event_ra=None,
     event_dec=None,
+    fit_double_source=False,
 ):
     """
     Ajusta una curva Roman/Rubin con pyLIMA.
@@ -2285,6 +2324,7 @@ def fit_rubin_roman(
         fit_parallax = True
 
     fit_parallax = bool(fit_parallax)
+    fit_double_source = bool(fit_double_source)
     fit_model_base = normalize_model_name(fit_model)
     sim_model_base = normalize_model_name(model)
 
@@ -2344,7 +2384,48 @@ def fit_rubin_roman(
         fit_params,
         Origin=Origin,
         fit_parallax=fit_parallax,
+        fit_double_source=fit_double_source,
     )
+
+
+    double_source_param_order = None
+
+    if fit_double_source:
+        double_source_seed_data = dict(event_params)
+
+        # fit_defaults intentionally overrides simulation truth.
+        # This allows callers to choose an H1 start policy that is
+        # identical for H0- and H1-generated datasets.
+        if fit_defaults is not None:
+            double_source_seed_data.update(fit_defaults)
+
+        double_source_params, double_source_param_order = (
+            parameters_model(
+                double_source_seed_data,
+                pyLIMAmodel,
+            )
+        )
+
+        # Keep the existing t0/u0/tE/rho/parallax initialization.
+        # Add only the extra parameters introduced by double source.
+        for parameter in double_source_param_order:
+            if parameter not in fit_params:
+                fit_params[parameter] = float(
+                    double_source_params[parameter]
+                )
+
+        ds_mode = getattr(
+            pyLIMAmodel,
+            "double_source_model",
+            ["None", 0.0],
+        )
+
+        if ds_mode[0] != "Circular":
+            raise RuntimeError(
+                "fit_double_source=True did not build a "
+                "Circular double-source pyLIMA model: "
+                f"{ds_mode}"
+            )
 
     fit, pool_processes = build_fitter(
         pyLIMAmodel,
@@ -2358,6 +2439,7 @@ def fit_rubin_roman(
         rango,
         fit_parallax=fit_parallax,
         fit_bounds=fit_bounds,
+        param_order_override=double_source_param_order,
         Origin=Origin,
     )
 
@@ -2366,6 +2448,9 @@ def fit_rubin_roman(
         fit_parallax=fit_parallax,
         Origin=Origin,
     )
+
+    if double_source_param_order is not None:
+        param_order = list(double_source_param_order)
 
     initial_guess_used, initial_guess_source = resolve_initial_guess(
         fit,
@@ -2409,6 +2494,7 @@ def fit_rubin_roman(
         sim_model=sim_model_base,
         fit_model=fit_model_base,
         fit_parallax=fit_parallax,
+        fit_double_source=fit_double_source,
         fit_bounds=fit_bounds,
     )
 
@@ -2438,6 +2524,7 @@ def fit_rubin_roman(
         fit_model_base,
         fit_parallax,
         fit_results,
+        fit_double_source=fit_double_source,
     )
 
     _fit_timer.stop("fit_save")
