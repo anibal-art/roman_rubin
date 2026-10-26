@@ -1,0 +1,40 @@
+# Generated from the pyLIMA_test environment by gen_requirements.py.
+# Direct third-party imports of the repository (legacy/ and notebooks/ excluded),
+# pinned to the installed versions. Full environment: requirements-lock.txt.
+# Python 3.11.15
+
+# --- Simulation, fits and analysis (production)
+astro-datalab==2.24.0
+astropy==5.3.4
+astroquery==0.4.6
+bokeh==2.4.3
+cycler==0.12.1
+h5py==3.11.0
+matplotlib==3.9.0
+numpy==1.26.3
+pandas==2.1.4
+pillow==10.3.0
+pyarrow==20.0.0
+pyerfa==2.0.1.5
+pyLIMA==1.9.8
+rubin-sim==2.2.4
+scipy==1.11.4
+tqdm==4.66.4
+
+# --- Catalogue construction (stellar_population/)
+beautifulsoup4==4.12.2
+# genulens  # NO INSTALADO en este entorno (import genulens)
+# pandeia  # NO INSTALADO en este entorno (import pandeia)
+# pysiaf  # NO INSTALADO en este entorno (import pysiaf)
+requests==2.32.3
+shapely==2.1.1
+# stsynphot  # NO INSTALADO en este entorno (import stsynphot)
+# synphot  # NO INSTALADO en este entorno (import synphot)
+urllib3==2.2.2
+
+# --- Cluster connection utilities
+# paramiko  # NO INSTALADO en este entorno (import paramiko)
+# scp  # NO INSTALADO en este entorno (import scp)
+
+# --- Tests
+pytest==8.2.2
