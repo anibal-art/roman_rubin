@@ -4,7 +4,6 @@
 * extract_data_event / new_data: per-event row (true and fitted parameters,
   uncertainties, chi2/dof, photometry summary) for Roman+Rubin and Roman.
 * save_extracted_results: write that row as parquet.
-* save_simulated_event_if_selected: optional raw simulation dump.
 """
 
 import numpy as np
@@ -14,7 +13,6 @@ from fitting.fit_inputs import fit_results_path_from_fit_object
 from fitting.fit_inputs import resolve_fit_options
 from pathlib import Path
 from photometry.roman_rubin_photometry import photometry_summary_columns
-from read_save import save_sim
 from utils.io import save_dict_as_parquet as _save_dict_as_parquet
 
 
@@ -880,33 +878,3 @@ def save_extracted_results(
 
     return new_data_true, new_data_rr, new_data_roman
 
-
-def save_simulated_event_if_selected(
-    i,
-    ROW_G,
-    ROW_T,
-    path_TRILEGAL_set,
-    path_GENULENS_set,
-    path_to_save_model,
-    my_own_model,
-    pyLIMA_parameters,
-    event_params,
-    GENULENS_row,
-    TRILEGAL_row,
-):
-    """
-    Guarda la curva simulada usando tu función save_sim().
-    """
-    save_sim(
-        i,
-        ROW_G,
-        ROW_T,
-        path_TRILEGAL_set,
-        path_GENULENS_set,
-        path_to_save_model,
-        my_own_model,
-        pyLIMA_parameters,
-        event_params,
-        GENULENS_row,
-        TRILEGAL_row,
-    )

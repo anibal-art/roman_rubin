@@ -46,7 +46,7 @@ def build_event_params_from_custom_system(
         Se conservan todas las claves adicionales como metadatos.
 
     model : str
-        Modelo verdadero usado por ``simulate_event_for_fit``.
+        Modelo verdadero usado por ``sim_event``.
 
     use_roman, use_rubin : bool
         Determinan qué magnitudes son obligatorias.

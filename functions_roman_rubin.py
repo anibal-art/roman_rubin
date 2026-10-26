@@ -71,11 +71,9 @@ from fitting.fit_inputs import (  # noqa: F401  (moved; re-exported)
     apply_fit_time_window_to_lc_dict,
     count_active_fit_points,
     extract_lightcurves_for_fit,
-    get_model_origin,
     get_event_coordinates,
     validate_event_coordinates,
     resolve_fit_options,
-    parallax_suffix_for_filename,
     expected_fit_results_path,
     fit_results_path_from_fit_object,
 )
@@ -115,7 +113,6 @@ from analysis.simfit_records import (  # noqa: F401  (moved; re-exported)
     extract_nset_string,
     build_analysis_event,
     save_extracted_results,
-    save_simulated_event_if_selected,
 )
 from utils.process import (  # noqa: F401  (moved; re-exported)
     register_clean_exit_handlers,
@@ -125,12 +122,10 @@ from simulation.simulate_event import (  # noqa: F401  (moved; re-exported)
     sim_event,
 )
 from fitting.run_fits import (  # noqa: F401  (moved; re-exported)
-    _call_fit_rubin_roman_compatible,
     run_all_fits,
     run_multiple_named_fits,
 )
 from pipeline.sim_fit import (  # noqa: F401  (moved; re-exported)
-    simulate_event_for_fit,
     sim_fit,
 )
 from pipeline.sim_fit_multi_fits import (  # noqa: F401  (moved; re-exported)

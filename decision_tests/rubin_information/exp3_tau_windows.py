@@ -71,7 +71,7 @@ from catalog.event_reader import (
 
 from functions_roman_rubin import (
     build_event_params_from_custom_system,
-    simulate_event_for_fit,
+    sim_event,
 )
 
 from analysis.fisher_information import (
@@ -296,7 +296,7 @@ for (
         true_model,
         true_params,
         detected,
-    ) = simulate_event_for_fit(
+    ) = sim_event(
         simulation_seed,
         event_params,
         path_ephemerides,

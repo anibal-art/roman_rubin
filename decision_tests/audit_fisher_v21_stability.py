@@ -21,7 +21,7 @@ resolved_paths = configure_environment(
 
 
 from catalog.event_reader import load_event_from_catalog
-from functions_roman_rubin import simulate_event_for_fit
+from functions_roman_rubin import sim_event
 
 from analysis.fisher_information import compute_e1_suite
 
@@ -108,7 +108,7 @@ def run_case(population, index, model_name):
 
     seed = int(event["simulation_seed"])
 
-    true_model, truth, decision = simulate_event_for_fit(
+    true_model, truth, decision = sim_event(
         seed,
         event,
         str(EPHEMERIDES),

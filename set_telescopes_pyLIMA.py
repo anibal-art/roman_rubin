@@ -6,25 +6,16 @@ Created on Wed Jul  8 13:36:34 2026
 @author: anibal
 """
 import numpy as np
-import os, sys, re, copy, math, time, hashlib
-import pandas as pd
+import os, re, time, hashlib
 from pathlib import Path
 
 # Get the directory where the script is located
 script_dir = Path(__file__).parent
 home_dir = os.path.expanduser("~")
 
-from rubin_sim.phot_utils.photometric_parameters import PhotometricParameters
-from rubin_sim.phot_utils.signaltonoise import calc_mag_error_m5
 from rubin_sim.phot_utils.bandpass import Bandpass
 import rubin_sim.maf as maf
 from rubin_sim.data import get_baseline
-
-# astropy
-import astropy.units as u
-from astropy.table import QTable
-from astropy.time import Time
-from astropy.coordinates import SkyCoord
 
 # --- Fix para IERS y sidereal_time de Astropy ---
 from astropy.utils import iers
@@ -32,35 +23,40 @@ iers.conf.auto_max_age = None
 iers.conf.auto_download = False  # No intenta descargar
 iers.conf.iers_degraded_accuracy = 'warn'
 
-# pyLIMA
-from pyLIMA import event
-from pyLIMA import telescopes
-# from pyLIMA.toolbox import time_series
-from pyLIMA.simulations import simulator
-# from pyLIMA.models import PSBL_model
-# from pyLIMA.models import USBL_model
-# from pyLIMA.models import FSPLarge_model
-# from pyLIMA.models import PSPL_model
-# from pyLIMA.fits import TRF_fit
-# from pyLIMA.fits import DE_fit
-# from pyLIMA.fits import MCMC_fit
-# from pyLIMA.outputs import pyLIMA_plots
-# from pyLIMA.outputs import file_outputs
-
-from class_analysis import Analysis_Event
-from ulens_params import microlensing_params, event_param
-# import multiprocessing as mul
-# import h5py
-from detection_criteria import filter5points, deviation_from_constant, has_consecutive_numbers, filter_band, mag, debug_nsigma_global
-from read_save import save_sim, save_fit, read_data
 
 
 
 
-# ================================================================
-#  Guardado a Parquet
-# ================================================================
-from utils.io import save_dict_as_parquet as _save_dict_as_parquet
+
+from simulation.telescope_templates import (  # noqa: F401  (moved; re-exported)
+    _telescope_array_signature,
+    _load_cached_roman_ephemerides,
+    _get_cached_roman_telescope,
+    _get_cached_rubin_telescope,
+    _build_event_template,
+    _ROMAN_TELESCOPE_TEMPLATE_CACHE,
+    _RUBIN_TELESCOPE_TEMPLATE_CACHE,
+    _ROMAN_EPHEMERIDES_TEMPLATE_CACHE,
+    _TELESCOPE_TEMPLATE_CACHE_STATS,
+)
+from simulation.roman_cadence import (  # noqa: F401  (moved; re-exported)
+    _structured_to_matrix,
+    _roman_nominal_and_off_seasons,
+    _simulate_roman_season,
+)
+from simulation.time_windows import (  # noqa: F401  (moved; re-exported)
+    _get_col_values,
+    _validate_time_window,
+    slice_lightcurve_by_time,
+    slice_dataslice_by_time,
+    apply_time_window_to_event,
+)
+from simulation.rubin_dataslice import (  # noqa: F401  (moved; re-exported)
+    _canonical_rubin_filter_array,
+    _canonicalize_dataslice_filter_column,
+    _build_rubin_ts,
+    _quantize_sky_position,
+)
 
 
 # ================================================================
@@ -99,20 +95,6 @@ def _release_lock(name: str):
 # ================================================================
 #  Helpers de arrays
 # ================================================================
-def _structured_to_matrix(arr, fields):
-    """Convierte un array estructurado 1D a matriz 2D por campos; si ya es 2D, lo retorna."""
-    if hasattr(arr, "dtype") and getattr(arr.dtype, "names", None):
-        # asegurar que todos los campos existen
-        fields = [f for f in fields if f in arr.dtype.names]
-        return np.column_stack([arr[f] for f in fields])
-    # si no es estructurado pero es 1D, forzamos 2D si se puede
-    arr = np.asarray(arr)
-    if arr.ndim == 1:
-        # no sabemos columnas: devolvemos con shape (N,1) para que falle antes que silently wrong
-        return arr.reshape(-1, 1)
-    return arr
-
-
 # ============================================================
 # Cache global por proceso
 # ============================================================
@@ -133,253 +115,6 @@ _ROMAN_MAG = None
 # calculation. Every caller receives a deepcopy.
 #
 # Event RA/Dec, North/East and deltas_positions are never cached.
-
-_ROMAN_TELESCOPE_TEMPLATE_CACHE = {}
-_RUBIN_TELESCOPE_TEMPLATE_CACHE = {}
-_ROMAN_EPHEMERIDES_TEMPLATE_CACHE = {}
-
-_TELESCOPE_TEMPLATE_CACHE_STATS = {
-    "roman_hits": 0,
-    "roman_misses": 0,
-    "rubin_hits": 0,
-    "rubin_misses": 0,
-}
-
-
-def _telescope_array_signature(values):
-    """
-    Exact SHA256 signature of an input numerical array.
-    """
-    arr = np.ascontiguousarray(
-        np.asarray(values)
-    )
-
-    if arr.dtype.hasobject:
-        raise TypeError(
-            "Object arrays are not valid Telescope-cache inputs."
-        )
-
-    h = hashlib.sha256()
-    h.update(arr.dtype.str.encode("ascii"))
-    h.update(repr(arr.shape).encode("ascii"))
-    h.update(arr.tobytes(order="C"))
-
-    return h.hexdigest()
-
-
-def _load_cached_roman_ephemerides(path_ephemerides):
-    """
-    Load one unchanged Roman ephemerides file once per process.
-    """
-    path = os.path.abspath(
-        os.path.expanduser(
-            str(path_ephemerides)
-        )
-    )
-
-    st = os.stat(path)
-
-    file_key = (
-        path,
-        int(st.st_size),
-        int(st.st_mtime_ns),
-    )
-
-    cached = (
-        _ROMAN_EPHEMERIDES_TEMPLATE_CACHE
-        .get(file_key)
-    )
-
-    if cached is None:
-
-        ephemerides = np.load(path)
-
-        cached = (
-            ephemerides,
-            _telescope_array_signature(
-                ephemerides
-            ),
-        )
-
-        _ROMAN_EPHEMERIDES_TEMPLATE_CACHE[
-            file_key
-        ] = cached
-
-    return cached
-
-
-def _get_cached_roman_telescope(
-    roman_mag,
-    path_ephemerides,
-):
-    """
-    Return a fresh Roman Telescope copied from a pristine template.
-    """
-    ephemerides, ephemerides_signature = (
-        _load_cached_roman_ephemerides(
-            path_ephemerides
-        )
-    )
-
-    key = (
-        _telescope_array_signature(
-            roman_mag
-        ),
-        ephemerides_signature,
-    )
-
-    template = (
-        _ROMAN_TELESCOPE_TEMPLATE_CACHE
-        .get(key)
-    )
-
-    if template is None:
-
-        template = telescopes.Telescope(
-            name="W149",
-            camera_filter="W149",
-            location="Space",
-            lightcurve=roman_mag,
-            lightcurve_names=[
-                "time",
-                "mag",
-                "err_mag",
-            ],
-            lightcurve_units=[
-                "d",
-                "mag",
-                "mag",
-            ],
-        )
-
-        template.spacecraft_name = "L2"
-
-        template.spacecraft_positions = {
-            "astrometry": [],
-            "photometry": ephemerides,
-        }
-
-        _ROMAN_TELESCOPE_TEMPLATE_CACHE[
-            key
-        ] = template
-
-        _TELESCOPE_TEMPLATE_CACHE_STATS[
-            "roman_misses"
-        ] += 1
-
-    else:
-
-        _TELESCOPE_TEMPLATE_CACHE_STATS[
-            "roman_hits"
-        ] += 1
-
-    return copy.deepcopy(
-        template
-    )
-
-
-def _get_cached_rubin_telescope(
-    band,
-    lightcurve,
-):
-    """
-    Return a fresh Rubin Telescope copied from a pristine template.
-
-    The cache key uses the complete input [time, mag, err_mag]
-    array, not only its timestamps.
-    """
-    band = str(band)
-
-    key = (
-        band,
-        _telescope_array_signature(
-            lightcurve
-        ),
-    )
-
-    template = (
-        _RUBIN_TELESCOPE_TEMPLATE_CACHE
-        .get(key)
-    )
-
-    if template is None:
-
-        template = telescopes.Telescope(
-            name=band,
-            camera_filter=band,
-            location="Earth",
-            lightcurve=lightcurve,
-            lightcurve_names=[
-                "time",
-                "mag",
-                "err_mag",
-            ],
-            lightcurve_units=[
-                "d",
-                "mag",
-                "mag",
-            ],
-        )
-
-        _RUBIN_TELESCOPE_TEMPLATE_CACHE[
-            key
-        ] = template
-
-        _TELESCOPE_TEMPLATE_CACHE_STATS[
-            "rubin_misses"
-        ] += 1
-
-    else:
-
-        _TELESCOPE_TEMPLATE_CACHE_STATS[
-            "rubin_hits"
-        ] += 1
-
-    return copy.deepcopy(
-        template
-    )
-
-
-def get_telescope_template_cache_stats():
-    """
-    Process-local Telescope-template cache diagnostics.
-    """
-    out = dict(
-        _TELESCOPE_TEMPLATE_CACHE_STATS
-    )
-
-    out["roman_cached_templates"] = len(
-        _ROMAN_TELESCOPE_TEMPLATE_CACHE
-    )
-
-    out["rubin_cached_templates"] = len(
-        _RUBIN_TELESCOPE_TEMPLATE_CACHE
-    )
-
-    out["roman_ephemerides_cached_files"] = len(
-        _ROMAN_EPHEMERIDES_TEMPLATE_CACHE
-    )
-
-    return out
-
-
-def reset_telescope_template_cache():
-    """
-    Clear only Telescope-template optimization caches.
-    """
-    _ROMAN_TELESCOPE_TEMPLATE_CACHE.clear()
-    _RUBIN_TELESCOPE_TEMPLATE_CACHE.clear()
-    _ROMAN_EPHEMERIDES_TEMPLATE_CACHE.clear()
-
-    for key in (
-        "roman_hits",
-        "roman_misses",
-        "rubin_hits",
-        "rubin_misses",
-    ):
-        _TELESCOPE_TEMPLATE_CACHE_STATS[
-            key
-        ] = 0
 
 _DATASLICE_OPSIM_CACHE_TAG = None
 _DATASLICE_OPSIM_DB_PATH = None
@@ -750,14 +485,6 @@ def _opsim_cache_tag(opsim_db_path=None):
     return f"{safe_stem}_{digest}"
 
 
-def _opsim_info(opsim_db_path=None):
-    path = _resolve_opsim_db_path(opsim_db_path)
-    return {
-        "opsim_db_path": str(path),
-        "opsim_cache_tag": _opsim_cache_tag(path),
-    }
-
-
 def _init_common_roman_rubin(path_ephemerides, rubin_throughputs_dir=None):
     """
     Inicializa ingredientes comunes:
@@ -782,35 +509,6 @@ def _init_common_roman_rubin(path_ephemerides, rubin_throughputs_dir=None):
         _ROMAN_MAG = _load_or_build_roman_template()
 
 
-def _quantize_sky_position(Ra, Dec, cache_cell_deg=None):
-    """
-    Devuelve una coordenada para cachear/consultar MAF.
-
-    Si cache_cell_deg is None:
-        usa la coordenada exacta.
-
-    Si cache_cell_deg tiene valor, por ejemplo 0.05:
-        agrupa las coordenadas en celdas de 0.05 deg.
-    """
-
-    Ra = float(Ra)
-    Dec = float(Dec)
-
-    if cache_cell_deg is None:
-        return Ra, Dec, "exact"
-
-    cache_cell_deg = float(cache_cell_deg)
-
-    if cache_cell_deg <= 0:
-        raise ValueError("cache_cell_deg debe ser positivo o None.")
-
-    Ra_q = np.round(Ra / cache_cell_deg) * cache_cell_deg
-    Dec_q = np.round(Dec / cache_cell_deg) * cache_cell_deg
-
-    Ra_q = Ra_q % 360.0
-    Dec_q = np.clip(Dec_q, -90.0, 90.0)
-
-    return float(Ra_q), float(Dec_q), "cell"
 def _get_source_field_rubin(
     path_ephemerides,
     Ra,
@@ -932,176 +630,6 @@ def _get_source_field_rubin(
 # ============================================================
 # Utilidades generales
 # ============================================================
-
-def _get_col_values(col):
-    """
-    Devuelve valores numéricos desde una columna astropy Quantity/Column
-    o desde un array numpy.
-    """
-    return col.value if hasattr(col, "value") else np.asarray(col)
-
-
-def _validate_time_window(time_window):
-    """
-    Normaliza una ventana temporal en JD.
-    """
-    if time_window is None:
-        return None
-
-    if len(time_window) != 2:
-        raise ValueError("time_window debe ser None o una tupla (time_min, time_max).")
-
-    time_min, time_max = time_window
-
-    if time_min is None and time_max is None:
-        return None
-
-    if time_min is not None:
-        time_min = float(time_min)
-
-    if time_max is not None:
-        time_max = float(time_max)
-
-    if time_min is not None and time_max is not None:
-        if time_min > time_max:
-            raise ValueError("time_min no puede ser mayor que time_max.")
-
-    return time_min, time_max
-
-
-def slice_lightcurve_by_time(lightcurve, time_window=None):
-    """
-    Recorta una lightcurve usando la columna 'time'.
-    """
-    time_window = _validate_time_window(time_window)
-
-    if time_window is None:
-        return lightcurve
-
-    time_min, time_max = time_window
-
-    t = _get_col_values(lightcurve["time"])
-
-    mask = np.ones(len(t), dtype=bool)
-
-    if time_min is not None:
-        mask &= t >= time_min
-
-    if time_max is not None:
-        mask &= t <= time_max
-
-    return lightcurve[mask]
-
-
-def slice_dataslice_by_time(dataSlice, time_window=None):
-    """
-    Recorta el dataSlice de Rubin usando observationStartMJD.
-
-    Las curvas de luz están en JD, mientras que OpSim/MAF usa MJD.
-    Por eso se convierte:
-
-        JD = MJD + 2400000.5
-    """
-    time_window = _validate_time_window(time_window)
-
-    if time_window is None:
-        return dataSlice
-
-    time_min, time_max = time_window
-
-    jd = dataSlice["observationStartMJD"] + 2400000.5
-
-    mask = np.ones(len(jd), dtype=bool)
-
-    if time_min is not None:
-        mask &= jd >= time_min
-
-    if time_max is not None:
-        mask &= jd <= time_max
-
-    return dataSlice[mask]
-
-
-def apply_time_window_to_event(my_event, time_window=None):
-    """
-    Aplica una ventana temporal a todos los telescopios del evento.
-    """
-    time_window = _validate_time_window(time_window)
-
-    if time_window is None:
-        return my_event
-
-    for tel in my_event.telescopes:
-        tel.lightcurve = slice_lightcurve_by_time(
-            tel.lightcurve,
-            time_window=time_window,
-        )
-
-    return my_event
-
-
-def make_t0_window(data, window_days=None, window_tE=None):
-    """
-    Construye una ventana simétrica alrededor de t0.
-
-    Ejemplos
-    --------
-    window_tE=5    -> (t0 - 5*tE, t0 + 5*tE)
-    window_days=50 -> (t0 - 50, t0 + 50)
-    """
-    t0 = data["t0"]
-    tE = data["tE"]
-
-    if window_days is not None and window_tE is not None:
-        raise ValueError("Usá window_days o window_tE, no ambos.")
-
-    if window_days is not None:
-        delta_t = float(window_days)
-
-    elif window_tE is not None:
-        delta_t = float(window_tE) * float(tE)
-
-    else:
-        raise ValueError("Tenés que pasar window_days o window_tE.")
-
-    return t0 - delta_t, t0 + delta_t
-
-
-def make_asymmetric_t0_window(data, before_days=None, after_days=None,
-                              before_tE=None, after_tE=None):
-    """
-    Construye una ventana asimétrica alrededor de t0.
-
-    Sirve para probar, por ejemplo:
-    - solo datos antes del pico;
-    - solo datos después del pico;
-    - más baseline de un lado que del otro.
-    """
-    t0 = data["t0"]
-    tE = data["tE"]
-
-    if before_days is not None and before_tE is not None:
-        raise ValueError("Usá before_days o before_tE, no ambos.")
-
-    if after_days is not None and after_tE is not None:
-        raise ValueError("Usá after_days o after_tE, no ambos.")
-
-    if before_days is None and before_tE is None:
-        before = 0.0
-    elif before_days is not None:
-        before = float(before_days)
-    else:
-        before = float(before_tE) * float(tE)
-
-    if after_days is None and after_tE is None:
-        after = 0.0
-    elif after_days is not None:
-        after = float(after_days)
-    else:
-        after = float(after_tE) * float(tE)
-
-    return t0 - before, t0 + after
-
 
 # ============================================================
 # Construcción modular Roman + Rubin
@@ -1256,187 +784,6 @@ def _load_or_build_dataslice(Ra, Dec, opsim_db_path=None):
     return dataSlice
 
 
-def _canonical_rubin_filter_array(values):
-    """
-    Convierte nombres de filtro de OpSim a bandas Rubin canónicas.
-
-    Ejemplos:
-        'g'    -> 'g'
-        'g_6'  -> 'g'
-        'r_57' -> 'r'
-        b'i_39' -> 'i'
-    """
-
-    arr = np.asarray(values)
-
-    if arr.dtype.kind == "S":
-        arr = np.char.decode(arr, "utf-8")
-    else:
-        arr = arr.astype(str)
-
-    out = []
-
-    for value in arr:
-        value = str(value).strip()
-
-        if len(value) >= 4 and value.startswith("b'") and value.endswith("'"):
-            value = value[2:-1]
-
-        if len(value) >= 4 and value.startswith('b"') and value.endswith('"'):
-            value = value[2:-1]
-
-        # Caso nuevo de baseline v5.3.5:
-        # g_6, i_39, r_57, u_24, y_10, z_20
-        band = value.split("_")[0].lower()
-
-        if band not in {"u", "g", "r", "i", "z", "y"}:
-            raise ValueError(
-                f"No pude interpretar el filtro Rubin {value!r} como banda ugrizy."
-            )
-
-        out.append(band)
-
-    return np.asarray(out, dtype=str)
-
-
-def _canonicalize_dataslice_filter_column(dataSlice):
-    """
-    Devuelve una copia del dataSlice con la columna de filtro canonicalizada.
-
-    Esto permite que el resto del pipeline, incluido functions_roman_rubin.py,
-    siga usando comparaciones antiguas como:
-
-        dataSlice["filter"] == "r"
-
-    aunque la OpSim nueva tenga valores como:
-
-        r_57, g_6, i_39, u_24, y_10, z_20
-
-    Los telescopios pyLIMA se siguen llamando u,g,r,i,z,y.
-    """
-
-    if dataSlice is None:
-        return dataSlice
-
-    names = getattr(getattr(dataSlice, "dtype", None), "names", None)
-
-    if names is None:
-        return dataSlice
-
-    if "filter" in names:
-        column = "filter"
-    elif "band" in names:
-        column = "band"
-    else:
-        return dataSlice
-
-    canonical = _canonical_rubin_filter_array(dataSlice[column])
-
-    # Copia explícita: no modifica el objeto original de MAF in-place.
-    out = dataSlice.copy()
-
-    try:
-        out[column] = canonical
-    except Exception:
-        # Fallback robusto para dtypes muy restrictivos.
-        out[column] = canonical.astype(out[column].dtype, copy=False)
-
-    return out
-
-
-def _build_rubin_ts(dataSlice, lsst_filterlist="ugrizy"):
-    """
-    Construye las curvas base de Rubin a partir del dataSlice.
-
-    Cada telescopio Rubin recibe columnas:
-        time, mag, err_mag
-
-    donde mag y err_mag se cargan inicialmente con m5.
-    """
-
-    rubin_ts = {}
-
-    if "filter" in dataSlice.dtype.names:
-        filter_values = _canonical_rubin_filter_array(dataSlice["filter"])
-    elif "band" in dataSlice.dtype.names:
-        filter_values = _canonical_rubin_filter_array(dataSlice["band"])
-    else:
-        raise KeyError(
-            "dataSlice no tiene columna 'filter' ni 'band'. "
-            f"Columnas disponibles: {dataSlice.dtype.names}"
-        )
-
-    print(
-        "[MAF] Rubin observations by canonical band:",
-        {
-            fil: int(np.sum(filter_values == fil))
-            for fil in lsst_filterlist
-        },
-        flush=True,
-    )
-
-    for fil in lsst_filterlist:
-        mask = filter_values == fil
-
-        m5 = dataSlice["fiveSigmaDepth"][mask]
-        mjd = dataSlice["observationStartMJD"][mask] + 2400000.5
-
-        int_array = np.column_stack(
-            (
-                mjd,
-                m5,
-                m5,
-            )
-        ).astype(float)
-
-        rubin_ts[fil] = int_array
-
-    return rubin_ts
-
-
-def _roman_nominal_and_off_seasons():
-    """
-    Define las temporadas Roman usadas en la simulación.
-    """
-    nominal_seasons = [
-        {"start": "2027-02-11T00:00:00", "end": "2027-04-24T00:00:00"},
-        {"start": "2027-08-16T00:00:00", "end": "2027-10-27T00:00:00"},
-        {"start": "2028-02-11T00:00:00", "end": "2028-04-24T00:00:00"},
-        {"start": "2030-02-11T00:00:00", "end": "2030-04-24T00:00:00"},
-        {"start": "2030-08-16T00:00:00", "end": "2030-10-27T00:00:00"},
-        {"start": "2031-02-11T00:00:00", "end": "2031-04-24T00:00:00"},
-    ]
-
-    off_seasons = [
-        {"start": "2028-08-15T00:00:00", "end": "2028-10-27T00:00:00"},
-        {"start": "2029-02-11T00:00:00", "end": "2029-04-24T00:00:00"},
-        {"start": "2029-08-16T00:00:00", "end": "2029-10-27T00:00:00"},
-    ]
-
-    return nominal_seasons, off_seasons
-
-
-def _simulate_roman_season(season, sampling):
-    """
-    Simula una temporada Roman W149.
-    """
-    tstart = Time(season["start"], format="isot").jd
-    tend = Time(season["end"], format="isot").jd
-
-    Roman = simulator.simulate_a_telescope(
-        name="W149",
-        time_start=tstart,
-        time_end=tend,
-        sampling=sampling,
-        location="Space",
-        camera_filter="W149",
-        uniform_sampling=True,
-        astrometry=False,
-    )
-
-    return Roman.lightcurve
-
-
 def _load_or_build_roman_template():
     """
     Lee o genera la plantilla completa Roman W149.
@@ -1518,57 +865,6 @@ def _load_or_build_roman_template():
 
     return roman_mag
 
-
-def _build_event_template(
-    Ra,
-    Dec,
-    roman_mag,
-    rubin_ts,
-    path_ephemerides,
-    lsst_filterlist="ugrizy",
-    use_roman=True,
-    use_rubin=True,
-):
-    """
-    Construye el Event base con Roman y/o Rubin.
-    """
-
-    my_own_creation = event.Event(
-        ra=Ra,
-        dec=Dec,
-    )
-
-    my_own_creation.name = "An event observed by Roman/Rubin"
-
-    if use_roman:
-
-        Roman_tot = _get_cached_roman_telescope(
-            roman_mag,
-            path_ephemerides,
-        )
-
-        my_own_creation.telescopes.append(
-            Roman_tot
-        )
-
-    if use_rubin:
-
-        for band in lsst_filterlist:
-
-            lsst_telescope = _get_cached_rubin_telescope(
-                band,
-                rubin_ts[band],
-            )
-
-            my_own_creation.telescopes.append(
-                lsst_telescope
-            )
-
-
-    if len(my_own_creation.telescopes) == 0:
-        raise ValueError("No hay telescopios activos: use_roman=False y use_rubin=False.")
-
-    return my_own_creation
 
 # ============================================================
 # API principal

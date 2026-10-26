@@ -5,7 +5,6 @@
 * run_multiple_named_fits: several named fit specs on the same data.
 """
 
-import inspect
 from fit_lc import fit_rubin_roman
 from fitting.fit_inputs import resolve_fit_options
 from fitting.fit_inputs import validate_event_coordinates
@@ -13,39 +12,6 @@ from fitting.likelihood import true_photometric_chi2_for_telescope
 from fitting.multi_fit import _fit_entry_error
 from fitting.multi_fit import _fit_entry_from_objects
 from pathlib import Path
-
-
-def _call_fit_rubin_roman_compatible(*args, **kwargs):
-    """
-    Call fit_rubin_roman while passing only keyword arguments supported by the
-    installed version of fit_lc.py.
-
-    This keeps the function compatible with both older versions and the newer
-    version that accepts event_ra/event_dec and random_state.
-    """
-
-    try:
-        parameters = inspect.signature(fit_rubin_roman).parameters
-        supported_kwargs = {
-            key: val
-            for key, val in kwargs.items()
-            if key in parameters
-        }
-
-        dropped = sorted(set(kwargs) - set(supported_kwargs))
-        if dropped:
-            print(
-                "[warning] fit_rubin_roman does not accept these kwargs; "
-                f"dropping: {dropped}",
-                flush=True,
-            )
-
-        return fit_rubin_roman(*args, **supported_kwargs)
-
-    except Exception:
-        # If inspect failed for any reason, call directly so the original error
-        # is not hidden.
-        return fit_rubin_roman(*args, **kwargs)
 
 
 def run_all_fits(
@@ -74,8 +40,7 @@ def run_all_fits(
     """
     Run Roman+Rubin/Rubin-only and optional Roman-only fits.
 
-    Adds compatibility filtering for fit_rubin_roman keyword arguments,
-    a deterministic random_state (defaulting to Source), and the same
+    Uses a deterministic random_state (defaulting to Source) and the same
     event_ra/event_dec geometry used for parallax fits.
     """
 
@@ -116,7 +81,7 @@ def run_all_fits(
         f"initial_guess={initial_guess!r}"
     )
 
-    fit_rr, event_fit_rr, pyLIMAmodel_rr = _call_fit_rubin_roman_compatible(
+    fit_rr, event_fit_rr, pyLIMAmodel_rr = fit_rubin_roman(
         Source,
         pyLIMA_parameters,
         path_to_save_fit,
@@ -191,7 +156,7 @@ def run_all_fits(
             except Exception:
                 roman_random_state = random_state
 
-        fit_roman, event_fit_roman, pyLIMAmodel_roman = _call_fit_rubin_roman_compatible(
+        fit_roman, event_fit_roman, pyLIMAmodel_roman = fit_rubin_roman(
             Source,
             pyLIMA_parameters,
             path_to_save_fit,

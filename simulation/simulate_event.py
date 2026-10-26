@@ -16,7 +16,7 @@ from photometry.constants import SIMULATION_BAND_ZERO_POINTS
 from photometry.roman_rubin_photometry import apply_roman_rubin_photometry
 from photometry.roman_rubin_photometry import replace_flux_by_noisy_magnitude_flux_ZP
 from photometry.roman_rubin_photometry import set_photometric_parameters
-from set_model_pyLIMA import model_choice
+from set_model_pyLIMA import build_pyLIMA_model
 from set_model_pyLIMA import parameters_model
 from set_telescopes_pyLIMA import tel_roman_rubin
 from simulation.core import simulate_light_curve
@@ -223,16 +223,15 @@ def sim_event(
         caustic_origin_arg = [realization.caustic_origin, [0, 0]]
     else:
         caustic_origin_arg = None
-    bl_random_origin = False
 
     _sim_timer.start("simulation_model_choice")
 
-    my_own_model = model_choice(
-        new_creation,
-        model,
+    my_own_model = build_pyLIMA_model(
+        pyLIMA_event=new_creation,
+        model=model,
         parallax=parallax_arg,
-        BL_random_origin=bl_random_origin,
-        BL_origin=caustic_origin_arg,
+        origin=caustic_origin_arg,
+        blend_flux_parameter="ftotal",
     )
 
     _sim_timer.stop("simulation_model_choice")

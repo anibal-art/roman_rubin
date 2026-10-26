@@ -10,12 +10,11 @@ import time
 from analysis.simfit_records import build_analysis_event
 from analysis.simfit_records import extract_nset_string
 from analysis.simfit_records import save_extracted_results
-from analysis.simfit_records import save_simulated_event_if_selected
+from read_save import save_sim
 from fitting.fit_inputs import apply_fit_time_window_to_lc_dict
 from fitting.fit_inputs import count_active_fit_points
 from fitting.fit_inputs import extract_lightcurves_for_fit
 from fitting.fit_inputs import get_event_coordinates
-from fitting.fit_inputs import get_model_origin
 from fitting.fit_inputs import resolve_fit_options
 from fitting.fit_inputs import validate_event_coordinates
 from photometry.roman_rubin_photometry import summarize_photometry_flags
@@ -27,42 +26,6 @@ from fitting.run_fits import (
 from simulation.simulate_event import (
     sim_event,
 )
-
-
-def simulate_event_for_fit(
-    i,
-    event_params,
-    path_ephemerides,
-    model,
-    time_window=None,
-    use_roman=True,
-    use_rubin=True,
-    truth_parallax=True,
-    rubin_pointing_mode="source",
-    rubin_cache_cell_deg=None,
-    apply_detection_criteria=True,
-    apply_photometric_filter=True,
-    rubin_saturation_mag=None,
-    roman_saturation_mag=None,
-):
-    my_own_model, pyLIMA_parameters, decision = sim_event(
-        i,
-        event_params,
-        path_ephemerides,
-        model,
-        time_window=time_window,
-        use_roman=use_roman,
-        use_rubin=use_rubin,
-        truth_parallax=truth_parallax,
-        rubin_pointing_mode=rubin_pointing_mode,
-        rubin_cache_cell_deg=rubin_cache_cell_deg,
-        apply_detection_criteria=apply_detection_criteria,
-        apply_photometric_filter=apply_photometric_filter,
-        rubin_saturation_mag=rubin_saturation_mag,
-        roman_saturation_mag=roman_saturation_mag,
-    )
-
-    return my_own_model, pyLIMA_parameters, decision
 
 
 def sim_fit(
@@ -230,7 +193,7 @@ def sim_fit(
     # 3. Simulación
     # ============================================================
 
-    my_own_model, pyLIMA_parameters, decision = simulate_event_for_fit(
+    my_own_model, pyLIMA_parameters, decision = sim_event(
         i,
         event_params,
         path_ephemerides,
@@ -547,7 +510,7 @@ def sim_fit(
     print("chi2_true:", chi2_true)
     print("n_data_true:", n_data_true)
 
-    save_simulated_event_if_selected(
+    save_sim(
         i,
         ROW_G,
         ROW_T,
@@ -609,9 +572,7 @@ def sim_fit(
             "event_params": event_params,
         }
 
-    origin = get_model_origin(
-        my_own_model,
-    )
+    origin = getattr(my_own_model, "origin", None)
 
     # ============================================================
     # 5. Ajustes

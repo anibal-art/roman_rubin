@@ -1,6 +1,7 @@
 import pytest
 
 import fit_lc
+import fitting.fit_parameters
 from fit_lc import (
     apply_narrow_bounds,
     build_fit_pyLIMA_model,
@@ -208,7 +209,7 @@ def test_usbl_parallax_reference_epoch_uses_active_trajectory_time(
         return object()
 
     monkeypatch.setattr(
-        fit_lc,
+        fitting.fit_parameters,
         "build_pyLIMA_model",
         fake_build_pyLIMA_model,
     )
@@ -224,7 +225,6 @@ def test_usbl_parallax_reference_epoch_uses_active_trajectory_time(
     assert result is not None
     assert captured["t0_parallax"] == expected_tref
     assert captured["origin"] == origin
-    assert captured["random_origin"] is False
 
 
 def test_non_usbl_models_keep_t0_u0_parameterization():

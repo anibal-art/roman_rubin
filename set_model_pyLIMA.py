@@ -11,7 +11,6 @@ Regla de diseño:
 - Esta capa no prepara guesses, bounds, ni corre fits.
 """
 
-import numpy as np
 
 from pyLIMA.models import USBL_model
 from pyLIMA.models import FSPLarge_model
@@ -92,37 +91,20 @@ def make_parallax_arg(
     ]
 
 
-def choose_usbl_origin(
-    origin=None,
-    random_origin=False,
-    rng=None,
-):
+def choose_usbl_origin(origin=None):
     """
     Define el origin de USBL.
 
-    Si rng=None usa np.random.choice para preservar la reproducibilidad
-    de código que hace np.random.seed(i) antes de llamar a model_choice().
+    El origen de la simulacion viene del catalogo (caustic_origin); sin
+    origen se usa la caustica central. (La version que sorteaba el origen
+    al azar esta en legacy/pure_wrappers.py.)
     """
 
     if origin is not None:
         return origin
 
-    choices = [
-        "central_caustic",
-        "second_caustic",
-        "third_caustic",
-    ]
-
-    if random_origin:
-        if rng is None:
-            choice = np.random.choice(choices)
-        else:
-            choice = rng.choice(choices)
-    else:
-        choice = "central_caustic"
-
     return [
-        choice,
+        "central_caustic",
         [
             0,
             0,
@@ -137,9 +119,7 @@ def build_pyLIMA_model(
     t0_parallax=None,
     parallax=None,
     origin=None,
-    random_origin=False,
     blend_flux_parameter="ftotal",
-    rng=None,
 ):
     """
     Constructor único de modelos pyLIMA.
@@ -176,8 +156,6 @@ def build_pyLIMA_model(
     if model_base == "USBL":
         kwargs["origin"] = choose_usbl_origin(
             origin=origin,
-            random_origin=random_origin,
-            rng=rng,
         )
 
         return USBL_model.USBLmodel(
@@ -186,34 +164,6 @@ def build_pyLIMA_model(
         )
 
     raise ValueError(f"Modelo no reconocido: {model}")
-
-
-def model_choice(
-    new_creation,
-    model,
-    parallax=["None", 0.0],
-    BL_random_origin=True,
-    BL_origin=None,
-):
-    """
-    Wrapper compatible con sim_event.
-
-    Antes sim_event llamaba:
-        model_choice(new_creation, model, parallax, BL_random_origin)
-
-    Ahora redirige al constructor único.
-    """
-
-    return build_pyLIMA_model(
-        pyLIMA_event=new_creation,
-        model=model,
-        parallax=parallax,
-        origin=BL_origin,
-        random_origin=(
-            BL_random_origin if BL_origin is None else False
-        ),
-        blend_flux_parameter="ftotal",
-    )
 
 
 def physical_parameter_order(

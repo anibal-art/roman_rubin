@@ -12,7 +12,6 @@ from fitting.fit_inputs import apply_fit_time_window_to_lc_dict
 from fitting.fit_inputs import count_active_fit_points
 from fitting.fit_inputs import extract_lightcurves_for_fit
 from fitting.fit_inputs import get_event_coordinates
-from fitting.fit_inputs import get_model_origin
 from fitting.likelihood import add_oracle_lrt_to_results
 from fitting.likelihood import compute_lrt_from_multi_fits
 from fitting.multi_fit import _fit_entry_from_objects
@@ -186,7 +185,7 @@ def sim_fit_multi_fits(
             true_model
         )
 
-    origin = get_model_origin(true_model)
+    origin = getattr(true_model, "origin", None)
     rango = 1
 
     # ------------------------------------------------------------------

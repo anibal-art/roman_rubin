@@ -10,7 +10,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from functions_roman_rubin import simulate_event_for_fit
+from functions_roman_rubin import sim_event
 
 
 MODEL = {
@@ -576,7 +576,7 @@ def main():
                     model_obj,
                     pyparams,
                     decision,
-                ) = simulate_event_for_fit(
+                ) = sim_event(
                     i=event_seed,
                     event_params=event_params,
                     path_ephemerides=str(

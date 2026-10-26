@@ -136,7 +136,7 @@ def compare_array(label, left, right, atol=ATOL_GEOMETRY):
 def run_simulation(event, model_name, half_window, filtered):
     t0 = float(event["t0"])
 
-    model, truth, decision = frr.simulate_event_for_fit(
+    model, truth, decision = frr.sim_event(
         i=int(event["simulation_seed"]),
         event_params=event,
         path_ephemerides=str(

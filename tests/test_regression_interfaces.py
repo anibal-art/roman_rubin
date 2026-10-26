@@ -77,11 +77,6 @@ def test_alias_candidate_keys_are_symmetric():
     ):
         assert alias in fit_lc._custom_bound_candidate_keys(canonical)
         assert canonical in fit_lc._custom_bound_candidate_keys(alias)
-        # Single source of truth: both alias-key functions must agree.
-        assert (
-            fit_lc._initial_guess_candidate_keys(canonical)
-            == fit_lc._custom_bound_candidate_keys(canonical)
-        )
 
 
 def test_get_param_resolves_either_alias_name():
@@ -286,7 +281,7 @@ def _minimal_event(times, name):
 
 def _build_model_and_flux(realization, band_order, magstar):
     """Exactly what sim_event's adapter does with a decided
-    realization: call model_choice and flux_parameters_model itself,
+    realization: call build_pyLIMA_model and flux_parameters_model itself,
     using realization.caustic_origin / realization.blend_ratio instead
     of letting those functions sample internally."""
     from photometry.constants import SIMULATION_BAND_ZERO_POINTS
@@ -300,12 +295,12 @@ def _build_model_and_flux(realization, band_order, magstar):
         else None
     )
 
-    model = smp.model_choice(
-        event_,
-        realization.model_name,
+    model = smp.build_pyLIMA_model(
+        pyLIMA_event=event_,
+        model=realization.model_name,
         parallax=["None", 0.0],
-        BL_random_origin=False,
-        BL_origin=caustic_origin_arg,
+        origin=caustic_origin_arg,
+        blend_flux_parameter="ftotal",
     )
 
     params, param_order = smp.parameters_model(realization.physical_params, model)

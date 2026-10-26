@@ -188,16 +188,6 @@ def extract_lightcurves_for_fit(pyLIMA_model):
     return lc_to_fit, lc_to_save
 
 
-def get_model_origin(pyLIMA_model):
-    """
-    Devuelve el origen del modelo si existe.
-
-    Para USBL suele existir my_own_model.origin.
-    Para PSPL/FSPL puede no ser relevante.
-    """
-    return getattr(pyLIMA_model, "origin", None)
-
-
 def get_event_coordinates(pyLIMA_model):
     """Devuelve (RA, Dec) del Event asociado a un modelo pyLIMA."""
     if pyLIMA_model is None or getattr(pyLIMA_model, "event", None) is None:
@@ -265,15 +255,6 @@ def resolve_fit_options(
     return model_use, fit_model_use, fit_parallax_use
 
 
-def parallax_suffix_for_filename(use_parallax):
-    """
-    Sufijo explícito para nombres de archivos de fit.
-
-    Wrapper de compatibilidad sobre `fit_lc.parallax_suffix` (misma lógica).
-    """
-    return parallax_suffix(use_parallax)
-
-
 def expected_fit_results_path(
     path_to_save_fit,
     event_name,
@@ -286,7 +267,7 @@ def expected_fit_results_path(
     """
 
     fit_model_use = normalize_model_name(fit_model)
-    suffix = f"{fit_model_use}_{parallax_suffix_for_filename(fit_parallax)}"
+    suffix = f"{fit_model_use}_{parallax_suffix(fit_parallax)}"
 
     return Path(path_to_save_fit) / f"{event_name}_{algo}_{suffix}.npy"
 

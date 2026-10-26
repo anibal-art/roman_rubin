@@ -26,12 +26,6 @@ Deliberately excluded from this module (and why it must stay out):
   finished before this module is ever called;
 - any knowledge of `event_seed`, `system_type`, `catalog_mode`, or
   Amax -- this module never inspects a catalog row;
-- the monkey-patching points LRT relies on
-  (`functions_roman_rubin.{model_choice, flux_parameters_model,
-  extract_lightcurves_for_fit, fit_rubin_roman}`): those calls stay in
-  `functions_roman_rubin.sim_event` itself, called unqualified, so
-  LRT's runtime replacement of those module attributes keeps working.
-  This module is called *after* all of them have already run.
 
 Only code whose extraction does not change WHEN anything is drawn from
 the RNG lives here. Nothing below touches `np.random` or any `rng`.

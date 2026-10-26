@@ -353,7 +353,6 @@ def rebuild_model(
             if use_parallax
             else None
         ),
-        random_origin=False,
         blend_flux_parameter=getattr(
             source_model,
             "blend_flux_parameter",
