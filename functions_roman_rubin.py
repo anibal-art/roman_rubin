@@ -601,24 +601,10 @@ def sim_event(
         for tel in new_creation.telescopes
     ]
 
-    # Event realization is selected from two independent pieces of
-    # information already present in `data`:
-    #
-    # A. blend_ratio + fsource/ftotal for every active band:
-    #    fully materialized catalog realization. All values are
-    #    authoritative and are passed through unchanged.
-    #
-    # B. blend_ratio for every active band, but no materialized fluxes:
-    #    generated/manual realization with explicit blending. The
-    #    supplied g values are preserved, but fluxes are constructed by
-    #    the generated/manual path.
-    #
-    # C. neither blend_ratio nor materialized fluxes:
-    #    legacy/generated realization. Blending remains undecided here
-    #    and is sampled later at the historical RNG call site.
-    #
-    # Partial materialization is an integrity error; the helpers below
-    # raise rather than silently mixing fixed and reconstructed values.
+    # The realization (physical parameters, blend ratios, fsource/ftotal
+    # and, for USBL, caustic_origin) comes only from the materialized
+    # catalogue row. Nothing is sampled here; a row without materialized
+    # fluxes/blend ratios for every active band is an error.
     _sim_timer.start("simulation_model_realization")
 
     has_materialized_blend = data_has_materialized_blend_ratio(
@@ -631,65 +617,31 @@ def sim_event(
         band_order,
     )
 
-    if has_materialized_fluxes:
-
-        if not has_materialized_blend:
-            raise ValueError(
-                "Materialized fsource/ftotal require "
-                "blend_ratio_<band> for every active band."
-            )
-
-        realization = realization_from_catalog(
-            data,
-            model,
-            truth_parallax,
-            t0,
-            band_order,
+    if not (has_materialized_fluxes and has_materialized_blend):
+        raise ValueError(
+            "sim_event requires a materialized catalogue row: "
+            "fsource_<band>, ftotal_<band> and blend_ratio_<band> for "
+            "every active band. Generating blending at simulation time "
+            "was removed (see legacy/sim_event_generated_realization.py)."
         )
 
-    elif has_materialized_blend:
-
-        explicit_blend_ratio = {
-            band: float(
-                data[f"blend_ratio_{band}"]
-            )
-            for band in band_order
-        }
-
-        realization = realization_from_generated_parameters(
-            data,
-            model,
-            truth_parallax,
-            t0,
-            band_order,
-            blend_ratio=explicit_blend_ratio,
-        )
-
-    else:
-
-        realization = realization_from_generated_parameters(
-            data,
-            model,
-            truth_parallax,
-            t0,
-            band_order,
-        )
+    realization = realization_from_catalog(
+        data,
+        model,
+        truth_parallax,
+        t0,
+        band_order,
+    )
 
     _sim_timer.stop("simulation_model_realization")
 
+    # USBL: caustic_origin comes from the catalogue (realization_from_catalog
+    # raises if it is missing). Other models have no origin.
     if realization.caustic_origin is not None:
-        # Explicit origin (from either producer): never sampled.
         caustic_origin_arg = [realization.caustic_origin, [0, 0]]
-        bl_random_origin = False
     else:
-        # Not USBL, or legacy/generated USBL with no explicit origin
-        # in `data`: preserve EXACTLY the historical random-origin
-        # mechanism (np.random.choice inside
-        # set_model_pyLIMA.choose_usbl_origin, via model_choice),
-        # unmoved, at the same point in the RNG sequence it has always
-        # occupied -- before flux_parameters_model's blending draws.
         caustic_origin_arg = None
-        bl_random_origin = True
+    bl_random_origin = False
 
     _sim_timer.start("simulation_model_choice")
 
@@ -779,28 +731,10 @@ def sim_event(
                         f"but blend_ratio={g_catalog}"
                     )
 
-    elif realization.blend_ratio is not None:
-        # Generated/manual realization with an explicitly supplied
-        # blend ratio but without materialized catalog fluxes.
-        my_own_flux_parameters, fs, G, F = flux_parameters_from_blend_ratio(
-            magstar,
-            ZP,
-            my_own_model,
-            band_order,
-            realization.blend_ratio,
-        )
-
     else:
-        # Legacy/generated/LRT path: EXACT historical signature and
-        # call site. This global is what LRT monkey-patches
-        # (functions_roman_rubin.flux_parameters_model = ...), and its
-        # replacement does not accept blend_ratio or **kwargs -- do
-        # not add any keyword here.
-        my_own_flux_parameters, fs, G, F = flux_parameters_model(
-            magstar,
-            ZP,
-            my_own_model,
-            band_order=band_order,
+        raise RuntimeError(
+            "sim_event requires materialized catalogue fluxes "
+            "(fsource_<band>, ftotal_<band>)."
         )
 
     my_own_parameters += my_own_flux_parameters
