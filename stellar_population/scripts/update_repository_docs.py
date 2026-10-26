@@ -25,42 +25,81 @@ INDEX_END = "<!-- END ROMAN_RUBIN_SOURCE_INDEX -->"
 # Only factual, human-reviewed descriptions belong in this mapping.
 # Missing files are omitted. Any other .py appears in docs/CODE_INDEX.md.
 GROUPS = [
-    ("Scientific models and orchestration", [
-        ("ulens_params.py", "Sampling and assembly of microlensing system parameters, priors, and model-specific parameterization."),
-        ("set_model_pyLIMA.py", "Construct the requested pyLIMA microlensing model and its parameter layout."),
-        ("set_telescopes_pyLIMA.py", "Construct Roman/Rubin telescope objects, observation times, Rubin OpSim/MAF pointing, and caching."),
-        ("functions_roman_rubin.py", "End-to-end simulation, instrumental photometry, filtering, detection selection, truth chi-square, fitting, and data extraction."),
-        ("fit_lc.py", "Configure and execute Roman-only and joint Roman+Rubin light-curve fits."),
+    ("Production pipeline: entry points", [
+        ("launch_catalog_simfit_from_config.py", "Active launcher: read one JSON configuration and run sim_fit for each materialized catalogue event."),
+        ("functions_roman_rubin.py", "Public facade: re-exports the pipeline (sim_event, sim_fit, fits, photometry, records); configures IERS and the Earth-ephemerides cache."),
+        ("pipeline/sim_fit.py", "Simulate one catalogue event, run the Roman+Rubin and Roman-only fits and save the outputs."),
+        ("pipeline/sim_fit_multi_fits.py", "sim_fit plus several named fits on the same simulated data (e.g. H1/H0) with LRT summaries."),
+    ]),
+    ("Simulation of one event", [
+        ("simulation/simulate_event.py", "sim_event: telescopes at the event RA/Dec, true pyLIMA model from the catalogue realization, noiseless light curves, Roman/Rubin photometry and Roman-only detection."),
+        ("simulation/event_inputs.py", "Validate and normalize one materialized catalogue row into event_params (nothing is sampled)."),
+        ("simulation/realization.py", "EventRealization: parameters, materialized fluxes, blend ratios and caustic origin taken from the catalogue row."),
+        ("simulation/core.py", "pyLIMA compute_pyLIMA_parameters and noiseless simulate_lightcurve for an already-built model."),
+        ("simulation/roman_detection.py", "Roman-only detection criteria (Delta chi2 >= 300 and n3sigma consecutive points)."),
+        ("simulation/telescope_arrays.py", "Model flux of ground telescopes, parallax arrays after the photometric filter, removal of empty telescopes."),
+        ("simulation/parallax_cache.py", "Exact cache of the Earth ephemerides used by pyLIMA's parallax."),
+        ("set_telescopes_pyLIMA.py", "tel_roman_rubin: Roman and Rubin pyLIMA telescopes at the event RA/Dec; Rubin OpSim/MAF dataslice, paths and caches (OpSim global state)."),
+        ("simulation/telescope_templates.py", "In-process cache of the Roman/Rubin pyLIMA telescope templates."),
+        ("simulation/roman_cadence.py", "Roman GBTDS time sampling (nominal seasons and off-seasons)."),
+        ("simulation/rubin_dataslice.py", "Rubin OpSim dataslice helpers: canonical filter names, Rubin time series, sky cell of the dataslice cache."),
+        ("simulation/time_windows.py", "Optional time window applied to telescopes and to the OpSim dataslice."),
+        ("set_model_pyLIMA.py", "build_pyLIMA_model: single constructor of the PSPL/FSPL/USBL pyLIMA models used to simulate, fit and plot."),
         ("detection_criteria.py", "Detection and observational-selection criteria applied to simulated light curves."),
-        ("class_analysis.py", "Event/result representation for analysis and stored outputs."),
+    ]),
+    ("Photometry and noise", [
+        ("photometry/roman_f146.py", "RomanF146Noise: interpolation of the precomputed Pandeia F146 grid, including saturation/validity state; provides sigma_mag_ab()."),
+        ("photometry/roman_photometry.py", "Apply the F146 noise model to the simulated Roman telescope photometry."),
+        ("photometry/roman_rubin_photometry.py", "Rubin rubin_sim m5/gamma noise, m5 and saturation filters and photometry flags; calls the Roman F146 photometry."),
+        ("photometry/constants.py", "Zero points: simulation band zero points (W149 27.615, Rubin ugrizy) and the pyLIMA fit zero point (27.4)."),
+        ("photometry/data/roman_f146_pandeia_2026p1.csv", "Precomputed Pandeia F146 grid: per-detector S/N, sigma_mag, saturation flags, and magnitude in AB."),
+        ("photometry/data/roman_f146_pandeia_2026p1.json", "Metadata and configuration associated with the Pandeia F146 grid."),
+        ("stellar_population/scripts/build_roman_f146_pandeia_grid.py", "Rebuild the Pandeia input grid; not required for routine light-curve simulations or plotting."),
+        ("stellar_population/scripts/audit_roman_f146_noise_grid.py", "Audit computed Pandeia grid and saturation transitions."),
+    ]),
+    ("Fits", [
+        ("fit_lc.py", "fit_rubin_roman (Roman+Rubin and Roman-only TRF/DE fits), save_fit_results, model_rubin_roman (model rebuilt for plots)."),
+        ("fitting/fit_event.py", "Build the pyLIMA Event that is fitted from lc_to_fit, at the RA/Dec of the simulated event."),
+        ("fitting/fit_parameters.py", "Fit-model parameters: aliases, pyLIMA order, initial values, fit pyLIMA model."),
+        ("fitting/fit_bounds.py", "Bounds of the fitted parameters (custom, narrow, wide)."),
+        ("fitting/initial_guess.py", "Initial guess of the fit, validated against the bounds."),
+        ("fitting/trf_optimizer.py", "pyLIMA fitter, TRF least-squares options, run_fit and optimizer diagnostics."),
+        ("fitting/fit_inputs.py", "lc_to_fit extraction, fit-only time windows, event coordinates, fit options and result paths."),
+        ("fitting/run_fits.py", "run_all_fits (Roman+Rubin and Roman-only) and run_multiple_named_fits."),
+        ("fitting/likelihood.py", "Photometric chi2 / logL and likelihood-ratio tests."),
+        ("fitting/true_generator.py", "chi2 / logL of the true simulated model on the fitted data."),
+        ("fitting/multi_fit.py", "Named fit specs, result entries and one-row parquet summary."),
+    ]),
+    ("Outputs and analysis", [
+        ("analysis/simfit_records.py", "Per-event output records: Analysis_Event, parameter/uncertainty row, parquet."),
+        ("analysis/analysis_event.py", "Analysis_Event: one simulated + fitted event for the analysis tables."),
+        ("class_analysis.py", "Metrics helpers for the notebooks; re-exports Analysis_Event and the Roman+Rubin figures."),
         ("read_save.py", "Simulation/fit serialization and loading of saved results."),
         ("timing_utils.py", "Stage-by-stage runtime diagnostics."),
-        ("pyLIMA_plots.py", "pyLIMA plotting helpers."),
+        ("analysis/fisher_information.py", "Local Fisher information for Roman-Rubin E1 (physical derivatives by five-point finite differences)."),
+    ]),
+    ("Plotting", [
+        ("plotting/roman_rubin_plots.py", "Roman+Rubin light-curve figures from saved simulations and fits (plot_roman_rubin_plt, graph_maker)."),
+        ("plotting/pyLIMA_plots.py", "Light curves, model telescopes and colors (modified copy of pyLIMA's pyLIMA_plots)."),
+        ("plotting/pyLIMA_geometry.py", "Lens geometry and astrometry plots."),
+        ("plotting/pyLIMA_distributions.py", "Sample distributions and parameter table."),
+        ("pyLIMA_plots.py", "Compatibility facade for plotting/ (import pyLIMA_plots keeps working)."),
     ]),
     ("Stellar populations and event catalogue", [
         ("stellar_population/scripts/download_trilegal.py", "Generate/download TRILEGAL stellar populations for configured Galactic-bulge cells."),
         ("stellar_population/scripts/build_genulens_trilegal_reservoir.py", "Produce GENULENS samples/reservoir for the configured fields."),
         ("stellar_population/scripts/build_precomputed_event_catalogs.py", "Match Galactic lens/source parameters and construct precomputed FFP, BH and binary-lens event Parquet files."),
         ("stellar_population/scripts/run_full_event_catalog_production.py", "Resumable per-cell orchestration of TRILEGAL, GENULENS, event catalogue generation and assembly."),
-        ("stellar_population/scripts/build_event_production_index.py", "Build/audit global event-to-file shard index for production catalogues."),
-        ("stellar_population/scripts/catalog_event_reader.py", "Load a deterministic catalogue event by population and global index, including simulation seed."),
+        ("ulens_params.py", "Microlensing system parameters, priors and model-specific parameterization used to build the catalogue."),
+        ("catalog/blending.py", "Deterministic, precomputed blending (source/total fluxes per band) for the catalogue."),
+        ("catalog/caustic_origin.py", "Reproducible caustic-origin realizations for binary lenses."),
+        ("catalog/amax.py", "Catalogue-level Amax detectability prefilter."),
+        ("catalog/event_reader.py", "Load a deterministic catalogue event by population and global index, including the simulation seed."),
         ("stellar_population/PRODUCTION_METHOD.md", "Detailed production method and assumptions; consult before changing catalogue inputs."),
-        ("stellar_population/config/gbtds_trilegal_cells_production.csv", "Configured sky-cell list; input to stellar-population production."),
-    ]),
-    ("Roman F146 photometric noise — single source of truth", [
-        ("stellar_population/noise_models/roman_f146.py", "RomanF146Noise: load and interpolate the precomputed Pandeia F146 grid, including saturation/validity state; provides sigma_mag_ab()."),
-        ("stellar_population/noise_models/roman_photometry.py", "Apply the F146 instrument model to simulated Roman telescope photometry; used by the simulation pipeline."),
-        ("stellar_population/noise_models/data/roman_f146_pandeia_2026p1.csv", "Precomputed Pandeia F146 grid: per-detector S/N, sigma_mag, saturation flags, and magnitude in AB."),
-        ("stellar_population/noise_models/data/roman_f146_pandeia_2026p1.json", "Metadata and configuration associated with the Pandeia F146 grid."),
-        ("stellar_population/noise_models/data/roman_f146_pandeia_2026p1_revh_patch.json", "Provenance of local Rev-H IM_66_6_V2 read-pattern configuration."),
-        ("stellar_population/scripts/build_roman_f146_pandeia_grid.py", "Rebuild the Pandeia input grid; not required for routine light-curve simulations or plotting."),
-        ("stellar_population/scripts/audit_roman_f146_noise_grid.py", "Audit computed Pandeia grid and saturation transitions."),
     ]),
     ("Validation, diagnostics, and figures", [
         ("stellar_population/scripts/smoke_roman_rubin.py", "End-to-end catalogue-event simulation and Roman-only/Roman+Rubin fit smoke tests."),
         ("stellar_population/scripts/audit_parallax_mask.py", "Compare masked time-dependent parallax geometry with recomputation after photometry filtering."),
-        ("stellar_population/scripts/plot_pilot_lightcurves.py", "Visualize selected pilot-event light curves and empirical observation intervals."),
-        ("stellar_population/scripts/plot_updated_photometric_uncertainties.py", "Experimental plotting script: verify it calls RomanF146Noise and the exact Rubin pipeline before publication use."),
         ("stellar_population/scripts/update_repository_docs.py", "Refresh README's workflow/code map and exhaustive Python source index."),
     ]),
 ]
@@ -137,11 +176,16 @@ def render_readme(root: Path, paths: list[str]) -> str:
         "```text",
         "Sky cells + TRILEGAL source stars + GENULENS lens/source population",
         "    -> source/lens matching and FFP/BH/planetary-system event catalogues",
-        "    -> indexed Parquet shards + event reader (population, index, seed)",
-        "    -> pyLIMA model + Roman scheduled times + Rubin OpSim observations",
-        "    -> Roman F146/Pandeia noise + Rubin rubin_sim photometry + filtering",
-        "    -> detection selection -> Roman-only / Roman+Rubin fits",
-        "    -> saved light curves, parameters and fit diagnostics",
+        "       (parameters, RA/Dec, materialized fluxes/blending, caustic origin)",
+        "    -> indexed Parquet shards + catalog/event_reader.py (population, index, seed)",
+        "",
+        "launch_catalog_simfit_from_config.py -> pipeline/sim_fit.py, for each event:",
+        "    -> simulation/simulate_event.py (sim_event): tel_roman_rubin at the event RA/Dec",
+        "       (Roman template + Rubin OpSim), pyLIMA model, noiseless light curves",
+        "    -> photometry/: Roman F146/Pandeia noise + Rubin rubin_sim noise + m5/saturation filter",
+        "    -> Roman-only detection (simulation/roman_detection.py)",
+        "    -> Roman+Rubin and Roman-only fits (fit_lc.fit_rubin_roman, fitting/)",
+        "    -> outputs (analysis/simfit_records.py): parquet row, Analysis_Event, saved fits",
         "```",
         "",
     ]
@@ -158,7 +202,7 @@ def render_readme(root: Path, paths: list[str]) -> str:
         "### Roman F146: read this before modifying noise or figures",
         "",
         "- **Current noise input:** saved Pandeia R2026.1 F146 grid, with the project-specific Rev-H `IM_66_6_V2` read pattern. The grid is already computed: do not rerun Pandeia just to make a figure.",
-        "- **Use the production interpolation:** `RomanF146Noise` in `stellar_population/noise_models/roman_f146.py`, especially `sigma_mag_ab()` for a magnitude-uncertainty curve. The simulation applies the model via `roman_photometry.py`.",
+        "- **Use the production interpolation:** `RomanF146Noise` in `photometry/roman_f146.py`, especially `sigma_mag_ab()` for a magnitude-uncertainty curve. The simulation applies the model via `photometry/roman_photometry.py`.",
         "- **Magnitude convention:** the Pandeia noise grid is in **AB**; the TRILEGAL Roman source catalogue uses **Vega**. Use the project's calibrated AB–Vega conversion before mixing magnitudes or plotting thresholds.",
         "- **Catalog selection is not noise sensitivity:** a TRILEGAL extraction cut at F146 = 28 Vega, when configured, is not automatically the Pandeia 5-sigma limiting magnitude.",
         "- **Legacy name:** some pyLIMA telescope objects/data products still use `W149` as an internal band label. This is not a justification for applying the obsolete W149 noise prescription to F146.",
@@ -241,8 +285,8 @@ def main() -> None:
     root = Path.cwd().resolve()
     if not (root / ".git").exists() or not (root / "functions_roman_rubin.py").is_file():
         raise SystemExit("Run from the root of the roman_rubin Git repository")
-    if not (root / "stellar_population/noise_models/roman_f146.py").is_file():
-        raise SystemExit("Missing stellar_population/noise_models/roman_f146.py: verify checkout")
+    if not (root / "photometry/roman_f146.py").is_file():
+        raise SystemExit("Missing photometry/roman_f146.py: verify checkout")
     paths = tracked_python_paths(root)
     readme = root / "README.md"
     current_readme = readme.read_text(encoding="utf-8") if readme.exists() else "# Roman + Rubin Microlensing\n"
