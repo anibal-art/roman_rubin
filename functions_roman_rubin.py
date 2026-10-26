@@ -410,7 +410,7 @@ def sim_event(
     use_roman=True,
     use_rubin=True,
     truth_parallax=True,
-    rubin_pointing_mode="fixed",
+    rubin_pointing_mode="source",
     rubin_cache_cell_deg=None,
     apply_detection_criteria=True,
     apply_photometric_filter=True,
@@ -424,9 +424,9 @@ def sim_event(
     model (str): modelo de microlente ('USBL','FSPL','PSPL', etc.)
 
     rubin_pointing_mode:
-        "fixed"  -> usa el campo fijo Roman/Rubin.
-        "source" -> usa data["maf_ra"], data["maf_dec"] o data["ra"], data["dec"].
-                    Pensado para Rubin-only + AstroDataLab pairs.
+        Only "source" is supported: Rubin epochs/m5 come from OpSim at the
+        event position (data["maf_ra"], data["maf_dec"], or data["ra"],
+        data["dec"]), which is also the Event position used for parallax.
     """
 
     _sim_timer = StageTimer()
@@ -462,13 +462,16 @@ def sim_event(
     # ============================================================
     # Coordenadas para Rubin/MAF
     # ============================================================
-    # Regla:
-    # - Roman+Rubin: siempre campo fijo.
-    # - Rubin-only + rubin_pointing_mode="source": usa coordenadas de la fuente.
-    # - Default: campo fijo.
+    # Every event uses its own catalogue RA/Dec (rubin_pointing_mode="source").
 
     source_ra = data.get("maf_ra", data.get("ra", None))
     source_dec = data.get("maf_dec", data.get("dec", None))
+
+    if rubin_pointing_mode != "source":
+        raise ValueError(
+            "Only rubin_pointing_mode='source' is supported: every event "
+            f"uses its own catalogue RA/Dec (got {rubin_pointing_mode!r})."
+        )
 
     if rubin_pointing_mode == "source":
 
@@ -482,16 +485,6 @@ def sim_event(
         tel_ra = float(source_ra)
         tel_dec = float(source_dec)
 
-    elif rubin_pointing_mode == "fixed":
-
-        rubin_pointing_mode_use = "fixed"
-        tel_ra = None
-        tel_dec = None
-
-    else:
-        raise ValueError(
-            f"rubin_pointing_mode inválido: {rubin_pointing_mode}"
-        )
 
     _sim_timer.stop("simulation_prep")
     _sim_timer.start("simulation_maf")
@@ -1687,7 +1680,7 @@ def simulate_event_for_fit(
     use_roman=True,
     use_rubin=True,
     truth_parallax=True,
-    rubin_pointing_mode="fixed",
+    rubin_pointing_mode="source",
     rubin_cache_cell_deg=None,
     apply_detection_criteria=True,
     apply_photometric_filter=True,
@@ -2799,7 +2792,7 @@ def build_event_params_from_custom_system(
     model,
     use_roman=True,
     use_rubin=True,
-    rubin_pointing_mode="fixed",
+    rubin_pointing_mode="source",
 ):
     """
     Construye directamente ``event_params`` sin seleccionar ni emparejar
@@ -2922,11 +2915,9 @@ def build_event_params_from_custom_system(
     if use_rubin:
         required.extend(["u", "g", "r", "i", "z", "Y"])
 
-    if (
-        use_rubin
-        and str(rubin_pointing_mode).lower() == "source"
-    ):
-        required.extend(["maf_ra", "maf_dec"])
+    # Every event must carry its sky position (Rubin pointing and the
+    # Event RA/Dec used for parallax), also for Roman-only runs.
+    required.extend(["maf_ra", "maf_dec"])
 
     missing = [
         key
@@ -3034,7 +3025,7 @@ def sim_fit(
     fit_bounds=None,
     initial_guess=None,
     optimizer_options=None,
-    rubin_pointing_mode="fixed",
+    rubin_pointing_mode="source",
     rubin_cache_cell_deg=None,
     apply_detection_criteria=True,
     apply_photometric_filter=True,
@@ -5080,7 +5071,7 @@ def sim_fit_multi_fits(
     primary_fit=None,
     lrt_config=None,
     save_multi_fit_summary=True,
-    rubin_pointing_mode="fixed",
+    rubin_pointing_mode="source",
     rubin_cache_cell_deg=None,
     apply_detection_criteria=True,
     apply_photometric_filter=True,
