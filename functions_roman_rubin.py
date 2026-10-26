@@ -3739,63 +3739,6 @@ def remove_empty_telescopes(event, verbose=True):
 
     return event, removed_telescopes
 
-def read_fit(
-    nsource,
-    nset,
-    path_run,
-    model,
-    algo,
-    path_to_save_fit,
-    path_ephemerides,
-    fit_model=None,
-    fit_parallax=True,
-):
-
-    path_event = path_run + f'/set_sim{nset}/Event_{nsource}.h5'
-
-    print('path_event', path_event)
-    print('os.path.getsize(path_model):', os.path.getsize(path_event))
-    if os.path.getsize(path_event) == 0:
-        return
-    else:
-        model, fit_model, fit_parallax = resolve_fit_options(
-            model,
-            fit_model=fit_model,
-            fit_parallax=fit_parallax,
-            default_fit_parallax=True,
-        )
-
-        info_event, pyLIMA_parameters, curves = read_data(path_event)
-
-        lc_to_fit = {}
-        for telo in curves:
-            if len(curves[telo]['mag']) != 0:
-                df = curves[telo][['time', 'mag', 'err_mag']].to_pandas()
-                lc_to_fit[telo] = df.values
-            else:
-                lc_to_fit[telo] = []
-
-        origin = info_event[2]
-        rango = 1
-
-        print("Start the fit using Roman and Rubin data:")
-        fit_rr, event_fit_rr, pyLIMAmodel_rr = fit_rubin_roman(
-            nsource, pyLIMA_parameters, path_to_save_fit, path_ephemerides,
-            model, algo, origin, rango,
-            lc_to_fit["W149"], lc_to_fit["u"], lc_to_fit["g"], lc_to_fit["r"],
-            lc_to_fit["i"], lc_to_fit["z"], lc_to_fit["y"],
-            fit_model=fit_model,
-            fit_parallax=fit_parallax,
-        )
-        print("Start the fit using only the Roman data:")
-        fit_roman, event_fit_roman, pyLIMAmodel_roman = fit_rubin_roman(
-            nsource, pyLIMA_parameters, path_to_save_fit, path_ephemerides,
-            model, algo, origin, rango,
-            lc_to_fit["W149"], [], [], [], [], [], [],
-            fit_model=fit_model,
-            fit_parallax=fit_parallax,
-        )
-
 # ============================================================================
 # Multi-fit generalization: one simulation, multiple fits on the same noisy LC
 # ============================================================================

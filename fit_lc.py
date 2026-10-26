@@ -32,13 +32,6 @@ from set_model_pyLIMA import (
 )
 
 
-# ============================================================
-# Constantes del campo
-# ============================================================
-
-RA_FIELD = 267.92497054815516
-DEC_FIELD = -29.152232510353276
-
 LSST_BANDS = [
     "u",
     "g",
@@ -206,9 +199,8 @@ def resolve_event_coordinates(
 
     Reglas
     ------
-    - Si no se pasan coordenadas, conserva el comportamiento histórico y
-      usa RA_FIELD/DEC_FIELD.
-    - Si se pasa una coordenada, deben pasarse ambas.
+    - event_ra y event_dec son obligatorias: no hay coordenadas por
+      defecto (cada evento usa su RA/Dec del catálogo).
     - Las coordenadas explícitas deben ser finitas.
 
     En el pipeline nuevo, sim_fit debe pasar aquí las coordenadas del
@@ -216,12 +208,9 @@ def resolve_event_coordinates(
     De esta forma simulación y ajuste usan exactamente la misma geometría
     para el cálculo del paralaje.
     """
-    if event_ra is None and event_dec is None:
-        return float(RA_FIELD), float(DEC_FIELD)
-
     if event_ra is None or event_dec is None:
         raise ValueError(
-            "event_ra y event_dec deben pasarse juntos. "
+            "event_ra y event_dec son obligatorias (RA/Dec del evento). "
             f"Recibí event_ra={event_ra!r}, event_dec={event_dec!r}."
         )
 
@@ -2269,8 +2258,8 @@ def fit_rubin_roman(
     event_ra, event_dec : float or None
         Coordenadas del Event que debe usar el ajuste. Cuando sim_fit llama
         a esta función, deben ser las coordenadas del Event usado realmente
-        durante la simulación. Si ambas son None se conserva el campo fijo
-        histórico RA_FIELD/DEC_FIELD por compatibilidad.
+        durante la simulación. Son obligatorias: si falta alguna, el
+        ajuste aborta.
     """
     _fit_timer = StageTimer()
     _fit_timer.start("fit_total")

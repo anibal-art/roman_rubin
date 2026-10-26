@@ -550,18 +550,6 @@ def test_sim_fit_calls_extract_lightcurves_for_fit_unqualified():
         frr.extract_lightcurves_for_fit = original
 
 
-def test_read_fit_calls_fit_rubin_roman_unqualified():
-    assert frr.read_fit.__globals__["fit_rubin_roman"] is frr.fit_rubin_roman
-
-    sentinel = object()
-    original = frr.fit_rubin_roman
-    frr.fit_rubin_roman = sentinel
-    try:
-        assert frr.read_fit.__globals__["fit_rubin_roman"] is sentinel
-    finally:
-        frr.fit_rubin_roman = original
-
-
 def test_run_all_fits_resolves_fit_rubin_roman_from_functions_roman_rubin():
     # run_all_fits's real call chain is
     # run_all_fits -> _call_fit_rubin_roman_compatible -> fit_rubin_roman

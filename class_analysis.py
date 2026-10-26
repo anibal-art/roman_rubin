@@ -237,10 +237,14 @@ def plot_roman_rubin_plt(axs, axs_residual_rr, axs_residual_roman, Source,
     model_rr = model_rubin_roman(Source, {t0_str:data_fit_rr['best_model'][0]}, 
                                  path_ephemerides, model, origin, lightcurve_dict['W149'], 
                                   lightcurve_dict['u'], lightcurve_dict['g'], lightcurve_dict['r'],
-                                 lightcurve_dict['i'], lightcurve_dict['z'],lightcurve_dict['y'])
+                                 lightcurve_dict['i'], lightcurve_dict['z'],lightcurve_dict['y'],
+                                 event_ra=data_fit_rr['event_ra'],
+                                 event_dec=data_fit_rr['event_dec'])
     
     model_roman = model_rubin_roman(Source, {t0_str:data_fit_roman['best_model'][0]}, 
-                                    path_ephemerides, model, origin, lightcurve_dict['W149'], [], [], [], [], [],[])
+                                    path_ephemerides, model, origin, lightcurve_dict['W149'], [], [], [], [], [],[],
+                                    event_ra=data_fit_roman['event_ra'],
+                                    event_dec=data_fit_roman['event_dec'])
     
     
     # Call the function to plot the photometric models
