@@ -3,6 +3,8 @@
 import hashlib
 import numpy as np
 
+from photometry.constants import SIMULATION_BAND_ZERO_POINTS
+
 BLENDING_SCHEME = "independent_uniform_g_v1"
 
 BAND_MAG = {
@@ -15,15 +17,7 @@ BAND_MAG = {
     "y": "Y",
 }
 
-ZERO_POINTS = {
-    "W149": 27.615,
-    "u": 27.03,
-    "g": 28.38,
-    "r": 28.16,
-    "i": 27.85,
-    "z": 27.46,
-    "y": 26.68,
-}
+ZERO_POINTS = SIMULATION_BAND_ZERO_POINTS
 
 
 def _uniform_from_seeds(seeds, band):

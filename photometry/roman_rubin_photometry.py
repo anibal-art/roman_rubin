@@ -413,8 +413,6 @@ def apply_roman_rubin_photometry(
     LSST_BandPass,
     photParams,
     roman_band_name="W149",
-    roman_original_zp=27.4,
-    roman_m5=27.6,
     apply_photometric_filter=True,
     rubin_saturation_mag=None,
     roman_saturation_mag=None,

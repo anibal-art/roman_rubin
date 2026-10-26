@@ -426,39 +426,6 @@ def test_explicit_usbl_realization_never_samples_origin_or_blending():
 
 
 # ---------------------------------------------------------------
-# Point 5 (mandatory): golden test for the legacy/generated USBL path
-# against the pre-origin implementation, inspected (not restored)
-# from the quarantined backups:
-#   /tmp/roman_rubin_refactor_quarantine_20261006_171728/root_bak/
-#     functions_roman_rubin.py.before_origin_20261003_174641.bak
-#     set_model_pyLIMA.py.before_origin_20261003_174641.bak
-#
-# Historical sequence inside sim_event, confirmed by reading those
-# backups (not assumed):
-#   np.random.seed(i)
-#   model_choice(..., BL_random_origin=True)   # no BL_origin kwarg existed
-#     -> build_pyLIMA_model(origin=None, random_origin=True)
-#     -> choose_usbl_origin(origin=None, random_origin=True, rng=None)
-#     -> np.random.choice(["central_caustic","second_caustic","third_caustic"])
-#   flux_parameters_model(...)                  # per band, AFTER origin
-#     -> np.random.uniform(0, 1) per band, in band_order
-#
-# The current legacy/generated path must reproduce this exactly:
-# model_choice(..., BL_random_origin=True, BL_origin=None) (this
-# refactor's compatibility path) followed by flux_parameters_model
-# with no blend_ratio.
-# ---------------------------------------------------------------
-
-# ---------------------------------------------------------------
-# flux_parameters_model (LRT monkey-patch point, historical signature)
-# vs. flux_parameters_from_blend_ratio (explicit-realization path,
-# NOT a monkey-patch point) -- correction: LRT's replacement is
-# catalog_flux_parameters_model(magstar, ZP, my_own_model, band_order),
-# no **kwargs, no blend_ratio. Adding a blend_ratio keyword to the
-# legacy call site would break that patch.
-# ---------------------------------------------------------------
-
-# ---------------------------------------------------------------
 # No-mutation
 # ---------------------------------------------------------------
 
@@ -509,17 +476,6 @@ def test_blend_ratio_validation_allows_g_greater_than_one():
     assert r.materialized_fluxes[band]["fsource"] == FIXED_FSOURCE
     assert r.materialized_fluxes[band]["ftotal"] == FIXED_FSOURCE * 6.0
 
-
-# ---------------------------------------------------------------
-# Monkey-patching indirection (LRT compatibility contract)
-#
-# LRT replaces functions_roman_rubin.{sim_event, model_choice,
-# flux_parameters_model, extract_lightcurves_for_fit, fit_rubin_roman}
-# as plain module attributes. This only works if the real caller
-# resolves the name unqualified against functions_roman_rubin's own
-# globals -- these tests check that identity directly, without running
-# any simulation (as instructed: no heavy execution needed for this).
-# ---------------------------------------------------------------
 
 # ---------------------------------------------------------------
 # Legacy import/signature surface LRT depends on

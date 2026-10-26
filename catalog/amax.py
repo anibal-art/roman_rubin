@@ -35,6 +35,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from photometry.constants import SIMULATION_BAND_ZERO_POINTS
+
 
 BANDS = ("W149", "u", "g", "r", "i", "z", "y")
 
@@ -49,15 +51,7 @@ MAG_COLUMN = {
 }
 
 # Internal flux zero points used by the Roman-Rubin simulation.
-ZERO_POINTS = {
-    "W149": 27.615,
-    "u": 27.03,
-    "g": 28.38,
-    "r": 28.16,
-    "i": 27.85,
-    "z": 27.46,
-    "y": 26.68,
-}
+ZERO_POINTS = SIMULATION_BAND_ZERO_POINTS
 
 
 # ============================================================

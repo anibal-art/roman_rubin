@@ -13,6 +13,7 @@ import pyLIMA_plots
 from analysis.analysis_event import Analysis_Event
 from cycler import cycler
 from fit_lc import model_rubin_roman
+from photometry.constants import PYLIMA_FIT_ZERO_POINT, SIMULATION_BAND_ZERO_POINTS
 
 
 def create_df_to_plot(sources_array, model, path_event):
@@ -64,8 +65,7 @@ def plot_roman_rubin_plt(axs, axs_residual_rr, axs_residual_roman, Source,
           'i':'yellow', 'z':'k', 'y':'cyan'}
     colors1 = cycler(color=['purple', 'darkorange', 'forestgreen'])
     colors2 = cycler(color=['royalblue', 'crimson', 'purple'])
-    ZP = {'W149':27.615, 'u':27.03, 'g':28.38, 'r':28.16,
-              'i':27.85, 'z':27.46, 'y':26.68}
+    ZP = SIMULATION_BAND_ZERO_POINTS
 
     Event = Analysis_Event(model, path_event,
                            path_fit_rr, 
@@ -102,7 +102,7 @@ def plot_roman_rubin_plt(axs, axs_residual_rr, axs_residual_roman, Source,
     flux_params = []
     for b in bands:
         if not len(bands[b])==0:
-            zp_Rubin_to_pyLIMA = (10**((-27.4+ZP[b])/2.5))            
+            zp_Rubin_to_pyLIMA = (10**((-PYLIMA_FIT_ZERO_POINT+ZP[b])/2.5))            
             flux_params.append(pyLIMA_parameters['fsource_'+b]/zp_Rubin_to_pyLIMA)
             flux_params.append(pyLIMA_parameters['ftotal_'+b]/zp_Rubin_to_pyLIMA)
             
