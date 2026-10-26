@@ -22,8 +22,6 @@ iers.conf.iers_degraded_accuracy = 'warn'
 
 from pyLIMA.simulations import simulator
 from class_analysis import Analysis_Event
-from ulens_params import microlensing_params, event_param, sample_from_spec
-from ulens_params import event_param_from_pair_row
 from fit_lc import fit_rubin_roman, parallax_suffix
 from timing_utils import StageTimer
 from photometry.roman_photometry import apply_roman_f146_photometry
@@ -33,7 +31,6 @@ from photometry.constants import (
 )
 from simulation.realization import (
     realization_from_catalog,
-    realization_from_generated_parameters,
     data_has_materialized_blend_ratio,
     data_has_materialized_fluxes,
 )
@@ -47,8 +44,6 @@ from read_save import save_sim, save_fit, read_data
 from set_model_pyLIMA import (
     model_choice,
     parameters_model,
-    flux_parameters_model,
-    flux_parameters_from_blend_ratio,
     normalize_model_name,
 )
 
@@ -459,46 +454,6 @@ def sim_event(
             params_obj,
             decision_obj,
         )
-
-    # ============================================================
-    # Magnitudes de la fuente
-    # ============================================================
-    # Solo exigimos las bandas necesarias según use_roman/use_rubin.
-    # Esto permite correr Roman-only con solo W149, o Rubin-only sin W149
-    # en modos custom_system.
-
-    magstar = {}
-
-    if use_roman:
-
-        if "W149" not in data:
-            raise KeyError(
-                "use_roman=True pero data no contiene magnitud 'W149'."
-            )
-
-        magstar["W149"] = data["W149"]
-
-    if use_rubin:
-
-        for band in ["u", "g", "r", "i", "z"]:
-
-            if band not in data:
-                raise KeyError(
-                    f"use_rubin=True pero data no contiene magnitud '{band}'."
-                )
-
-            magstar[band] = data[band]
-
-        if "Y" in data:
-            magstar["y"] = data["Y"]
-
-        elif "y" in data:
-            magstar["y"] = data["y"]
-
-        else:
-            raise KeyError(
-                "use_rubin=True pero data no contiene magnitud 'Y' ni 'y'."
-            )
 
     ZP = SIMULATION_BAND_ZERO_POINTS
 
@@ -1722,38 +1677,7 @@ def register_clean_exit_handlers():
         # Puede pasar si se llama desde un thread que no es el principal.
         pass
     
-# def build_event_params_from_rows(
-#     i,
-#     TRILEGAL_row,
-#     GENULENS_row,
-#     system_type,
-# ):
-#     """
-#     Construye el diccionario event_params a partir de TRILEGAL + GENULENS.
-#     """
-#     magstar = TRILEGAL_row[
-#         [
-#             "W149",
-#             "u",
-#             "g",
-#             "r",
-#             "i",
-#             "z",
-#             "Y",
-#         ]
-#     ].iloc[0]
 
-#     event_params = {
-#         **magstar.to_dict(),
-#         **event_param(
-#             i,
-#             TRILEGAL_row.iloc[0],
-#             GENULENS_row.iloc[0],
-#             system_type,
-#         ),
-#     }
-
-#     return event_params
 def simulate_event_for_fit(
     i,
     event_params,

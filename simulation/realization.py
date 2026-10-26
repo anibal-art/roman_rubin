@@ -1,48 +1,20 @@
-"""EventRealization: an already-decided event, independent of its origin.
+"""EventRealization: the already-decided event that sim_event simulates.
 
-Two independent decisions make up a realization, and neither is
-allowed to infer the other (do not couple them):
+Every realization comes from one row of the materialized catalogue
+(`realization_from_catalog`). The catalogue is authoritative for:
 
-1. Blending: explicit/materialized `blend_ratio_<band>` columns (from
-   `catalog.blending.blending_columns`) vs. legacy/sampled-later.
-   `data_has_materialized_blend_ratio(data, band_order)` is this
-   decision -- it says nothing about whether `data` "is a catalog
-   event"; it only says whether blending is already materialized in
-   it. A `catalog_mode="custom_system"` event with no materialized
-   blending is legacy for blending purposes, independently of its
-   `catalog_mode`.
-2. Caustic origin (USBL only): explicit `caustic_origin` in `data` vs.
-   legacy/random. This is resolved independently by each producer
-   below; it is NOT derived from decision 1.
-
-Two producers build the same `EventRealization` shape:
-
-- `realization_from_catalog`: the materialized-blending producer.
-  Requires `blend_ratio_<band>` for every band (raises `KeyError`
-  otherwise) -- never samples blending. For USBL, also requires an
-  explicit `caustic_origin` in `data` (raises `RuntimeError` otherwise)
-  -- a materialized catalog row is expected to carry both, written at
-  catalog-construction time by `catalog.blending.blending_columns` and
+* physical parameters (t0, u0, tE, rho, piEN, piEE, s, q, alpha, ...);
+* blending: `blend_ratio_<band>`, `fsource_<band>`, `ftotal_<band>` for
+  every active band, written at catalogue-construction time by
+  `catalog.blending.blending_columns`;
+* USBL caustic origin: `caustic_origin`, written by
   `catalog.caustic_origin.choose_catalog_caustic_origin`.
-- `realization_from_generated_parameters`: the legacy/on-the-fly
-  producer. Blending defaults to undecided (`None`, sampled later by
-  `set_model_pyLIMA.flux_parameters_model`, exactly as before this
-  refactor) but accepts an explicit `blend_ratio` override for a
-  caller (e.g. a test) that already decided every input by hand. For
-  USBL, if `data` has an explicit `caustic_origin`, it is used
-  (validated, not sampled); if it does not, `caustic_origin` is left
-  `None` -- meaning "not yet decided" -- and the caller
-  (`functions_roman_rubin.sim_event`) MUST fall back to the exact
-  historical random-origin mechanism
-  (`set_model_pyLIMA.model_choice(..., BL_random_origin=True,
-  BL_origin=None)`, which samples via `np.random.choice` inside
-  `choose_usbl_origin`, unmoved from where it has always lived).
-  This function never samples a caustic origin itself.
 
-Neither producer samples physical parameters (t0, u0, tE, rho, piEN,
-piEE, s, q, alpha, ...): those are already decided by the caller
-(`ulens_params.event_param` / a catalog row) before reaching this
-module.
+Nothing is sampled or reconstructed here. Missing or partial
+materialization is an integrity error (KeyError / RuntimeError).
+
+The former on-the-fly producer of generated parameters was moved to
+legacy/realization_generated_parameters.py.
 """
 
 from __future__ import annotations
@@ -55,15 +27,8 @@ from dataclasses import dataclass, field
 class EventRealization:
     """Container for what the simulation core actually consumes.
 
-    `caustic_origin` (USBL only) is `None` in two different cases that
-    callers must not confuse: (a) the model is not USBL, where origin
-    is simply irrelevant, or (b) the model is USBL and this is a
-    `realization_from_generated_parameters` realization with no
-    explicit origin in its input -- meaning "not yet decided, the
-    legacy random mechanism in `set_model_pyLIMA.model_choice` must
-    decide it." A `realization_from_catalog` realization never has
-    `caustic_origin=None` for USBL: it raises instead (see module
-    docstring).
+    `caustic_origin` is `None` only for non-USBL models; for USBL,
+    `realization_from_catalog` raises if the catalogue row lacks it.
 
     `physical_params` is currently a full copy of the input mapping
     (`dict(data)`), kept for compatibility with `set_model_pyLIMA
@@ -122,21 +87,6 @@ def _resolve_catalog_caustic_origin(data, model_name):
             "caustic_origin writes it at catalog-construction time) "
             "and never samples it."
         )
-
-    return _validated_origin_name(str(data[CAUSTIC_ORIGIN_KEY]))
-
-
-def _resolve_generated_caustic_origin(data, model_name):
-    """The legacy/on-the-fly producer's origin contract: if `data`
-    already provides an explicit caustic_origin, use it (validated,
-    not sampled). Otherwise return None -- "not yet decided" -- so the
-    caller falls back to the historical random-origin mechanism. This
-    function never samples anything."""
-    if str(model_name).upper() != "USBL":
-        return None
-
-    if CAUSTIC_ORIGIN_KEY not in data:
-        return None
 
     return _validated_origin_name(str(data[CAUSTIC_ORIGIN_KEY]))
 
@@ -349,8 +299,8 @@ def realization_from_catalog(
         raise KeyError(
             "realization_from_catalog requires a precomputed "
             f"blend_ratio_<band> for every band; missing for: {missing}. "
-            "Use realization_from_generated_parameters for data without "
-            "a materialized blending realization."
+            "Every active band must be materialized in the "
+            "catalogue (catalog.blending.blending_columns)."
         )
 
     return EventRealization(
@@ -367,39 +317,3 @@ def realization_from_catalog(
         metadata=_metadata_from_data(data),
     )
 
-
-def realization_from_generated_parameters(
-    data,
-    model_name,
-    use_parallax,
-    t0_parallax,
-    band_order=None,
-    blend_ratio=None,
-):
-    """Build an EventRealization from on-the-fly generated parameters
-    (or parameters set manually, e.g. in a test). See module docstring
-    for the full contract, including the lenient, legacy-compatible
-    caustic_origin resolution for USBL (returns None rather than
-    raising when `data` has no explicit caustic_origin -- the caller
-    must then use the historical random-origin mechanism).
-
-    Blending defaults to undecided (None): it is then sampled where it
-    always has been (`set_model_pyLIMA.flux_parameters_model`, at
-    simulation time), using the same global-RNG call site as before
-    this refactor. Pass an explicit `blend_ratio` (one value per band
-    in `band_order`) only when the caller already decided it -- e.g a
-    test fixing every input of a realization -- and nothing is
-    sampled.
-    """
-    if blend_ratio is not None:
-        _validate_blend_ratio(blend_ratio, band_order)
-
-    return EventRealization(
-        model_name=model_name,
-        use_parallax=use_parallax,
-        t0_parallax=t0_parallax,
-        caustic_origin=_resolve_generated_caustic_origin(data, model_name),
-        blend_ratio=blend_ratio,
-        physical_params=dict(data),
-        metadata=_metadata_from_data(data),
-    )

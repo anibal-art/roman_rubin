@@ -112,3 +112,45 @@ Reproduced below as comments, in the order it appeared in sim_event.
 #             my_own_model,
 #             band_order=band_order,
 #         )
+
+
+# ---- bloque magstar/ZP de sim_event (solo lo usaban los flujos generados) ----
+#     # ============================================================
+#     # Magnitudes de la fuente
+#     # ============================================================
+#     # Solo exigimos las bandas necesarias según use_roman/use_rubin.
+#     # Esto permite correr Roman-only con solo W149, o Rubin-only sin W149
+#     # en modos custom_system.
+#
+#     magstar = {}
+#
+#     if use_roman:
+#
+#         if "W149" not in data:
+#             raise KeyError(
+#                 "use_roman=True pero data no contiene magnitud 'W149'."
+#             )
+#
+#         magstar["W149"] = data["W149"]
+#
+#     if use_rubin:
+#
+#         for band in ["u", "g", "r", "i", "z"]:
+#
+#             if band not in data:
+#                 raise KeyError(
+#                     f"use_rubin=True pero data no contiene magnitud '{band}'."
+#                 )
+#
+#             magstar[band] = data[band]
+#
+#         if "Y" in data:
+#             magstar["y"] = data["Y"]
+#
+#         elif "y" in data:
+#             magstar["y"] = data["y"]
+#
+#         else:
+#             raise KeyError(
+#                 "use_rubin=True pero data no contiene magnitud 'Y' ni 'y'."
+#             )
