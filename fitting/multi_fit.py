@@ -39,7 +39,8 @@ def normalize_fit_specs(
         }
 
     Optional per-fit key "coordinates": None/"physical" or "log_te_rho"
-    (see fitting.fit_coordinates).
+    (see fitting.fit_coordinates), and "flux_method": None/"fit" or
+    "bounded_profile" (see fitting.flux_profile).
 
     list/tuple:
         [
@@ -61,6 +62,7 @@ def normalize_fit_specs(
                 "bounds": fit_bounds,
                 "initial_guess": initial_guess,
                 "coordinates": None,
+                "flux_method": None,
             }
         })
 
@@ -87,6 +89,7 @@ def normalize_fit_specs(
                 "bounds": spec.get("bounds", fit_bounds),
                 "initial_guess": spec.get("initial_guess", initial_guess),
                 "coordinates": spec.get("coordinates", None),
+                "flux_method": spec.get("flux_method", None),
             }
 
         if len(out) == 0:
@@ -120,6 +123,7 @@ def normalize_fit_specs(
                 "bounds": spec.get("bounds", fit_bounds),
                 "initial_guess": spec.get("initial_guess", initial_guess),
                 "coordinates": spec.get("coordinates", None),
+                "flux_method": spec.get("flux_method", None),
             }
 
         if len(out) == 0:
@@ -183,6 +187,7 @@ def _fit_entry_from_objects(
         "initial_guess_parameter_order": fit_rr.fit_results.get("initial_guess_parameter_order", None),
         "initial_guess_values": fit_rr.fit_results.get("initial_guess_values", None),
         "fit_coordinates": fit_rr.fit_results.get("fit_coordinates", None),
+        "flux_method": fit_rr.fit_results.get("flux_method", None),
         "best_model_physical": fit_rr.fit_results.get("best_model_physical", None),
         "timings": fit_timings,
         "optimizer_diagnostics": optimizer_diagnostics,

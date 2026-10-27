@@ -37,6 +37,7 @@ def run_all_fits(
     optimizer_options=None,
     true_model=None,
     fit_coordinates=None,
+    flux_method=None,
 ):
     """
     Run Roman+Rubin/Rubin-only and optional Roman-only fits.
@@ -120,6 +121,7 @@ def run_all_fits(
             random_state=random_state,
             optimizer_options=optimizer_options,
             fit_coordinates=fit_coordinates,
+            flux_method=flux_method,
         )
 
     fit_roman = None
@@ -196,6 +198,7 @@ def run_all_fits(
             random_state=roman_random_state,
             optimizer_options=optimizer_options,
             fit_coordinates=fit_coordinates,
+            flux_method=flux_method,
         )
 
         if roman_true_info is not None:
@@ -273,6 +276,7 @@ def run_multiple_named_fits(
         fit_bounds_use = spec.get("bounds", None)
         initial_guess_use = spec.get("initial_guess", None)
         fit_coordinates_use = spec.get("coordinates", None)
+        flux_method_use = spec.get("flux_method", None)
 
         if random_state_base is None:
             random_state = None
@@ -286,7 +290,8 @@ def run_multiple_named_fits(
             f"parallax={fit_parallax_use}, "
             f"random_state={random_state}, "
             f"initial_guess={initial_guess_use!r}, "
-            f"coordinates={fit_coordinates_use!r}"
+            f"coordinates={fit_coordinates_use!r}, "
+            f"flux_method={flux_method_use!r}"
         )
         print("=" * 80)
 
@@ -320,6 +325,7 @@ def run_multiple_named_fits(
                 event_dec=event_dec,
                 random_state=random_state,
                 fit_coordinates=fit_coordinates_use,
+                flux_method=flux_method_use,
             )
 
             validate_event_coordinates(

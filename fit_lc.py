@@ -78,6 +78,7 @@ from fitting.fit_coordinates import (
     guess_to_fit_space,
     physical_fit_results,
 )
+from fitting.flux_profile import normalize_flux_method
 
 
 # ============================================================
@@ -179,6 +180,7 @@ def fit_rubin_roman(
     event_ra=None,
     event_dec=None,
     fit_coordinates=None,
+    flux_method=None,
 ):
     """
     Ajusta una curva Roman/Rubin con pyLIMA.
@@ -251,6 +253,11 @@ def fit_rubin_roman(
         ["covariance_matrix"] quedan en espacio de ajuste;
         ["best_model_physical"] y ["covariance_matrix_physical"] en
         coordenadas físicas.
+
+    flux_method : None, "fit" or "bounded_profile"
+        Manejo de los flujos por telescopio (ver fitting.flux_profile).
+        None equivale a "fit". Con "bounded_profile" los flujos se
+        perfilan con cotas exactas y no forman parte de best_model.
     """
     _fit_timer = StageTimer()
     _fit_timer.start("fit_total")
@@ -338,6 +345,7 @@ def fit_rubin_roman(
     fit, pool_processes = build_fitter(
         pyLIMAmodel,
         algo,
+        flux_method=flux_method,
     )
 
     rango_used = apply_fit_bounds(
@@ -426,6 +434,7 @@ def fit_rubin_roman(
 
     # Coordenadas del optimizador y vista física de los resultados.
     fit_results["fit_coordinates"] = fit_coordinates
+    fit_results["flux_method"] = normalize_flux_method(flux_method)
 
     if "best_model" in fit_results:
         fit_results.update(

@@ -13,6 +13,10 @@ from pyLIMA.fits import DE_fit
 from pyLIMA.fits import MCMC_fit
 from pyLIMA.fits import TRF_fit
 from set_model_pyLIMA import normalize_model_name
+from fitting.flux_profile import (
+    normalize_flux_method,
+    enable_bounded_flux_profile,
+)
 
 TRF_DEFAULT_OPTIMIZER_OPTIONS = {
     "xtol": 1e-10,
@@ -36,11 +40,34 @@ def build_fitter(
     de_population_size=20,
     de_max_iteration=10000,
     de_display_progress=True,
+    flux_method=None,
 ):
     """
     Crea el objeto fitter y devuelve cuántos procesos usar.
+
+    flux_method: "fit" (default) o "bounded_profile" (solo TRF; ver
+    fitting.flux_profile).
     """
-    if algo == "TRF":
+    flux_method = normalize_flux_method(flux_method)
+
+    if flux_method != "fit" and algo != "TRF":
+        raise ValueError(
+            f"flux_method={flux_method!r} solo se soporta con TRF; "
+            f"algo={algo!r}."
+        )
+
+    if algo == "TRF" and flux_method == "bounded_profile":
+
+        fit = TRF_fit.TRFfit(
+            pyLIMAmodel,
+            telescopes_fluxes_method="polyfit",
+        )
+
+        enable_bounded_flux_profile(pyLIMAmodel)
+
+        pool_processes = None
+
+    elif algo == "TRF":
 
         fit = TRF_fit.TRFfit(
             pyLIMAmodel,
