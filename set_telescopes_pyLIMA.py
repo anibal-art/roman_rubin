@@ -1875,6 +1875,7 @@ def _init_tel_roman_rubin(path_ephemerides, opsim_db_path=None, rubin_throughput
 
 #     time_window = _validate_time_window(time_window)
 
+
 #     my_event = copy.deepcopy(_EVENT_TEMPLATE)
 
 #     if time_window is not None:
@@ -1892,6 +1893,21 @@ def _init_tel_roman_rubin(path_ephemerides, opsim_db_path=None, rubin_throughput
 #         dataSlice = _DATASLICE
 
 #     return my_event, dataSlice, _LSST_BANDPASS
+
+def _init_roman_only():
+    """
+    Initialize only the Roman observing template.
+
+    This path must not resolve Rubin OpSim, load Rubin throughputs,
+    build a Rubin dataSlice, or invoke MAF.
+    """
+    global _ROMAN_MAG
+
+    if _ROMAN_MAG is None:
+        _ROMAN_MAG = _load_or_build_roman_template()
+
+
+
 def tel_roman_rubin(
     path_ephemerides,
     time_window=None,
@@ -1899,7 +1915,6 @@ def tel_roman_rubin(
     use_rubin=True,
     Ra=None,
     Dec=None,
-    rubin_pointing_mode="fixed",
     rubin_cache_cell_deg=None,
     opsim_db_path=None,
     rubin_sim_data_dir=None,
@@ -1913,18 +1928,6 @@ def tel_roman_rubin(
         RUBIN_OPSIM_DB_PATH / RUBIN_OPSIM_DB si existen; si no,
         get_baseline().
 
-    rubin_pointing_mode:
-        "fixed"
-            Usa siempre el campo fijo Roman+Rubin actual.
-            Este es el default y conserva el cache global.
-
-        "source"
-            Usa Ra, Dec pasados por argumento.
-            Pensado para pruebas Rubin-only con fuentes TRILEGAL.
-
-    Regla recomendada:
-        Roman + Rubin  -> fixed
-        Rubin-only     -> fixed o source, según el experimento
     """
 
     if not use_roman and not use_rubin:
@@ -1948,61 +1951,84 @@ def tel_roman_rubin(
 
     time_window = _validate_time_window(time_window)
 
-    lsst_filterlist = "ugrizy"
 
     # ------------------------------------------------------------
-    # Si Roman+Rubin están encendidos, forzamos campo fijo.
-    # Esto preserva tu simulación principal.
+    # Roman-only fast path
     # ------------------------------------------------------------
-
-    # El modo "fixed" se conserva por defecto.
-    # El modo "source" también se permite con Roman+Rubin.
-
-    # ------------------------------------------------------------
-    # Modo campo fijo Roman+Rubin
-    # ------------------------------------------------------------
-
-    if rubin_pointing_mode == "fixed":
-
-        _init_fixed_field_rubin(
-            path_ephemerides,
-            opsim_db_path=opsim_db_path,
-            rubin_throughputs_dir=rubin_throughputs_dir,
-        )
-
-        event_Ra, event_Dec = _roman_rubin_field_coordinates()
-
-        dataSlice_full = _DATASLICE
-        rubin_ts = _RUBIN_TS
-
-    # ------------------------------------------------------------
-    # Modo coordenadas de fuente TRILEGAL
-    # ------------------------------------------------------------
-
-    elif rubin_pointing_mode == "source":
+    #
+    # Architectural invariant:
+    #
+    # use_roman=True, use_rubin=False must not initialize
+    # Rubin throughputs, OpSim, MAF, or Rubin dataSlice state.
+    #
+    if use_roman and not use_rubin:
 
         if Ra is None or Dec is None:
             raise ValueError(
-                "rubin_pointing_mode='source' requiere Ra y Dec."
+                "Roman-only requires the physical source coordinates "
+                "Ra and Dec."
             )
 
+        _init_roman_only()
 
         event_Ra = float(Ra)
         event_Dec = float(Dec)
 
-        dataSlice_full, rubin_ts = _get_source_field_rubin(
-            path_ephemerides,
+        my_event = _build_event_template(
             event_Ra,
             event_Dec,
-            cache_cell_deg=rubin_cache_cell_deg,
-            opsim_db_path=opsim_db_path,
-            rubin_throughputs_dir=rubin_throughputs_dir,
+            _ROMAN_MAG,
+            None,
+            path_ephemerides,
+            lsst_filterlist="ugrizy",
+            use_roman=True,
+            use_rubin=False,
         )
 
-    else:
+        if time_window is not None:
+            my_event = apply_time_window_to_event(
+                my_event,
+                time_window=time_window,
+            )
+
+        return my_event, None, None
+
+    lsst_filterlist = "ugrizy"
+
+    # ------------------------------------------------------------
+    # Rubin observing field
+    # ------------------------------------------------------------
+    #
+    # This point is reached only when use_rubin=True because the
+    # Roman-only path returned above.
+    #
+    # Ra/Dec are the physical source coordinates. Rubin/MAF may use
+    # an internally quantized coordinate for cache efficiency, but
+    # _build_event_template() always receives the true source Ra/Dec.
+    # ------------------------------------------------------------
+
+    if Ra is None or Dec is None:
         raise ValueError(
-            "rubin_pointing_mode debe ser 'fixed' o 'source'."
+            "tel_roman_rubin requires physical source Ra and Dec."
         )
+
+    event_Ra = float(Ra)
+    event_Dec = float(Dec)
+
+    if not np.isfinite(event_Ra) or not np.isfinite(event_Dec):
+        raise ValueError(
+            "Invalid physical event coordinates: "
+            f"Ra={event_Ra}, Dec={event_Dec}"
+        )
+
+    dataSlice_full, rubin_ts = _get_source_field_rubin(
+        path_ephemerides,
+        event_Ra,
+        event_Dec,
+        cache_cell_deg=rubin_cache_cell_deg,
+        opsim_db_path=opsim_db_path,
+        rubin_throughputs_dir=rubin_throughputs_dir,
+    )
 
     # ------------------------------------------------------------
     # Construcción del evento

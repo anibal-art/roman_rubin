@@ -297,14 +297,6 @@ def build_simfit_kwargs(
                 truth_parallax,
             ),
 
-        "rubin_pointing_mode":
-            str(
-                simulation.get(
-                    "rubin_pointing_mode",
-                    "source",
-                )
-            ),
-
         "rubin_cache_cell_deg":
             simulation.get(
                 "rubin_cache_cell_deg",
@@ -408,16 +400,6 @@ def build_simfit_kwargs(
     ):
         raise ValueError(
             "At least one observatory must be enabled."
-        )
-
-    if (
-        kwargs["use_rubin"]
-        and kwargs["rubin_pointing_mode"]
-        != "source"
-    ):
-        raise ValueError(
-            "This materialized GBTDS catalogue requires "
-            "simulation.rubin_pointing_mode='source'."
         )
 
     return kwargs

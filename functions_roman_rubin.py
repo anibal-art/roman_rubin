@@ -991,7 +991,6 @@ def sim_event(
     use_roman=True,
     use_rubin=True,
     truth_parallax=True,
-    rubin_pointing_mode="fixed",
     rubin_cache_cell_deg=None,
     apply_detection_criteria=True,
     apply_photometric_filter=True,
@@ -1006,8 +1005,8 @@ def sim_event(
     path_ephemerides (str): path a las efemérides de Roman
     model (str): modelo de microlente ('USBL','FSPL','PSPL', etc.)
 
-    rubin_pointing_mode:
-        "fixed"  -> usa el campo fijo Roman/Rubin.
+
+fixed"  -> usa el campo fijo Roman/Rubin.
         "source" -> usa data["maf_ra"], data["maf_dec"] o data["ra"], data["dec"].
                     Pensado para Rubin-only + AstroDataLab pairs.
     """
@@ -1083,37 +1082,33 @@ def sim_event(
     t0 = data["t0"]
 
     # ============================================================
-    # Coordenadas para Rubin/MAF
+    # Physical event coordinates
     # ============================================================
-    # Regla:
-    # - Roman+Rubin: siempre campo fijo.
-    # - Rubin-only + rubin_pointing_mode="source": usa coordenadas de la fuente.
-    # - Default: campo fijo.
+    #
+    # Single source of truth:
+    #
+    #     data["ra"], data["dec"]
+    #
+    # These coordinates define the pyLIMA Event and therefore the
+    # North/East basis used by the parallax calculation.
+    #
+    # maf_ra / maf_dec, when present, are observational/cache metadata
+    # only and must never define the physical event geometry.
+    # ============================================================
 
-    source_ra = data.get("maf_ra", data.get("ra", None))
-    source_dec = data.get("maf_dec", data.get("dec", None))
+    if "ra" not in data or "dec" not in data:
+        raise KeyError(
+            "Every simulated event requires physical source "
+            "coordinates data['ra'] and data['dec']."
+        )
 
-    if rubin_pointing_mode == "source":
+    tel_ra = float(data["ra"])
+    tel_dec = float(data["dec"])
 
-        if source_ra is None or source_dec is None:
-            raise ValueError(
-                "rubin_pointing_mode='source' requiere ra/dec "
-                "o maf_ra/maf_dec."
-            )
-
-        rubin_pointing_mode_use = "source"
-        tel_ra = float(source_ra)
-        tel_dec = float(source_dec)
-
-    elif rubin_pointing_mode == "fixed":
-
-        rubin_pointing_mode_use = "fixed"
-        tel_ra = None
-        tel_dec = None
-
-    else:
+    if not np.isfinite(tel_ra) or not np.isfinite(tel_dec):
         raise ValueError(
-            f"rubin_pointing_mode inválido: {rubin_pointing_mode}"
+            "Invalid physical event coordinates: "
+            f"ra={tel_ra}, dec={tel_dec}"
         )
 
     _sim_timer.stop("simulation_prep")
@@ -1126,7 +1121,6 @@ def sim_event(
         use_rubin=use_rubin,
         Ra=tel_ra,
         Dec=tel_dec,
-        rubin_pointing_mode=rubin_pointing_mode_use,
         rubin_cache_cell_deg=rubin_cache_cell_deg,
     )
     _sim_timer.stop("simulation_maf")
@@ -1426,7 +1420,7 @@ def sim_event(
     # ============================================================
     # Fotometría Roman + Rubin
     # ============================================================
-    
+
     _sim_timer.start("simulation_parallax_snapshot")
 
     if truth_parallax:
@@ -1930,8 +1924,8 @@ def new_data(
         new_row["ln_likelihood"] = [np.nan]
 
     return new_row
-    
-    
+
+
 def extract_data_event(Event, model, nevent, system_type, nset):
     """
     Extrae datos true, fit_rr y opcionalmente fit_roman.
@@ -1997,7 +1991,6 @@ def extract_data_event(Event, model, nevent, system_type, nset):
         "maf_dec_used",
         "maf_source_ra",
         "maf_source_dec",
-        "rubin_pointing_mode",
         "rubin_cache_cell_deg",
         "maf_mode",
         "maf_cache_mode",
@@ -2378,7 +2371,7 @@ def register_clean_exit_handlers():
     except ValueError:
         # Puede pasar si se llama desde un thread que no es el principal.
         pass
-    
+
 def choose_catalog_rows(seed, n_rows=10000):
     """
     Reproduce la selección aleatoria original de filas TRILEGAL y GENULENS.
@@ -2559,7 +2552,6 @@ def simulate_event_for_fit(
     use_roman=True,
     use_rubin=True,
     truth_parallax=True,
-    rubin_pointing_mode="fixed",
     rubin_cache_cell_deg=None,
     apply_detection_criteria=True,
     apply_photometric_filter=True,
@@ -2579,7 +2571,6 @@ def simulate_event_for_fit(
         truth_parallax=truth_parallax,
         truth_double_source=truth_double_source,
         add_photometric_noise=add_photometric_noise,
-        rubin_pointing_mode=rubin_pointing_mode,
         rubin_cache_cell_deg=rubin_cache_cell_deg,
         apply_detection_criteria=apply_detection_criteria,
         apply_photometric_filter=apply_photometric_filter,
@@ -2738,8 +2729,8 @@ def save_simulated_event_if_selected(
         GENULENS_row,
         TRILEGAL_row,
     )
-    
-    
+
+
 def extract_lightcurves_for_fit(pyLIMA_model):
     """
     Extrae las curvas de luz del evento en dos formatos:
@@ -4023,7 +4014,7 @@ def replace_flux_by_noisy_magnitude_flux_ZP(pyLIMA_model, verbose=False):
                 f"median flux={np.nanmedian(flux):.4g}, "
                 f"median err_flux={np.nanmedian(err_flux):.4g}"
             )
-            
+
 from collections.abc import Mapping
 
 
@@ -4032,7 +4023,6 @@ def build_event_params_from_custom_system(
     model,
     use_roman=True,
     use_rubin=True,
-    rubin_pointing_mode="fixed",
 ):
     """
     Construye directamente ``event_params`` sin seleccionar ni emparejar
@@ -4067,9 +4057,6 @@ def build_event_params_from_custom_system(
 
     use_roman, use_rubin : bool
         Determinan qué magnitudes son obligatorias.
-
-    rubin_pointing_mode : str
-        Si vale ``"source"``, se requieren coordenadas de la fuente.
 
     Returns
     -------
@@ -4155,11 +4142,10 @@ def build_event_params_from_custom_system(
     if use_rubin:
         required.extend(["u", "g", "r", "i", "z", "Y"])
 
-    if (
-        use_rubin
-        and str(rubin_pointing_mode).lower() == "source"
-    ):
-        required.extend(["maf_ra", "maf_dec"])
+    # Physical sky coordinates are mandatory.
+    # These coordinates define the pyLIMA Event geometry and therefore
+    # the North/East basis used for parallax.
+    required.extend(["ra", "dec"])
 
     missing = [
         key
@@ -4267,7 +4253,6 @@ def sim_fit(
     fit_bounds=None,
     initial_guess=None,
     optimizer_options=None,
-    rubin_pointing_mode="fixed",
     rubin_cache_cell_deg=None,
     apply_detection_criteria=True,
     apply_photometric_filter=True,
@@ -4376,8 +4361,7 @@ def sim_fit(
             model=model,
             use_roman=use_roman,
             use_rubin=use_rubin,
-            rubin_pointing_mode=rubin_pointing_mode,
-        )
+            )
 
         # No existe una selección aleatoria de filas.
         ROW_T = int(i)
@@ -4505,7 +4489,6 @@ def sim_fit(
         truth_parallax=truth_parallax,
         truth_double_source=truth_double_source,
         add_photometric_noise=add_photometric_noise,
-        rubin_pointing_mode=rubin_pointing_mode,
         rubin_cache_cell_deg=rubin_cache_cell_deg,
         apply_detection_criteria=apply_detection_criteria,
         apply_photometric_filter=apply_photometric_filter,
@@ -4553,7 +4536,6 @@ def sim_fit(
 
         maf_info = getattr(stp, "LAST_DATASLICE_INFO", {})
 
-        event_params["rubin_pointing_mode"] = rubin_pointing_mode
         event_params["rubin_cache_cell_deg"] = rubin_cache_cell_deg
 
         event_params["maf_mode"] = maf_info.get("mode", np.nan)
@@ -6465,7 +6447,6 @@ def sim_fit_multi_fits(
     primary_fit=None,
     lrt_config=None,
     save_multi_fit_summary=True,
-    rubin_pointing_mode="fixed",
     rubin_cache_cell_deg=None,
     apply_detection_criteria=True,
     apply_photometric_filter=True,
@@ -6559,7 +6540,6 @@ def sim_fit_multi_fits(
         fit_bounds=primary_spec.get("bounds", fit_bounds),
         initial_guess=primary_spec.get("initial_guess", initial_guess),
         optimizer_options=optimizer_options,
-        rubin_pointing_mode=rubin_pointing_mode,
         rubin_cache_cell_deg=rubin_cache_cell_deg,
         apply_detection_criteria=apply_detection_criteria,
         apply_photometric_filter=apply_photometric_filter,
