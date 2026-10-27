@@ -62,7 +62,25 @@ class Analysis_Event:
         self.model_params = None
         self.info = None
         self.indices = None
+        self._mc_samples_cache = {}
         
+    def _mc_fit_code(self, data):
+        """1 = Roman+Rubin fit, 2 = Roman-only fit, 3 = any other fit dict."""
+        if data is not None and data is self.fit_rr_data:
+            return 1
+        if data is not None and data is self.fit_roman_data:
+            return 2
+        return 3
+
+    def _mc_event_seed(self):
+        """Event seed for the Monte Carlo: info['mc_seed'] or the i of Event_<i>.h5."""
+        import re
+
+        if isinstance(self.info, dict) and self.info.get("mc_seed") is not None:
+            return int(self.info["mc_seed"])
+        match = re.search(r"Event_(\d+)", str(self.path_model))
+        return int(match.group(1)) if match else 0
+
     def labels_params(self):
         if self.model == "USBL":
             labels_params: list[str] = ['t_center','u_center','tE','rho',"separation","mass_ratio","alpha",'piEN','piEE']
@@ -609,6 +627,16 @@ class Analysis_Event:
 
         self.load_data_sim()
 
+        # One sample set per fit, reused by piE_err and the three mass errors.
+        # Own generator seeded by (event, fit): the result does not depend on
+        # what else used random numbers before (e.g. whether the RR fit ran).
+        cache = self.__dict__.setdefault("_mc_samples_cache", {})
+        fit_code = self._mc_fit_code(data)
+        cache_key = (fit_code, id(data))
+        if cache_key in cache:
+            return cache[cache_key]
+        rng = np.random.default_rng([self._mc_event_seed(), fit_code])
+
         n = 100000
 
         best_model = data["best_model"]
@@ -635,7 +663,7 @@ class Analysis_Event:
                 (n, 1),
             )
         else:
-            samples = np.random.multivariate_normal(
+            samples = rng.multivariate_normal(
                 mean,
                 data["covariance_matrix"],
                 n,
@@ -680,12 +708,14 @@ class Analysis_Event:
 
             thetaE_samples_wrho = theta_s / rho_dist
 
-        return {
+        result = {
             "thetaE_samples_wrho": thetaE_samples_wrho,
             "thetaE_samples_wtE": thetaE_samples_wtE,
             "piEE_dist": piEE_dist,
             "piEN_dist": piEN_dist,
         }
+        cache[cache_key] = result
+        return result
     
 
     def piE_propagation(self, piEE, piEN, err_piEE, err_piEN, cov_piEE_piEN):

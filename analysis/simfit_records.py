@@ -811,6 +811,7 @@ def build_analysis_event(
             "n_data_true_roman": n_data_true_roman,
             "chi2_true_by_telescope": chi2_true["chi2_true_by_telescope"],
             "truth_parallax": bool(truth_parallax),
+            "mc_seed": int(i),
             "fit_time_window": fit_time_window,
             "apply_photometric_filter": event_params.get("apply_photometric_filter", np.nan),
             "phot_n_total": event_params.get("phot_n_total", np.nan),
