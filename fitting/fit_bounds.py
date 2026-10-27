@@ -10,6 +10,11 @@ from fitting.fit_parameters import (
     fit_parameter_order,
     fit_trajectory_parameter_names,
 )
+from fitting.fit_coordinates import (
+    fit_key,
+    stage_physical_bound,
+    write_transformed_bounds,
+)
 
 
 def safe_bounds(
@@ -56,7 +61,15 @@ def set_fit_bound(
 ):
     """
     Setea bounds solo si el parámetro existe.
+
+    Bounds are always physical. For a parameter fitted in transformed
+    coordinates they are staged and written by write_transformed_bounds
+    at the end of apply_fit_bounds.
     """
+    if fit_key(fit.model, parameter_name) != parameter_name:
+        stage_physical_bound(fit, parameter_name, bounds)
+        return
+
     if parameter_name in fit.fit_parameters:
         fit.fit_parameters[parameter_name][1] = bounds
 
@@ -618,5 +631,7 @@ def apply_fit_bounds(
             fit_bounds=fit_bounds,
             Origin=Origin,
         )
+
+    write_transformed_bounds(fit)
 
     return rango_used

@@ -38,6 +38,9 @@ def normalize_fit_specs(
           "H1": {"model": "FSPL", "parallax": True,  "bounds": {...}},
         }
 
+    Optional per-fit key "coordinates": None/"physical" or "log_te_rho"
+    (see fitting.fit_coordinates).
+
     list/tuple:
         [
           {"key": "H0", "model": "FSPL", "parallax": False},
@@ -57,6 +60,7 @@ def normalize_fit_specs(
                 "defaults": fit_defaults,
                 "bounds": fit_bounds,
                 "initial_guess": initial_guess,
+                "coordinates": None,
             }
         })
 
@@ -82,6 +86,7 @@ def normalize_fit_specs(
                 "defaults": spec.get("defaults", fit_defaults),
                 "bounds": spec.get("bounds", fit_bounds),
                 "initial_guess": spec.get("initial_guess", initial_guess),
+                "coordinates": spec.get("coordinates", None),
             }
 
         if len(out) == 0:
@@ -114,6 +119,7 @@ def normalize_fit_specs(
                 "defaults": spec.get("defaults", fit_defaults),
                 "bounds": spec.get("bounds", fit_bounds),
                 "initial_guess": spec.get("initial_guess", initial_guess),
+                "coordinates": spec.get("coordinates", None),
             }
 
         if len(out) == 0:
@@ -176,6 +182,8 @@ def _fit_entry_from_objects(
         "initial_guess_source": fit_rr.fit_results.get("initial_guess_source", None),
         "initial_guess_parameter_order": fit_rr.fit_results.get("initial_guess_parameter_order", None),
         "initial_guess_values": fit_rr.fit_results.get("initial_guess_values", None),
+        "fit_coordinates": fit_rr.fit_results.get("fit_coordinates", None),
+        "best_model_physical": fit_rr.fit_results.get("best_model_physical", None),
         "timings": fit_timings,
         "optimizer_diagnostics": optimizer_diagnostics,
         "fit_rr": fit_rr,
@@ -280,6 +288,12 @@ def flatten_multi_fit_results_for_parquet(
                 record[f"{prefix}_best_model"] = repr(best_model.tolist())
             except Exception:
                 pass
+
+        if entry.get("best_model_physical") is not None:
+            record[f"{prefix}_fit_coordinates"] = entry.get("fit_coordinates")
+            record[f"{prefix}_best_model_physical"] = repr(
+                np.asarray(entry["best_model_physical"], dtype=float).tolist()
+            )
 
         if entry.get("status") == "error":
             record[f"{prefix}_error"] = entry.get("error", "")

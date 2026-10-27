@@ -72,6 +72,12 @@ from fitting.trf_optimizer import (  # noqa: F401  (moved; re-exported)
     TRF_DEFAULT_OPTIMIZER_OPTIONS,
     TRF_ALLOWED_OPTIMIZER_OPTIONS,
 )
+from fitting.fit_coordinates import (
+    normalize_fit_coordinates,
+    fancy_parameters_for,
+    guess_to_fit_space,
+    physical_fit_results,
+)
 
 
 # ============================================================
@@ -172,6 +178,7 @@ def fit_rubin_roman(
     optimizer_options=None,
     event_ra=None,
     event_dec=None,
+    fit_coordinates=None,
 ):
     """
     Ajusta una curva Roman/Rubin con pyLIMA.
@@ -235,6 +242,15 @@ def fit_rubin_roman(
         a esta función, deben ser las coordenadas del Event usado realmente
         durante la simulación. Son obligatorias: si falta alguna, el
         ajuste aborta.
+
+    fit_coordinates : None, "physical" or "log_te_rho"
+        Coordenadas en las que trabaja el optimizador (pyLIMA
+        fancy_parameters, ver fitting.fit_coordinates). None equivale a
+        "physical". Bounds, initial_guess e initial_guess_values son
+        siempre físicos. fit_results["best_model"] y
+        ["covariance_matrix"] quedan en espacio de ajuste;
+        ["best_model_physical"] y ["covariance_matrix_physical"] en
+        coordenadas físicas.
     """
     _fit_timer = StageTimer()
     _fit_timer.start("fit_total")
@@ -251,6 +267,7 @@ def fit_rubin_roman(
     fit_parallax = bool(fit_parallax)
     fit_model_base = normalize_model_name(fit_model)
     sim_model_base = normalize_model_name(model)
+    fit_coordinates = normalize_fit_coordinates(fit_coordinates)
 
     lsst_lcs = {
         "u": as_empty_if_none(lsst_u),
@@ -308,6 +325,14 @@ def fit_rubin_roman(
         fit_params,
         Origin=Origin,
         fit_parallax=fit_parallax,
+        fancy_parameters=fancy_parameters_for(
+            fit_coordinates,
+            fit_parameter_order(
+                fit_model_base,
+                fit_parallax=fit_parallax,
+                Origin=Origin,
+            ),
+        ),
     )
 
     fit, pool_processes = build_fitter(
@@ -342,11 +367,18 @@ def fit_rubin_roman(
         Origin=Origin,
     )
 
-    fit.model_parameters_guess = initial_guess_used
+    initial_guess_fit = guess_to_fit_space(
+        pyLIMAmodel,
+        param_order,
+        initial_guess_used,
+    )
+
+    fit.model_parameters_guess = initial_guess_fit
 
     print(
         "[fit_rubin_roman] Initial guess "
         f"source={initial_guess_source}, "
+        f"coordinates={fit_coordinates}, "
         f"order={param_order}, "
         f"values={initial_guess_used}"
     )
@@ -387,6 +419,18 @@ def fit_rubin_roman(
         float(value)
         for value in initial_guess_used
     ]
+    fit_results["initial_guess_values_fit"] = [
+        float(value)
+        for value in initial_guess_fit
+    ]
+
+    # Coordenadas del optimizador y vista física de los resultados.
+    fit_results["fit_coordinates"] = fit_coordinates
+
+    if "best_model" in fit_results:
+        fit_results.update(
+            physical_fit_results(fit)
+        )
 
     _fit_timer.stop("fit_finalize")
     fit_results.update(

@@ -11,6 +11,11 @@ from fitting.fit_bounds import (
 from fitting.fit_parameters import (
     fit_guess_values,
 )
+from fitting.fit_coordinates import (
+    fit_key,
+    to_fit_value,
+    to_physical_value,
+)
 
 
 def sample_guess_inside_bounds(
@@ -20,6 +25,8 @@ def sample_guess_inside_bounds(
 ):
     """
     Samplea un guess inicial dentro de los bounds.
+
+    The sample is uniform in fit space and returned in physical units.
     """
     if rng is None:
         rng = np.random.default_rng()
@@ -28,13 +35,15 @@ def sample_guess_inside_bounds(
 
     for par in param_order:
 
-        if par not in fit.fit_parameters:
+        key = fit_key(fit.model, par)
+
+        if key not in fit.fit_parameters:
             raise KeyError(
                 f"El parámetro {par} no está en fit.fit_parameters. "
                 f"Parámetros disponibles: {list(fit.fit_parameters.keys())}"
             )
 
-        interval = fit.fit_parameters[par][1]
+        interval = fit.fit_parameters[key][1]
 
         lo = float(interval[0])
         hi = float(interval[1])
@@ -50,14 +59,18 @@ def sample_guess_inside_bounds(
             )
 
         if lo == hi:
-            guess.append(lo)
+            value = lo
         else:
-            guess.append(
-                rng.uniform(
-                    lo,
-                    hi,
-                )
+            value = rng.uniform(
+                lo,
+                hi,
             )
+
+        guess.append(
+            to_physical_value(fit.model, key, value)
+            if key != par
+            else value
+        )
 
     return guess
 
@@ -157,6 +170,8 @@ def validate_initial_guess_inside_bounds(
 
     Para un guess explícito preferimos fallar con un mensaje claro antes que
     dejar que pyLIMA/TRF modifique silenciosamente el punto inicial.
+
+    guess is physical; the comparison is done in fit space.
     """
     if len(guess) != len(param_order):
         raise ValueError(
@@ -166,20 +181,28 @@ def validate_initial_guess_inside_bounds(
 
     for par, value in zip(param_order, guess):
 
-        if par not in fit.fit_parameters:
+        key = fit_key(fit.model, par)
+
+        if key not in fit.fit_parameters:
             raise KeyError(
                 f"El parámetro {par} no está en fit.fit_parameters. "
                 f"Parámetros disponibles: {list(fit.fit_parameters.keys())}"
             )
 
-        interval = fit.fit_parameters[par][1]
+        interval = fit.fit_parameters[key][1]
         lo = float(interval[0])
         hi = float(interval[1])
-        value = float(value)
 
-        if value < lo - atol or value > hi + atol:
+        with np.errstate(divide="ignore", invalid="ignore"):
+            value = to_fit_value(fit.model, par, value)
+
+        if (
+            not np.isfinite(value)
+            or value < lo - atol
+            or value > hi + atol
+        ):
             raise ValueError(
-                f"Guess inicial fuera de bounds para {par}: "
+                f"Guess inicial fuera de bounds para {par} ({key}): "
                 f"value={value}, bounds=[{lo}, {hi}]."
             )
 

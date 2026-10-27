@@ -120,12 +120,16 @@ def build_pyLIMA_model(
     parallax=None,
     origin=None,
     blend_flux_parameter="ftotal",
+    fancy_parameters=None,
 ):
     """
     Constructor único de modelos pyLIMA.
 
     Sirve para simular, ajustar y graficar. No prepara parámetros
     iniciales, no aplica bounds y no corre el fit.
+
+    fancy_parameters: objeto pyLIMA fancy_parameters (ver
+    fitting.fit_coordinates) o None para coordenadas físicas.
     """
 
     model_base = normalize_model_name(model)
@@ -140,6 +144,9 @@ def build_pyLIMA_model(
         "blend_flux_parameter": blend_flux_parameter,
         "parallax": parallax_arg,
     }
+
+    if fancy_parameters is not None:
+        kwargs["fancy_parameters"] = fancy_parameters
 
     if model_base == "PSPL":
         return PSPL_model.PSPLmodel(

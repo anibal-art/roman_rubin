@@ -383,6 +383,7 @@ def build_fit_pyLIMA_model(
     fit_params,
     Origin=None,
     fit_parallax=True,
+    fancy_parameters=None,
 ):
     """
     Construye el modelo pyLIMA que se va a ajustar.
@@ -404,4 +405,5 @@ def build_fit_pyLIMA_model(
         t0_parallax=t0_parallax,
         origin=Origin,
         blend_flux_parameter="ftotal",
+        fancy_parameters=fancy_parameters,
     )
