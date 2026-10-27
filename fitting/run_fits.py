@@ -71,42 +71,54 @@ def run_all_fits(
     lc_z = lc_to_fit["z"] if use_rubin else []
     lc_y = lc_to_fit["y"] if use_rubin else []
 
-    print("Start the fit using active telescopes:")
-    print(
-        f"[run_all_fits] sim_model={model}, "
-        f"fit_model={fit_model}, "
-        f"fit_parallax={fit_parallax}, "
-        f"event_ra={event_ra}, event_dec={event_dec}, "
-        f"random_state={random_state}, "
-        f"initial_guess={initial_guess!r}"
+    n_rubin_fit_points = sum(
+        len(lc) if lc is not None else 0
+        for lc in (lc_u, lc_g, lc_r, lc_i, lc_z, lc_y)
     )
 
-    fit_rr, event_fit_rr, pyLIMAmodel_rr = fit_rubin_roman(
-        Source,
-        pyLIMA_parameters,
-        path_to_save_fit,
-        path_ephemerides,
-        model,
-        algo,
-        origin,
-        rango,
-        lc_W149,
-        lc_u,
-        lc_g,
-        lc_r,
-        lc_i,
-        lc_z,
-        lc_y,
-        fit_model=fit_model,
-        fit_parallax=fit_parallax,
-        fit_defaults=fit_defaults,
-        fit_bounds=fit_bounds,
-        initial_guess=initial_guess,
-        event_ra=event_ra,
-        event_dec=event_dec,
-        random_state=random_state,
-        optimizer_options=optimizer_options,
-    )
+    if use_rubin and n_rubin_fit_points == 0:
+        # Without Rubin points the Roman+Rubin fit would repeat the
+        # Roman-only fit on the same data: it is not run.
+        print("[run_all_fits] Roman+Rubin fit skipped: no Rubin data (0 points)")
+        fit_rr, event_fit_rr, pyLIMAmodel_rr = None, None, None
+
+    else:
+        print("Start the fit using active telescopes:")
+        print(
+            f"[run_all_fits] sim_model={model}, "
+            f"fit_model={fit_model}, "
+            f"fit_parallax={fit_parallax}, "
+            f"event_ra={event_ra}, event_dec={event_dec}, "
+            f"random_state={random_state}, "
+            f"initial_guess={initial_guess!r}"
+        )
+
+        fit_rr, event_fit_rr, pyLIMAmodel_rr = fit_rubin_roman(
+            Source,
+            pyLIMA_parameters,
+            path_to_save_fit,
+            path_ephemerides,
+            model,
+            algo,
+            origin,
+            rango,
+            lc_W149,
+            lc_u,
+            lc_g,
+            lc_r,
+            lc_i,
+            lc_z,
+            lc_y,
+            fit_model=fit_model,
+            fit_parallax=fit_parallax,
+            fit_defaults=fit_defaults,
+            fit_bounds=fit_bounds,
+            initial_guess=initial_guess,
+            event_ra=event_ra,
+            event_dec=event_dec,
+            random_state=random_state,
+            optimizer_options=optimizer_options,
+        )
 
     fit_roman = None
     event_fit_roman = None

@@ -259,8 +259,10 @@ def extract_data_event(Event, model, nevent, system_type, nset):
     # Cargar fit_rr si no viene en memoria
     # ============================================================
 
-    if Event.fit_rr_data is None:
-        if Event.path_fit_rr is not None and Path(Event.path_fit_rr).exists():
+    if Event.fit_rr_data is None and Event.path_fit_rr is not None:
+        # path_fit_rr is None when the Roman+Rubin fit was not run
+        # (no Rubin data); then there is no fit_rr table.
+        if Path(Event.path_fit_rr).exists():
             Event.fit_rr_data = np.load(
                 Event.path_fit_rr,
                 allow_pickle=True,
@@ -318,6 +320,12 @@ def extract_data_event(Event, model, nevent, system_type, nset):
     ]
 
     cols_photometry = photometry_summary_columns()
+
+    # Rubin points in the fit and whether the Roman+Rubin fit ran.
+    cols_fit_status = [
+        "n_rubin_fit_points",
+        "fit_rr_status",
+    ]
 
     # ============================================================
     # Columnas true
@@ -383,6 +391,7 @@ def extract_data_event(Event, model, nevent, system_type, nset):
             ]
             + cols_spatial
             + cols_photometry
+            + cols_fit_status
         )
 
     # ============================================================
@@ -511,7 +520,7 @@ def extract_data_event(Event, model, nevent, system_type, nset):
         if computed_params is None:
             computed_params = {}
 
-        for key in cols_spatial + cols_photometry:
+        for key in cols_spatial + cols_photometry + cols_fit_status:
 
             try:
                 value = computed_params.get(key, np.nan)
@@ -582,31 +591,34 @@ def extract_data_event(Event, model, nevent, system_type, nset):
     # Fit RR / telescopios activos
     # ============================================================
 
-    new_data_rr = new_data(
-        Event,
-        nset,
-        nevent,
-        cols_fit,
-        Event.fit_rr_data,
-        n_data=n_data_true,
-    )
+    if Event.fit_rr_data is None:
+        new_data_rr = None
+    else:
+        new_data_rr = new_data(
+            Event,
+            nset,
+            nevent,
+            cols_fit,
+            Event.fit_rr_data,
+            n_data=n_data_true,
+        )
 
-    new_data_rr["chi2_true"] = [
-        chi2_true
-    ]
-
-    new_data_rr["n_data_true"] = [
-        n_data_true
-    ]
-
-    try:
-        new_data_rr["delta_chi2_true"] = [
-            new_data_rr["chichi"][0] - chi2_true
+        new_data_rr["chi2_true"] = [
+            chi2_true
         ]
-    except Exception:
-        new_data_rr["delta_chi2_true"] = [
-            np.nan
+
+        new_data_rr["n_data_true"] = [
+            n_data_true
         ]
+
+        try:
+            new_data_rr["delta_chi2_true"] = [
+                new_data_rr["chichi"][0] - chi2_true
+            ]
+        except Exception:
+            new_data_rr["delta_chi2_true"] = [
+                np.nan
+            ]
 
     # ============================================================
     # Fit Roman-only, si existe
@@ -726,14 +738,17 @@ def build_analysis_event(
 
     path_model = Path(path_to_save_model) / f"Event_{i}.h5"
 
-    path_fit_rr = fit_results_path_from_fit_object(
-        fit_rr,
-        path_to_save_fit,
-        algo,
-        fit_model,
-        fit_parallax,
-        fallback_event_name=f"Event_RR_{i}",
-    )
+    if fit_rr is not None:
+        path_fit_rr = fit_results_path_from_fit_object(
+            fit_rr,
+            path_to_save_fit,
+            algo,
+            fit_model,
+            fit_parallax,
+            fallback_event_name=f"Event_RR_{i}",
+        )
+    else:
+        path_fit_rr = None
 
     if fit_roman is not None:
         path_fit_roman = fit_results_path_from_fit_object(
@@ -766,7 +781,11 @@ def build_analysis_event(
     Event = Analysis_Event(
         model,
         path_model=str(path_model),
-        path_fit_rr=str(path_fit_rr),
+        path_fit_rr=(
+            str(path_fit_rr)
+            if path_fit_rr is not None
+            else None
+        ),
         path_fit_roman=(
             str(path_fit_roman)
             if path_fit_roman is not None
@@ -775,7 +794,7 @@ def build_analysis_event(
         genulens_params=GENULENS_row.iloc[0],
         trilegal_params=TRILEGAL_row.iloc[0],
         computed_params=event_params,
-        fit_rr_data=fit_rr.fit_results,
+        fit_rr_data=fit_rr.fit_results if fit_rr is not None else None,
         fit_roman_data=fit_roman.fit_results if fit_roman is not None else None,
         origin=origin,
         lightcurves=lc_to_save,
@@ -799,7 +818,11 @@ def build_analysis_event(
             "phot_n_too_faint_5sigma": event_params.get("phot_n_too_faint_5sigma", np.nan),
             "phot_n_saturated": event_params.get("phot_n_saturated", np.nan),
             "phot_n_rejected": event_params.get("phot_n_rejected", np.nan),
-            "path_fit_rr_actual": str(path_fit_rr),
+            "path_fit_rr_actual": (
+                str(path_fit_rr)
+                if path_fit_rr is not None
+                else None
+            ),
             "path_fit_roman_actual": (
                 str(path_fit_roman)
                 if path_fit_roman is not None
@@ -853,11 +876,15 @@ def save_extracted_results(
         append=False,
     )
 
-    _save_dict_as_parquet(
-        new_data_rr,
-        path_fitrr_file,
-        append=False,
-    )
+    if new_data_rr is not None:
+        _save_dict_as_parquet(
+            new_data_rr,
+            path_fitrr_file,
+            append=False,
+        )
+        rr_msg = f"  {path_fitrr_file}"
+    else:
+        rr_msg = "  fit_rr no guardado (sin datos de Rubin: no se hizo el ajuste Roman+Rubin)"
 
     if save_roman and new_data_roman is not None:
         _save_dict_as_parquet(
@@ -872,7 +899,7 @@ def save_extracted_results(
     print(
         "→ Guardado Parquet:\n"
         f"  {path_true_file}\n"
-        f"  {path_fitrr_file}\n"
+        f"{rr_msg}\n"
         f"{roman_msg}"
     )
 

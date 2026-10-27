@@ -610,16 +610,28 @@ def sim_fit(
         true_model=my_own_model,
     )
 
+    # Rubin points used by the fit and whether the Roman+Rubin fit ran
+    # (no Rubin data -> no Roman+Rubin fit). Saved in the true table.
+    event_params["n_rubin_fit_points"] = (
+        int(sum(len(lc_to_fit.get(b, [])) for b in ("u", "g", "r", "i", "z", "y")))
+        if use_rubin
+        else 0
+    )
+    event_params["fit_rr_status"] = (
+        "fitted" if fit_rr is not None else "skipped_no_rubin_data"
+    )
+
     # ============================================================
     # Verificación obligatoria: simulación y fit misma geometría
     # ============================================================
 
-    validate_event_coordinates(
-        pyLIMAmodel_rr,
-        simulation_event_ra,
-        simulation_event_dec,
-        label="Rubin+Roman/Rubin fit",
-    )
+    if pyLIMAmodel_rr is not None:
+        validate_event_coordinates(
+            pyLIMAmodel_rr,
+            simulation_event_ra,
+            simulation_event_dec,
+            label="Rubin+Roman/Rubin fit",
+        )
 
     if pyLIMAmodel_roman is not None:
         validate_event_coordinates(

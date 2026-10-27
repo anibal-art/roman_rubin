@@ -173,6 +173,16 @@ def sim_fit_multi_fits(
         primary_result["fit_specs"] = fit_specs_use
         return primary_result if return_data else primary_result
 
+    if primary_result.get("fit_rr") is None:
+        # No Rubin data: no Roman+Rubin fit, so no fits/LRT on Rubin's
+        # contribution for this event.
+        primary_result["multi_fit_status"] = "skipped_no_rubin_data"
+        primary_result["multi_fit_reason"] = (
+            "no Rubin data: the Roman+Rubin fit was not run"
+        )
+        primary_result["fit_specs"] = fit_specs_use
+        return primary_result
+
     Source = int(i)
     seed = int(i)
     pyLIMA_parameters = primary_result["pyLIMA_parameters_true"]
