@@ -261,3 +261,51 @@ def remove_empty_telescopes(event, verbose=True):
         )
 
     return event, removed_telescopes
+
+
+def _canonical_telescope_name(name):
+    name = str(name).strip()
+    return "W149" if name.upper() == "W149" else name.lower()
+
+
+def keep_active_telescopes(event, active_bands=None, verbose=True):
+    """
+    Keep only the telescopes listed in active_bands (e.g. the bands a
+    catalogue marks as observable for this event). None keeps all.
+
+    Names are matched case-insensitively for Rubin bands ("Y" == "y");
+    Roman is "W149".
+    """
+    if active_bands is None:
+        return event, []
+
+    if isinstance(active_bands, str):
+        active_bands = [
+            band
+            for band in active_bands.replace(";", ",").split(",")
+            if band.strip()
+        ]
+
+    allowed = {
+        _canonical_telescope_name(band)
+        for band in active_bands
+    }
+
+    kept = []
+    removed = []
+
+    for telescope in event.telescopes:
+        if _canonical_telescope_name(telescope.name) in allowed:
+            kept.append(telescope)
+        else:
+            removed.append(telescope.name)
+
+    event.telescopes = kept
+
+    if verbose and removed:
+        print(
+            "Removed inactive telescopes (active_bands):",
+            removed,
+        )
+
+    return event, removed

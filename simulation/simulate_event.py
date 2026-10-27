@@ -32,6 +32,7 @@ from simulation.telescope_arrays import _capture_prefilter_telescope_times
 from simulation.telescope_arrays import _mask_time_indexed_telescope_arrays
 from simulation.telescope_arrays import inject_model_flux_for_ground_telescopes
 from simulation.telescope_arrays import remove_empty_telescopes
+from simulation.telescope_arrays import keep_active_telescopes
 from timing_utils import StageTimer
 
 
@@ -50,6 +51,7 @@ def sim_event(
     apply_photometric_filter=True,
     rubin_saturation_mag=None,
     roman_saturation_mag=None,
+    noise_seed=None,
 ):
     """
     i (int): índice del evento
@@ -61,6 +63,16 @@ def sim_event(
         Only "source" is supported: Rubin epochs/m5 come from OpSim at the
         event position (data["maf_ra"], data["maf_dec"], or data["ra"],
         data["dec"]), which is also the Event position used for parallax.
+
+    noise_seed (int or None):
+        Seed of the photometric-noise realization. None keeps the
+        historical behaviour (seed = i). A different noise_seed gives an
+        independent noise realization of the same event and cadence.
+
+    data["active_bands"] (optional):
+        Telescopes to simulate (e.g. the bands the catalogue marks as
+        observable). Bands not listed are removed before the model is
+        built, so materialized fluxes are only required for them.
     """
 
     _sim_timer = StageTimer()
@@ -140,7 +152,7 @@ def sim_event(
     _sim_timer.start("simulation_deepcopy")
     new_creation = copy.deepcopy(my_own_creation)
     _sim_timer.stop("simulation_deepcopy")
-    np.random.seed(i)
+    np.random.seed(i if noise_seed is None else int(noise_seed))
 
     # ============================================================
     # Eliminar bandas sin tiempos dentro de la ventana temporal
@@ -149,6 +161,11 @@ def sim_event(
     _sim_timer.start("simulation_remove_empty_telescopes")
     new_creation, removed_telescopes = remove_empty_telescopes(
         new_creation,
+        verbose=True,
+    )
+    new_creation, removed_inactive_telescopes = keep_active_telescopes(
+        new_creation,
+        data.get("active_bands", None),
         verbose=True,
     )
     _sim_timer.stop("simulation_remove_empty_telescopes")
