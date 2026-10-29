@@ -5,9 +5,29 @@ telescope per Rubin band with data, at the RA/Dec of the simulated event
 (resolve_event_coordinates raises if they are missing).
 """
 
+import astropy.units as u
 import numpy as np
 from pyLIMA import event
 from pyLIMA import telescopes
+
+
+def _register_jd_unit():
+    """
+    Register "JD" (= day) as an astropy unit, once.
+
+    pyLIMA declares the time column of every telescope with the unit string
+    "JD", which astropy does not know: each telescope then pays ~10 ms for
+    astropy's "did you mean" suggestions and stores an UnrecognizedUnit.
+    With "JD" registered the parse is immediate; the stored values (.value)
+    are unchanged.
+    """
+    try:
+        u.Unit("JD")
+    except ValueError:
+        u.add_enabled_units([u.def_unit("JD", u.day)])
+
+
+_register_jd_unit()
 
 LSST_BANDS = [
     "u",

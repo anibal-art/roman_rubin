@@ -90,7 +90,9 @@ def bounded_profile_ftotal_2d(magnification, flux, err_flux):
     candidates = []
 
     def _clip(value):
-        return float(np.clip(value, 0.0, fmax))
+        # Same value as float(np.clip(value, 0.0, fmax)) (NaN included);
+        # min/max on Python floats avoids the np.clip call overhead.
+        return min(max(float(value), 0.0), fmax)
 
     def _add(fs, ft, source):
         fs = _clip(fs)
