@@ -532,6 +532,7 @@ def finalize_fit_results(
     fit_model,
     fit_parallax,
     fit_bounds=None,
+    fit_double_source=False,
 ):
     """
     Agrega metadatos al fit_results.
@@ -540,6 +541,7 @@ def finalize_fit_results(
     fit.fit_results["sim_model"] = normalize_model_name(sim_model)
     fit.fit_results["fit_model"] = normalize_model_name(fit_model)
     fit.fit_results["fit_parallax"] = bool(fit_parallax)
+    fit.fit_results["fit_double_source"] = bool(fit_double_source)
     fit.fit_results["rango"] = rango_used
     fit.fit_results["method"] = algo
     fit.fit_results["name"] = event_name

@@ -52,6 +52,8 @@ def sim_event(
     rubin_saturation_mag=None,
     roman_saturation_mag=None,
     noise_seed=None,
+    truth_double_source=False,
+    add_photometric_noise=True,
 ):
     """
     i (int): índice del evento
@@ -68,6 +70,17 @@ def sim_event(
         Seed of the photometric-noise realization. None keeps the
         historical behaviour (seed = i). A different noise_seed gives an
         independent noise realization of the same event and cadence.
+
+    truth_double_source (bool):
+        If True, the true model is pyLIMA's circular double source
+        (binary source with orbital motion), double_source=["Circular", t0];
+        data must then provide xi_para, xi_perp, xi_angular_velocity,
+        xi_phase, xi_inclination, xi_mass_ratio and q_flux (or aliases).
+
+    add_photometric_noise (bool):
+        If False, the photometric uncertainties are computed as usual but
+        no Gaussian noise is drawn: the data lie exactly on the model
+        (Asimov light curve).
 
     data["active_bands"] (optional):
         Telescopes to simulate (e.g. the bands the catalogue marks as
@@ -249,6 +262,8 @@ def sim_event(
         parallax=parallax_arg,
         origin=caustic_origin_arg,
         blend_flux_parameter="ftotal",
+        use_double_source=bool(truth_double_source),
+        t0_double_source=t0,
     )
 
     _sim_timer.stop("simulation_model_choice")
@@ -392,6 +407,7 @@ def sim_event(
         apply_photometric_filter=apply_photometric_filter,
         rubin_saturation_mag=rubin_saturation_mag,
         roman_saturation_mag=roman_saturation_mag,
+        add_photometric_noise=add_photometric_noise,
     )
     _sim_timer.stop("simulation_photometry")
 

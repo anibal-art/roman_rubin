@@ -485,17 +485,14 @@ def _opsim_cache_tag(opsim_db_path=None):
     return f"{safe_stem}_{digest}"
 
 
-def _init_common_roman_rubin(path_ephemerides, rubin_throughputs_dir=None):
+def _init_rubin_bandpasses(rubin_throughputs_dir=None):
     """
-    Inicializa ingredientes comunes:
-    - LSST bandpasses
-    - plantilla Roman
+    Inicializa solo los bandpasses de Rubin (LSST).
 
-    No construye ningún dataSlice de Rubin.
+    No toca la plantilla de Roman ni construye ningún dataSlice.
     """
 
     global _LSST_BANDPASS
-    global _ROMAN_MAG
 
     lsst_filterlist = "ugrizy"
 
@@ -505,8 +502,34 @@ def _init_common_roman_rubin(path_ephemerides, rubin_throughputs_dir=None):
             path_che=rubin_throughputs_dir,
         )
 
+
+def _init_roman_template():
+    """
+    Inicializa solo la plantilla de observación de Roman.
+
+    No resuelve OpSim, no carga throughputs de Rubin y no llama a MAF.
+    """
+
+    global _ROMAN_MAG
+
     if _ROMAN_MAG is None:
         _ROMAN_MAG = _load_or_build_roman_template()
+
+
+def _init_common_roman_rubin(path_ephemerides, rubin_throughputs_dir=None):
+    """
+    Inicializa ingredientes comunes:
+    - LSST bandpasses
+    - plantilla Roman
+
+    No construye ningún dataSlice de Rubin.
+    """
+
+    _init_rubin_bandpasses(
+        rubin_throughputs_dir=rubin_throughputs_dir,
+    )
+
+    _init_roman_template()
 
 
 def _get_source_field_rubin(
@@ -530,7 +553,11 @@ def _get_source_field_rubin(
     global _RUBIN_SOURCE_CACHE
     global LAST_DATASLICE_INFO
 
-    _init_common_roman_rubin(path_ephemerides, rubin_throughputs_dir=rubin_throughputs_dir)
+    # Rubin only: the Roman template is initialized by tel_roman_rubin
+    # when Roman is active.
+    _init_rubin_bandpasses(
+        rubin_throughputs_dir=rubin_throughputs_dir,
+    )
 
     lsst_filterlist = "ugrizy"
 
@@ -940,6 +967,17 @@ def tel_roman_rubin(
         event_Ra = float(Ra)
         event_Dec = float(Dec)
 
+    # ------------------------------------------------------------
+    # Each survey initializes only its own ingredients:
+    #   Roman only  -> Roman template; no OpSim, MAF or Rubin throughputs.
+    #   Rubin only  -> Rubin OpSim/MAF dataSlice and bandpasses; no Roman.
+    #   Roman+Rubin -> both (unchanged).
+    # ------------------------------------------------------------
+
+    if use_roman:
+        _init_roman_template()
+
+    if use_rubin:
         dataSlice_full, rubin_ts = _get_source_field_rubin(
             path_ephemerides,
             event_Ra,
@@ -948,6 +986,8 @@ def tel_roman_rubin(
             opsim_db_path=opsim_db_path,
             rubin_throughputs_dir=rubin_throughputs_dir,
         )
+    else:
+        dataSlice_full, rubin_ts = None, None
 
 
     # ------------------------------------------------------------
@@ -957,7 +997,7 @@ def tel_roman_rubin(
     my_event = _build_event_template(
         event_Ra,
         event_Dec,
-        _ROMAN_MAG,
+        _ROMAN_MAG if use_roman else None,
         rubin_ts,
         path_ephemerides,
         lsst_filterlist=lsst_filterlist,
@@ -982,4 +1022,5 @@ def tel_roman_rubin(
     else:
         dataSlice = None
 
-    return my_event, dataSlice, _LSST_BANDPASS
+    # Rubin bandpasses are only meaningful (and only loaded) with Rubin.
+    return my_event, dataSlice, (_LSST_BANDPASS if use_rubin else None)

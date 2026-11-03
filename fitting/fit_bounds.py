@@ -132,6 +132,11 @@ def _center_for_parameter(parameter_name, fit_params):
     if parameter_name == "piEE":
         return fit_params["piEE"]
 
+    # Any other physical parameter present in fit_params
+    # (e.g. circular double source).
+    if parameter_name in fit_params:
+        return fit_params[parameter_name]
+
     raise KeyError(
         f"No sé cómo obtener centro para {parameter_name}"
     )
@@ -295,6 +300,7 @@ def apply_custom_bounds(
     fit_parallax=True,
     fit_bounds=None,
     Origin=None,
+    param_order_override=None,
 ):
     """
     Sobreescribe bounds usando un diccionario definido por el usuario.
@@ -309,6 +315,9 @@ def apply_custom_bounds(
         fit_parallax=fit_parallax,
         Origin=Origin,
     )
+
+    if param_order_override is not None:
+        param_order = list(param_order_override)
 
     for par in param_order:
 
@@ -591,6 +600,7 @@ def apply_fit_bounds(
     fit_parallax=True,
     fit_bounds=None,
     Origin=None,
+    param_order_override=None,
 ):
     """
     Aplica bounds según rango y, opcionalmente, sobreescribe
@@ -630,6 +640,7 @@ def apply_fit_bounds(
             fit_parallax=fit_parallax,
             fit_bounds=fit_bounds,
             Origin=Origin,
+            param_order_override=param_order_override,
         )
 
     write_transformed_bounds(fit)

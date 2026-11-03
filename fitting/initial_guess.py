@@ -275,6 +275,7 @@ def resolve_initial_guess(
             fit_model,
             fit_parallax=fit_parallax,
             Origin=Origin,
+            param_order_override=param_order,
         )
 
         source = "fit_params"

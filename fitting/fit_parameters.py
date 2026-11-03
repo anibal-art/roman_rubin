@@ -339,9 +339,13 @@ def fit_guess_values(
     fit_model,
     fit_parallax=True,
     Origin=None,
+    param_order_override=None,
 ):
     """
     Devuelve los valores iniciales en el orden esperado por pyLIMA.
+
+    param_order_override: orden explícito (p. ej. con los parámetros de
+    fuente doble); los parámetros extra se toman de fit_params.
     """
     fit_model = normalize_model_name(fit_model)
 
@@ -365,6 +369,15 @@ def fit_guess_values(
         values["piEN"] = fit_params["piEN"]
         values["piEE"] = fit_params["piEE"]
 
+    if param_order_override is not None:
+        for key, value in fit_params.items():
+            values.setdefault(key, value)
+
+        return [
+            values[p]
+            for p in param_order_override
+        ]
+
     order = fit_parameter_order(
         fit_model,
         fit_parallax=fit_parallax,
@@ -384,6 +397,7 @@ def build_fit_pyLIMA_model(
     Origin=None,
     fit_parallax=True,
     fancy_parameters=None,
+    fit_double_source=False,
 ):
     """
     Construye el modelo pyLIMA que se va a ajustar.
@@ -406,4 +420,8 @@ def build_fit_pyLIMA_model(
         origin=Origin,
         blend_flux_parameter="ftotal",
         fancy_parameters=fancy_parameters,
+        use_double_source=bool(fit_double_source),
+        t0_double_source=(
+            fit_params["t0"] if fit_double_source else None
+        ),
     )

@@ -416,9 +416,13 @@ def apply_roman_rubin_photometry(
     apply_photometric_filter=True,
     rubin_saturation_mag=None,
     roman_saturation_mag=None,
+    add_photometric_noise=True,
 ):
     """
     Aplica fotometría simulada a los telescopios activos.
+
+    add_photometric_noise=False keeps the uncertainties but draws no
+    Gaussian noise (Asimov light curve).
 
     Si apply_photometric_filter=True:
         mantiene el comportamiento viejo y aplica filter_band().
@@ -449,6 +453,7 @@ def apply_roman_rubin_photometry(
                 telescope=telo,
                 zero_point=ZP[telo.name],
                 apply_photometric_filter=apply_photometric_filter,
+                add_noise=add_photometric_noise,
             )
 
             if len(telo.lightcurve["mag"]) != 0:
@@ -531,7 +536,11 @@ def apply_roman_rubin_photometry(
                 )[0]
 
                 err_mag.append(magerr_k)
-                obs_mag.append(np.random.normal(ym[k], magerr_k))
+                obs_mag.append(
+                    np.random.normal(ym[k], magerr_k)
+                    if add_photometric_noise
+                    else float(ym[k])
+                )
                 obs_time.append(X[k])
                 M5.append(m5_k)
                 SAT.append(sat_k)

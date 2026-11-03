@@ -114,6 +114,7 @@ def apply_roman_f146_photometry(
     background_level=None,
     systematic_floor_frac=None,
     snr_min=None,
+    add_noise=True,
 ):
     """
     Replace the Roman/W149 placeholder photometry by the
@@ -295,7 +296,7 @@ def apply_roman_f146_photometry(
             finite_sigma
         )
 
-    if np.any(draw_mask):
+    if add_noise and np.any(draw_mask):
         observed_mag_vega[draw_mask] = np.random.normal(
             model_mag_vega[draw_mask],
             sigma_mag[draw_mask],
