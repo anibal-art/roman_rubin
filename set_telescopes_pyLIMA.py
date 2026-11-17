@@ -43,6 +43,8 @@ from simulation.roman_cadence import (  # noqa: F401  (moved; re-exported)
     _structured_to_matrix,
     _roman_nominal_and_off_seasons,
     _simulate_roman_season,
+    _simulate_roman_low_cadence_season,
+    ROMAN_SCHEDULE_VERSION,
 )
 from simulation.time_windows import (  # noqa: F401  (moved; re-exported)
     _get_col_values,
@@ -815,7 +817,9 @@ def _load_or_build_roman_template():
     """
     Lee o genera la plantilla completa Roman W149.
     """
-    rt_name = "roman_template_W149"
+    # the schedule version is part of the name: a new schedule never reuses
+    # a template cached with the old one
+    rt_name = f"roman_template_W149_{ROMAN_SCHEDULE_VERSION}"
     rt_npz = _npz_path(rt_name)
 
     if rt_npz.exists():
@@ -855,10 +859,7 @@ def _load_or_build_roman_template():
         lightcurve_fluxes.append(lc)
 
     for season in off_seasons:
-        lc = _simulate_roman_season(
-            season,
-            sampling=24 * 3,
-        )
+        lc = _simulate_roman_low_cadence_season(season)
         lightcurve_fluxes.append(lc)
 
     combined_array = np.concatenate(
