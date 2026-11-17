@@ -39,11 +39,11 @@ def _structured_to_matrix(arr, fields):
     return arr
 
 
-ROMAN_SCHEDULE_VERSION = "gbtds_rotac2025_v1"
+ROMAN_SCHEDULE_VERSION = "gbtds_rotac2025_v2"   # v1: low-cadence epochs 121 min apart (constant off by 10)
 
 # Bulge visibility windows (~72 d). High-cadence monitoring lasts 70.5 d,
 # centred in the window; the first season is shortened by 2 d at its start.
-HIGH_CADENCE_DAYS = 0.084027777777778   # 12.1 min, F146 epoch spacing (days)
+HIGH_CADENCE_DAYS = 12.1 / 1440.0       # 12.1 min, F146 epoch spacing (days)
 HIGH_SEASON_MONITORING_DAYS = 70.5
 FIRST_SEASON_SHORTENING_DAYS = 2.0
 LOW_CADENCE_PERIOD_DAYS = 5.0           # one microlensing unit every 5 days
